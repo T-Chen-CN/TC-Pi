@@ -194,17 +194,6 @@ export function createBrowserApi(): PiDesktopApi {
 				void refreshState().catch(() => undefined);
 				return result.session;
 			},
-			createAnonymous: async (input) => {
-				const result = await request<{
-					session: SessionRecord;
-					runtime: SessionRuntimeInfo;
-				}>("/api/sessions/anonymous", {
-					method: "POST",
-					body: JSON.stringify(input),
-				});
-				void refreshState().catch(() => undefined);
-				return result;
-			},
 			updateRecord: async (sessionId, patch) => {
 				const result = await request<{ session: SessionRecord }>(`/api/sessions/${encodeURIComponent(sessionId)}/update`, { method: "POST", body: JSON.stringify(patch) });
 				void refreshState().catch(() => undefined);

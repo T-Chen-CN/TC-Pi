@@ -1,22 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AgentBackend, AgentTab, Project, SessionRecord, SessionSortModeId } from "../../../shared/types";
-import { agentInventoryAtom, projectInventoryAtom, rpcLoggingAgentIdsAtom, sessionCatalogLoadStateAtom, sessionIdsByProjectAtom, sessionRecordsAtom, sidebarExpandedProjectIdsAtom, sidebarNavTabAtom, sidebarRuntimeAtom, toggleRpcLoggingAgent } from "../atoms";
+import type { AgentTab, Project, SessionRecord, SessionSortModeId } from "../../../shared/types";
+import { agentInventoryAtom, projectInventoryAtom, rpcLoggingAgentIdsAtom, sessionCatalogLoadStateAtom, sessionIdsByProjectAtom, sessionRecordsAtom, sidebarExpandedProjectIdsAtom, sidebarRuntimeAtom, toggleRpcLoggingAgent } from "../atoms";
 import { migrateLegacyCollapsedProjects, sameProjectIdSet, writeExpandedSidebarProjects } from "../utils/sidebarExpandedProjects";
-import { parseSidebarNavTab, writeSidebarNavTab, type SidebarNavTab } from "../utils/sidebarNavTab";
-import { SESSION_FILTER_PILLS, parseSessionFilterState, serializeSessionFilterState, sessionPillOf, type SessionFilterPill, type SessionFilterState } from "../sessionFilterPills";
-import { resolveSessionSortMode } from "../sessionSortModes";
 
 export const SIDEBAR_PROJECT_CHILD_PAGE_SIZE = 5;
 
-/** 侧栏过滤类别：来源 + DSH 后端（会话归属见 sessionFilterPills.sessionPillOf）。 */
-export type SidebarSourceFilter = Set<SessionFilterPill> | null;
-export type SidebarSourceFilters = SessionFilterState;
-export type SidebarSourceFilterMenu = {
-	projectId: string;
-	x: number;
-	y: number;
-};
 export type SidebarMenuTarget =
 	| { kind: "project"; projectId: string; x: number; y: number }
 	| { kind: "agent"; agentId: string; pinnable?: boolean; x: number; y: number }
@@ -45,14 +34,10 @@ export type SidebarController = {
 	catalog: SidebarCatalog;
 	search: string;
 	setSearch: (search: string) => void;
-	/** 侧栏 Chats/项目分段当前选中；记忆上次选择，双写到 localStorage 与 settings.json */
-	navTab: SidebarNavTab;
-	setNavTab: (tab: SidebarNavTab) => void;
 	/** Stable SessionRecord ids pinned within their owning project list. */
 	pinnedSessionIds: ReadonlySet<string>;
-	/** 当前会话排序模式（settings.sessionSortMode 的运行时快照） */
+	/** 固定创建时间倒序；忽略旧版可配置排序值。 */
 	sessionSortMode: SessionSortModeId;
-	setSessionSortMode: (mode: SessionSortModeId) => void;
 	isSessionPinned: (sessionId: string) => boolean;
 	toggleSessionPin: (sessionId: string) => void;
 	expandedProjectIds: ReadonlySet<string>;
@@ -62,14 +47,6 @@ export type SidebarController = {
 	setProjectExpanded: (projectId: string, forceExpand?: boolean) => void;
 	/** 批量折叠/展开工作区项目：任一展开则全折叠，全折叠则全展开；Chat 由自己标题栏控制。 */
 	toggleCollapseAllProjects: () => void;
-	sourceFilterFor: (projectId: string) => SidebarSourceFilter;
-	setSourceEnabled: (projectId: string, source: SessionFilterPill, enabled: boolean) => void;
-	/** Matches the dev filter menu: first source click narrows from All to that source. */
-	toggleSourceFilter: (projectId: string, source: SessionFilterPill) => void;
-	clearSourceFilter: (projectId: string) => void;
-	sourceFilterMenu?: SidebarSourceFilterMenu;
-	openSourceFilter: (projectId: string, x: number, y: number) => void;
-	closeSourceFilter: () => void;
 	visibleChildCountFor: (projectId: string) => number;
 	showMoreChildren: (projectId: string) => void;
 	/** 把项目子项列表收回到默认页大小（与 showMoreChildren 配对）。 */
@@ -106,7 +83,6 @@ export type SidebarController = {
 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-const SOURCE_FILTER_STORAGE_KEY = "pideck-session-source-filter";
 
 export function getBoundSidebarRuntimeAgent(catalog: Pick<SidebarCatalog, "agents" | "runtimeBySessionId">, sessionId: string): AgentTab | undefined {
 	const runtime = catalog.runtimeBySessionId[sessionId];
@@ -142,27 +118,6 @@ export function createSidebarRequestGate() {
 	};
 }
 
-export function readSidebarSourceFilters(storage?: StorageLike): SidebarSourceFilters {
-	if (!storage) return {};
-	try {
-		return parseSessionFilterState(storage.getItem(SOURCE_FILTER_STORAGE_KEY));
-	} catch {
-		return {};
-	}
-}
-
-export function serializeSidebarSourceFilters(filters: SidebarSourceFilters) {
-	return serializeSessionFilterState(filters);
-}
-
-/**
- * 按类别过滤侧栏会话：DSH 会话按 backend 判定（source 恒为 pi），
- * 避免「只选 Pi」时 DSH 会话仍显示 / 只选 DSH 时 pi 会话误显示。
- */
-export function filterSidebarSessions<T extends { source?: import("../../../shared/types").SessionSource; backend?: AgentBackend }>(sessions: readonly T[], filter: SidebarSourceFilter) {
-	return filter === null || filter === undefined ? sessions : sessions.filter((session) => filter.has(sessionPillOf(session)));
-}
-
 export function useSidebarController(
 	options: {
 		storage?: StorageLike;
@@ -174,18 +129,10 @@ export function useSidebarController(
 		persistExpandedProjectIds?: (projectIds: string[]) => void;
 		/** settings.json 中的权威展开集合，首次拿到时覆盖本地缓存 */
 		settingsExpandedProjectIds?: readonly string[];
-		/** 侧栏分段切换状态变更时写入 settings.json；dev 强杀丢 localStorage 时靠它恢复 */
-		persistNavTab?: (tab: SidebarNavTab) => void;
-		/** settings.json 中的权威侧栏分段，首次拿到时覆盖本地缓存 */
-		settingsNavTab?: SidebarNavTab;
 		/** 置顶会话 id 的权威 settings.json 值。 */
 		settingsPinnedSessionIds?: readonly string[];
 		/** 置顶集合变更时写入 settings.json。 */
 		persistPinnedSessionIds?: (sessionIds: string[]) => void;
-		/** 会话排序模式的权威 settings.json 值（settings.sessionSortMode）。 */
-		settingsSessionSortMode?: SessionSortModeId;
-		/** 排序模式切换时写入 settings.json。 */
-		persistSessionSortMode?: (mode: SessionSortModeId) => void;
 		/** 初始 settings.get 已完成；旧 key 迁移必须等此时才允许落盘。 */
 		settingsLoaded?: boolean;
 		/** 权威 settings 已应用且旧 key 已完成迁移后通知 App 开始懒加载会话。 */
@@ -201,17 +148,8 @@ export function useSidebarController(
 	const pageSize = options.pageSize ?? SIDEBAR_PROJECT_CHILD_PAGE_SIZE;
 	const [search, setSearch] = useState("");
 	const [expandedProjectIds, setExpandedProjectIds] = useAtom(sidebarExpandedProjectIdsAtom);
-	const [navTab, setNavTabState] = useAtom(sidebarNavTabAtom);
 	const [pinnedSessionIds, setPinnedSessionIds] = useState<ReadonlySet<string>>(() => new Set());
-	// 排序模式与置顶同策略：settings.json 为权威，controller 独占运行时状态，
-	// 避免迟到的 settings 响应覆盖用户刚切换的选择。
-	const [sessionSortMode, setSessionSortModeState] = useState<SessionSortModeId>(() => resolveSessionSortMode(undefined));
-	const sessionSortModeHydratedRef = useRef(false);
-	const persistSessionSortModeRef = useRef(options.persistSessionSortMode);
-	persistSessionSortModeRef.current = options.persistSessionSortMode;
-	const [sourceFilters, setSourceFilters] = useState<SidebarSourceFilters>(() => readSidebarSourceFilters(options.storage ?? (typeof window === "undefined" ? undefined : window.localStorage)));
 	const [visibleChildCountByProject, setVisibleChildCountByProject] = useState<Record<string, number>>({});
-	const [sourceFilterMenu, setSourceFilterMenu] = useState<SidebarSourceFilterMenu>();
 	const [expandedSubagentGroups, setExpandedSubagentGroups] = useState<Set<string>>(() => new Set());
 	const [expandedWorktreePaths, setExpandedWorktreePaths] = useState<Set<string>>(() => new Set());
 	const [drag, setDrag] = useState<{ sourceProjectId?: string; overProjectId?: string; overPosition?: "before" | "after" }>({});
@@ -234,16 +172,6 @@ export function useSidebarController(
 	const openRpcLogViewerRef = useRef(options.openRpcLogViewer);
 	openRpcLogViewerRef.current = options.openRpcLogViewer;
 
-	useEffect(() => {
-		const storage = options.storage ?? (typeof window === "undefined" ? undefined : window.localStorage);
-		if (!storage) return;
-		try {
-			storage.setItem(SOURCE_FILTER_STORAGE_KEY, serializeSidebarSourceFilters(sourceFilters));
-		} catch {
-			// Local preferences are optional and must not make the Sidebar unusable.
-		}
-	}, [options.storage, sourceFilters]);
-
 	// 置顶状态只落 settings.json：首次 hydration 后由 controller 独占运行时状态，
 	// 避免迟到的 settings 响应覆盖用户刚完成的置顶操作。
 	useEffect(() => {
@@ -253,21 +181,6 @@ export function useSidebarController(
 		pinnedSessionIdsRef.current = hydrated;
 		setPinnedSessionIds(hydrated);
 	}, [options.settingsLoaded, options.settingsPinnedSessionIds]);
-
-	// 排序模式 hydration：与置顶同款一次性合并，迟到的 settings 不覆盖用户刚切的模式
-	useEffect(() => {
-		if (sessionSortModeHydratedRef.current || !options.settingsLoaded) return;
-		sessionSortModeHydratedRef.current = true;
-		const hydrated = resolveSessionSortMode(options.settingsSessionSortMode);
-		setSessionSortModeState(hydrated);
-	}, [options.settingsLoaded, options.settingsSessionSortMode]);
-
-	const setSessionSortMode = useCallback((mode: SessionSortModeId) => {
-		sessionSortModeHydratedRef.current = true;
-		const next = resolveSessionSortMode(mode);
-		setSessionSortModeState(next);
-		persistSessionSortModeRef.current?.(next);
-	}, []);
 
 	const toggleSessionPin = useCallback((sessionId: string) => {
 		if (!sessionId) return;
@@ -279,47 +192,6 @@ export function useSidebarController(
 		setPinnedSessionIds(next);
 		persistPinnedSessionIdsRef.current?.([...next]);
 	}, []);
-
-	// ── 侧栏 Chats/项目分段：localStorage 首屏缓存 + settings.json 可靠落盘（与展开集合同策略） ──
-
-	const navTabRef = useRef(navTab);
-	navTabRef.current = navTab;
-	/** 已合并过 settings.json 的分段状态，避免迟到的 settings 覆盖用户在首屏刚切的标签 */
-	const navTabHydratedRef = useRef(false);
-	const persistNavTabRef = useRef(options.persistNavTab);
-	persistNavTabRef.current = options.persistNavTab;
-
-	/** 更新分段并双写：localStorage 同步落盘 + settings.json 交调用方写入 */
-	const commitNavTab = useCallback(
-		(tab: SidebarNavTab) => {
-			navTabRef.current = tab;
-			setNavTabState(tab);
-			writeSidebarNavTab(storageRef.current, tab);
-			persistNavTabRef.current?.(tab);
-		},
-		[setNavTabState],
-	);
-
-	const setNavTab = useCallback(
-		(tab: SidebarNavTab) => {
-			// 用户点选即视为权威已应用，防止迟到的 settings 回盖
-			navTabHydratedRef.current = true;
-			commitNavTab(tab);
-		},
-		[commitNavTab],
-	);
-
-	// settings.json 为权威来源：首次拿到时覆盖 localStorage 缓存值；缺省/非法保留本地默认 chats
-	const settingsNavTab = options.settingsNavTab;
-	useEffect(() => {
-		if (navTabHydratedRef.current || !options.settingsLoaded) return;
-		navTabHydratedRef.current = true;
-		const parsed = parseSidebarNavTab(settingsNavTab);
-		if (parsed === null || parsed === navTabRef.current) return;
-		navTabRef.current = parsed;
-		setNavTabState(parsed);
-		writeSidebarNavTab(storageRef.current, parsed);
-	}, [options.settingsLoaded, settingsNavTab, setNavTabState]);
 
 	// ── 侧栏展开状态：localStorage 首屏缓存 + settings.json 可靠落盘 ──
 
@@ -441,28 +313,6 @@ export function useSidebarController(
 		settingsHydratedRef.current = true;
 		commitExpandedProjectIds(next);
 	}, [commitExpandedProjectIds, projects]);
-	const setSourceEnabled = useCallback((projectId: string, source: SessionFilterPill, enabled: boolean) => {
-		setSourceFilters((current) => {
-			const previous = current[projectId] ?? null;
-			const next = new Set(previous ?? SESSION_FILTER_PILLS);
-			if (enabled) next.add(source);
-			else next.delete(source);
-			return { ...current, [projectId]: next.size === SESSION_FILTER_PILLS.length ? null : next };
-		});
-	}, []);
-	const toggleSourceFilter = useCallback((projectId: string, source: SessionFilterPill) => {
-		setSourceFilters((current) => {
-			const previous = current[projectId] ?? null;
-			if (previous === null) return { ...current, [projectId]: new Set([source]) };
-			const next = new Set(previous);
-			if (next.has(source)) next.delete(source);
-			else next.add(source);
-			return { ...current, [projectId]: next.size === 0 ? null : next };
-		});
-	}, []);
-	const clearSourceFilter = useCallback((projectId: string) => {
-		setSourceFilters((current) => ({ ...current, [projectId]: null }));
-	}, []);
 	const showMoreChildren = useCallback(
 		(projectId: string) => {
 			setVisibleChildCountByProject((current) => ({
@@ -522,25 +372,15 @@ export function useSidebarController(
 		catalog,
 		search,
 		setSearch,
-		navTab,
-		setNavTab,
 		pinnedSessionIds,
 		isSessionPinned: (sessionId) => pinnedSessionIds.has(sessionId),
 		toggleSessionPin,
-		sessionSortMode,
-		setSessionSortMode,
+		sessionSortMode: "createdAt",
 		expandedProjectIds,
 		isProjectCollapsed: (projectId) => !expandedProjectIds.has(projectId),
 		toggleProject,
 		setProjectExpanded,
 		toggleCollapseAllProjects,
-		sourceFilterFor: (projectId) => sourceFilters[projectId] ?? null,
-		setSourceEnabled,
-		toggleSourceFilter,
-		clearSourceFilter,
-		sourceFilterMenu,
-		openSourceFilter: (projectId, x, y) => setSourceFilterMenu({ projectId, x, y }),
-		closeSourceFilter: () => setSourceFilterMenu(undefined),
 		visibleChildCountFor: (projectId) => visibleChildCountByProject[projectId] ?? pageSize,
 		showMoreChildren,
 		collapseChildren,

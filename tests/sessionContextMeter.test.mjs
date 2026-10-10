@@ -357,14 +357,6 @@ test("picker shows usage inline on the provider group row; provider config pages
 	assert.doesNotMatch(authTab, /ProviderUsageDetails/);
 	assert.doesNotMatch(authTab, /ProviderUsageRow/);
 	assert.match(authTab, /UsageQueryEntryButton/);
-	const dshCards = readFileSync("src/renderer/src/config/DshProviderCards.tsx", "utf8");
-	// DSH 卡片徽章必须走 dsh 链路（配置/凭据都在 $DSH_HOME，不误读 pi 的 usage-probes.json）。
-	assert.match(dshCards, /<ProviderUsageInline provider=\{entry\.key\} variant="card" backend="dsh" \/>/);
-	assert.match(dshCards, /<ProviderUsageInline provider="deepseek" variant="card" backend="dsh" \/>/);
-	assert.doesNotMatch(dshCards, /ProviderUsageDetails/);
-	assert.match(dshCards, /config\.dsh\.modelsCount/);
-	assert.doesNotMatch(dshCards, /ProviderUsageRow/);
-	assert.match(dshCards, /UsageQueryEntryButton/);
 	// 旧胶囊徽标组件已删除（cc-switch 风格无胶囊）
 	assert.equal(existsSync("src/renderer/src/components/app/ProviderUsageBadge.tsx"), false);
 });

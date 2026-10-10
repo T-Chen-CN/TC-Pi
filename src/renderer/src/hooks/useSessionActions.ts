@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { AgentBackend, ArchivedPiSession, CreateAnonymousSessionResult, Project, SessionRecord, SessionLaunchPreferences, SessionSummary } from "../../../shared/types";
+import type { AgentBackend, ArchivedPiSession, Project, SessionRecord, SessionLaunchPreferences, SessionSummary } from "../../../shared/types";
 import { collectSessionSubtreeIds, getSessionEnvironment } from "../../../shared/sessionIdentity";
 import { isSameSessionPath } from "../agentListDisplay";
 import { t } from "../i18n";
@@ -8,7 +8,7 @@ import { t } from "../i18n";
  * 新建会话默认后端（C21 统一真相源）：缺省为 pi（经典后端，2026-12 兼容期
  * 从 dsh 回调）。用户可在设置「默认 Agent 后端」中切换为 dsh；运行时值由
  * useSessionActions 的 options.defaultBackend 注入（App 从 settings 读取）。
- * 引导页/匿名会话/侧栏「+」都经这里或显式传值，避免后端默认值分裂（F2）。
+ * 引导页/侧栏「+」都经这里或显式传值，避免后端默认值分裂（F2）。
  */
 export const DEFAULT_AGENT_BACKEND: AgentBackend = "pi";
 
@@ -55,7 +55,6 @@ export interface UseSessionActionsOptions {
 			deleteArchivedRecord: (archivedPath: string) => Promise<boolean>;
 			deleteArchivedDshSession: (dshSessionId: string) => Promise<boolean>;
 			createDraft: (input: { projectId: string; title: string; backend?: AgentBackend } & SessionLaunchPreferences) => Promise<SessionRecord>;
-			createAnonymous: (input: { projectId: string; title: string; backend?: AgentBackend } & SessionLaunchPreferences) => Promise<CreateAnonymousSessionResult>;
 		};
 	};
 	showToast: (message: string, duration?: number) => void;
@@ -265,29 +264,6 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 		}
 	}
 
-	async function createAnonymousSession(projectId = activeProjectId, preferences: SessionLaunchPreferences = {}, backend: AgentBackend = options.defaultBackend ?? DEFAULT_AGENT_BACKEND): Promise<SessionRecord | undefined> {
-		if (!projectId || creatingSessionDraftRef.current.has(projectId)) return undefined;
-		const project = projects.find((item) => item.id === projectId);
-		if (!project) return undefined;
-		creatingSessionDraftRef.current.add(projectId);
-		try {
-			const { session } = await api.sessions.createAnonymous({
-				projectId,
-				title: t("app.anonymousChatTitle", { name: project.name }),
-				backend,
-				...preferences,
-			});
-			upsertSession(session);
-			commitSessionSelection(projectId, session.id, true);
-			return session;
-		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error), 4000);
-			return undefined;
-		} finally {
-			creatingSessionDraftRef.current.delete(projectId);
-		}
-	}
-
 	return {
 		selectProject,
 		selectSession,
@@ -304,7 +280,6 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 		copySidebarSession,
 		exportSidebarSession,
 		createSessionDraft,
-		createAnonymousSession,
 		dismissSessionTree,
 	};
 }

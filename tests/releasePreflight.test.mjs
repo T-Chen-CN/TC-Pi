@@ -75,25 +75,9 @@ test("buildLanes：release 泳道覆盖全部 --check 型脚本", () => {
 		"--domain prompts --check",
 		"--domain skills --check",
 		"build-announcements.js --check",
-		"check-xueprompts.mjs",
-		"check-dsh-wire-payloads.mjs",
 		"check-electron.mjs",
 	]) {
 		assert.ok(commands.includes(expected), `release 泳道缺步骤：${expected}`);
-	}
-	// DSH 归档步骤：产物存在与否都合法，但必须存在这一步（skipped 或可执行）
-	assert.ok(release.steps.some((step) => step.label.includes("DSH runtime")));
-});
-
-test("buildLanes：DSH 归档缺失时该步带 skipReason 而非硬失败", () => {
-	const release = buildLanes({ testConcurrency: 4, e2e: false }).find((lane) => lane.id === "release");
-	const dshStep = release.steps.find((step) => step.label.includes("DSH runtime"));
-	const tgz = join(process.cwd(), "dist-runtime", `dsh-runtime-${process.platform}-${process.arch}.tgz`);
-	if (!existsSync(tgz)) {
-		assert.ok(dshStep.skipReason, "归档缺失时步骤应带 skipReason");
-		assert.match(dshStep.skipReason, /runtime:pack/);
-	} else {
-		assert.equal(dshStep.skipReason, undefined);
 	}
 });
 

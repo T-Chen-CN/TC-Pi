@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import type { ImageGenConfigFile } from "../src/shared/types/imagegen";
 import { armStartupOverlayDismissal } from "./startupOverlays";
 import { ensureWindowsProfileSkeleton } from "./win-profile";
+import { mockPiShim } from "./mockPiShim";
 
 /**
  * Mock pi fixture（#115 U6）：在隔离 userData 中预置 settings.json，
@@ -100,7 +101,7 @@ export const test = base.extend<
 			const shimName = process.platform === "win32" ? "mock-pi.cmd" : "mock-pi.sh";
 			const shimPath = join(userDataRoot, shimName);
 			const scriptPath = join(repoRoot, "e2e", "mock-pi.cjs");
-			const shimBody = process.platform === "win32" ? `@echo off\r\n"${process.execPath}" "${scriptPath}" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${scriptPath}" "$@"\n`;
+			const shimBody = mockPiShim(process.platform, process.execPath, scriptPath);
 			writeFileSync(shimPath, shimBody);
 			if (process.platform !== "win32") chmodSync(shimPath, 0o755);
 			// 预置设置：customPiPath 指向 shim；piEnvironmentChecked=true 跳过启动

@@ -1041,9 +1041,6 @@ function SessionTab(props: {
 							onDrop={props.onDrop}
 							onDragEnd={props.onDragEnd}
 							onClick={select}
-							onDoubleClick={() => {
-								if (preview) props.onPromotePreview?.(sessionId);
-							}}
 							onAuxClick={(event) => {
 								// 中键关闭（固定 Tab 忽略，需先取消固定），与浏览器 Tab 行为一致
 								if (event.button === 1 && !pinned) close();

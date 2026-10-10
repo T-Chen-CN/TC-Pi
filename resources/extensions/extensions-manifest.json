@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "1.0.1",
-  "bundleSha256": "ef8e35ec40c4284e17d5157babe77cdd1e92a4190f906c56f44b602063d9e189",
-  "fileCount": 26,
+  "bundleSha256": "a221455576b42f03185a5a818a1c3b9fd2fe6f68612535fdf3bf94311a2b49a0",
+  "fileCount": 25,
   "files": [
     {
       "name": "pi-deck-ask-question.ts",
@@ -128,11 +128,6 @@
       "name": "pi-deck-trash-guard.ts",
       "sha256": "db1753e697824cd0de37bf48c5eba56f7d822089c060398561f6cbf108a5b600",
       "bytes": 19539
-    },
-    {
-      "name": "pi-deck-vision.ts",
-      "sha256": "90b38ad76b8deaa632914ed0680c2cdaac437d52d32de80abcd9206583467897",
-      "bytes": 56104
     }
   ]
 }

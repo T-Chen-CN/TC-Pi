@@ -857,15 +857,16 @@ describe("session split edge resolution", () => {
 		assert.match(surfaces, /\.session-split-drop-preview/);
 	});
 
-	it("sidebar sessions share drag MIME and preview/permanent open modes", () => {
-		const tree = readFileSync("src/renderer/src/components/sidebar/SessionTree.tsx", "utf8");
+	it("sidebar sessions share drag MIME and ordinary open without double-click promotion", () => {
+		const tree = readFileSync("src/renderer/src/components/sidebar/WorkspaceSessionList.tsx", "utf8");
 		const injector = readFileSync("src/renderer/src/components/session/SessionRuntimeInjector.tsx", "utf8");
 		const chrome = readFileSync("src/renderer/src/hooks/useSessionWorkspaceChrome.ts", "utf8");
 		const runtime = readFileSync("src/renderer/src/hooks/useSessionRuntimeController.ts", "utf8");
 		const actions = readFileSync("src/renderer/src/hooks/useSessionActions.ts", "utf8");
 		assert.match(tree, /SESSION_TAB_DRAG_MIME/);
-		assert.match(tree, /onDoubleClick/);
-		assert.match(tree, /openSession\(session\.id, "permanent"\)/);
+		assert.match(tree, /actions\.sessions\.open\(item\.projectId,\s*item\.id\)/);
+		assert.match(tree, /setData\(SESSION_TAB_DRAG_MIME,\s*item\.id\)/);
+		assert.doesNotMatch(tree, /onDoubleClick|"permanent"/);
 		// chrome 域从 App 抽出，App 只装配；Tab 登记与 selectSession 解耦
 		assert.match(app, /useSessionWorkspaceChrome/);
 		assert.match(app, /workspaceChrome\.dropSplit/);

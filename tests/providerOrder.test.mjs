@@ -95,8 +95,6 @@ test("契约完整性：供应商排序在主进程设置、配置页两处、DS
 	const settingsStore = read("src/main/settings/SettingsStore.ts");
 	const modelsTab = read("src/renderer/src/config/ModelsTab.tsx");
 	const authTab = read("src/renderer/src/config/AuthTab.tsx");
-	const dshCards = read("src/renderer/src/config/DshProviderCards.tsx");
-	const dshTab = read("src/renderer/src/config/DshConfigTab.tsx");
 	const preferenceState = read("src/renderer/src/hooks/useSessionPreferenceState.ts");
 	const pickerOptions = read("src/renderer/src/components/session/sessionPickerOptions.ts");
 	const pickerHost = read("src/renderer/src/components/session/ComposerPickerHost.tsx");
@@ -109,11 +107,8 @@ test("契约完整性：供应商排序在主进程设置、配置页两处、DS
 	assert.ok(settingsStore.includes('"providerOrder", "dshProviderOrder"'));
 	// 配置页：读设置进 state，重排后落盘；顺序同时喂给模型页、认证页与 DSH 页
 	assert.ok(configModal.includes("setProviderOrder(settings.providerOrder ?? [])"));
-	assert.ok(configModal.includes("setDshProviderOrder(settings.dshProviderOrder ?? [])"));
 	assert.ok(configModal.includes("api.settings.update({ providerOrder: next })"));
-	assert.ok(configModal.includes("api.settings.update({ dshProviderOrder: next })"));
 	assert.equal(configModal.includes("providerOrder={providerOrder}"), true);
-	assert.ok(configModal.includes("providerOrder={dshProviderOrder}"));
 
 	// Pi 模型页 / 认证页：同一份顺序（AuthTab 用 applyProviderOrder 排 allProviders）
 	assert.ok(modelsTab.includes("applyProviderOrder(providerNames, props.providerOrder)"));
@@ -123,12 +118,6 @@ test("契约完整性：供应商排序在主进程设置、配置页两处、DS
 	assert.ok(modelsTab.includes("providerReorder.registerCard(name, element)"));
 	assert.ok(modelsTab.includes('data-provider-head=""'));
 	assert.ok(authTab.includes("applyProviderOrder(Object.keys(data), props.providerOrder)"));
-
-	// DSH 模型页：卡片复用同一 hook；顺序不能写回 DSH providers（host 侧是 merge 语义 patch，表达不了键顺序）
-	assert.ok(dshCards.includes("applyProviderOrder("));
-	assert.ok(dshCards.includes("useProviderReorder("));
-	assert.ok(dshCards.includes('data-provider-head=""'));
-	assert.ok(dshTab.includes("providerOrder={props.providerOrder}"));
 
 	// 模型选择器链路：偏好从 settings 读到 ComposerPickerHost，再传给按顺序分组的选项
 	assert.ok(preferenceState.includes("setProviderOrder(settings.providerOrder ?? [])"));
@@ -172,14 +161,11 @@ test("契约完整性：排序提示与「恢复默认顺序」在四个页都�
 	const configModal = read("src/renderer/src/ConfigModal.tsx");
 	const authTab = read("src/renderer/src/config/AuthTab.tsx");
 	const modelsTab = read("src/renderer/src/config/ModelsTab.tsx");
-	const dshCards = read("src/renderer/src/config/DshProviderCards.tsx");
-	const dshTab = read("src/renderer/src/config/DshConfigTab.tsx");
 
 	// 提示可发现性：排序行为写在设置里，用户遇到「另一页也变了」必须能从界面看到解释
 	for (const [label, source] of [
 		["ModelsTab", modelsTab],
 		["AuthTab", authTab],
-		["DshProviderCards", dshCards],
 	]) {
 		assert.ok(source.includes('t("config.providerOrderHint")') || source.includes('t("config.dsh.providerOrderHint")'), `${label} 缺少排序说明`);
 		assert.ok(source.includes('t("config.providerOrderReset")'), `${label} 缺少恢复默认顺序入口`);
@@ -187,11 +173,6 @@ test("契约完整性：排序提示与「恢复默认顺序」在四个页都�
 	// 重置按钮只在真的排过序时出现（默认状态下不该有可点的无效按钮）
 	assert.ok(modelsTab.includes("(props.providerOrder?.length ?? 0) > 0 && props.onResetProviders"));
 	assert.ok(authTab.includes("(props.providerOrder?.length ?? 0) > 0 && props.onResetProviders"));
-	assert.ok(dshCards.includes("(props.providerOrder?.length ?? 0) > 0 && props.onResetProviders"));
 	// 重置 = 写空数组，落到 SettingsStore 的默认（配置原始顺序）
 	assert.ok(configModal.includes("api.settings.update({ providerOrder: [] })"));
-	assert.ok(configModal.includes("api.settings.update({ dshProviderOrder: [] })"));
-	// DSH 页要透传 scope 与重置回调，否则卡片上的排序入口会静默失效
-	assert.ok(dshTab.includes("providerOrderScope={props.providerOrderScope}"));
-	assert.ok(dshTab.includes("onResetProviders={props.onResetProviders}"));
 });

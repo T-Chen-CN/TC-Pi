@@ -24,8 +24,20 @@ git("init -b main");
 git("config user.email e2e@pideck.local");
 git("config user.name pideck-e2e");
 writeFileSync(join(repoDir, "a.txt"), "hello\n");
+// 模拟 Agent 会在项目内生成会话；这些运行时产物不属于 Git 用例的待提交文件。
+writeFileSync(join(repoDir, ".gitignore"), ".pi/\n");
 git("add .");
 git("commit -m init");
+git("checkout -b feature/graph");
+writeFileSync(join(repoDir, "feature.txt"), "branch\n");
+git("add feature.txt");
+git('commit -m "feature: graph branch"');
+git("tag graph-v1");
+git("checkout main");
+writeFileSync(join(repoDir, "main.txt"), "main\n");
+git("add main.txt");
+git('commit -m "main: parallel change"');
+git('merge --no-ff feature/graph -m "merge: graph branch"');
 
 test.use({
 	seedProjects: [{ id: "e2e-git-repo", name: "GitE2E", path: repoDir }],
@@ -35,26 +47,30 @@ test("git panel: status -> diff -> stage -> commit", async ({ window }) => {
 	test.setTimeout(120_000);
 	await expect(window.locator("#boot-overlay")).toHaveCount(0, { timeout: 20_000 });
 
-	// 侧栏分段(56469f95)后默认停在「聊天」分段，工作区项目行在「项目」分段下，先切换
-	await window.getByRole("tab", { name: "项目" }).click();
-	// 选中种子项目（项目行显示目录 basename），并在该项目下新建会话草案
-	// （头部抽屉开关只在有会话视图时渲染；注意「新建 Agent」图标每个项目行都有，
-	//  必须限定在目标项目行内点击，否则会落到聊天项目上）
-	const projectRow = window.locator(".conversation", { hasText: "pideck-seed-git-repo" }).first();
-	await projectRow.click();
-	await projectRow.getByTitle("普通会话").first().click();
+	await window.getByRole("button", { name: "选择工作区", exact: true }).click();
+	await window.getByTestId("workspace-inline-list").getByRole("button", { name: "GitE2E", exact: true }).click();
+	await window.getByRole("button", { name: "选择会话", exact: true }).click();
+	await window.getByTestId("workspace-session-list").getByRole("button", { name: "新建会话", exact: true }).click();
 	await expect(window.locator(".composer .rich-input")).toHaveAttribute("contenteditable", "true", { timeout: 15_000 });
 
 	// 先展开抽屉（rail 只在抽屉打开期间渲染），再切到 Git tab
 	await window.locator(".header-drawer-toggle").first().click();
 	await expect(window.locator(".detail-drawer")).toHaveAttribute("data-open", "true", { timeout: 5000 });
-	await window.locator('[data-testid="drawer-rail-git"]').click();
+	await expect(window.locator('[data-testid="drawer-rail-git"]')).toBeVisible();
 	// GitPanel 新组件（bg-background）与旧 GitDrawerHost 都带 .git-panel class，
 	// 用 .bg-background 精确定位新面板（detail-drawer git tab 渲染的是它）。
 	const panel = window.locator(".git-panel.bg-background");
 	await expect(panel).toBeVisible({ timeout: 15_000 });
 	// 分支标签反映真实仓库状态
 	await expect(panel.locator(".git-branch-label")).toHaveText("main", { timeout: 15_000 });
+	const graph = panel.locator('[id$="-graph"]');
+	await expect(graph.getByRole("button", { name: /merge: graph branch/ })).toBeVisible();
+	await expect(graph.locator('[data-ref-kind="branch"]', { hasText: "feature/graph" })).toBeVisible();
+	await expect(graph.locator('[data-ref-kind="tag"]', { hasText: "graph-v1" })).toBeVisible();
+	await expect(graph.locator(".git-graph-hash").first()).toHaveText(git("rev-parse --short=7 HEAD"));
+	// Clicking a commit exposes its real changed files and the existing read-only diff viewer.
+	await graph.getByRole("button", { name: /feature: graph branch/ }).click();
+	await expect(graph.getByRole("button", { name: /查看 feature.txt 的提交差异/ })).toBeVisible();
 
 	// 制造一处工作区改动并刷新状态
 	appendFileSync(join(repoDir, "a.txt"), "changed by e2e\n");
@@ -63,6 +79,15 @@ test("git panel: status -> diff -> stage -> commit", async ({ window }) => {
 	await panel.getByRole("button", { name: "刷新" }).first().click();
 	const changedFile = panel.locator(".git-resource-name", { hasText: "a.txt" }).first();
 	await expect(changedFile).toBeVisible({ timeout: 15_000 });
+	await expect(graph.locator(".git-working-tree-row")).toContainText("未提交变动");
+	await graph
+		.locator(".git-working-tree-row")
+		.getByRole("button", { name: /未提交变动/ })
+		.click();
+	await expect(graph.locator(".git-working-tree-row .git-resource-name")).toHaveText("a.txt");
+	await expect(graph.locator(".git-working-tree-row svg").first()).toBeVisible();
+	await expect(graph.locator('path[stroke-dasharray="3 3"]').first()).toHaveAttribute("stroke-width", "1.6");
+	await panel.screenshot({ path: "test-results/git-graph-preview.png" });
 
 	// 行内 diff：点击文件名打开工作区 diff 查看器，确认内容后关闭
 	await panel.locator(".git-resource-open", { hasText: "a.txt" }).first().click();
@@ -82,9 +107,23 @@ test("git panel: status -> diff -> stage -> commit", async ({ window }) => {
 	await panel.locator(".git-commit-btn").click();
 
 	// 提交后面板回到「没有待提交的更改」
-	await expect(panel.locator(".git-status-msg")).toContainText("没有待提交的更改", { timeout: 15_000 });
+	await expect(panel.locator(".git-status-msg").first()).toContainText("没有待提交的更改", { timeout: 15_000 });
+	await expect(graph.locator(".git-working-tree-row")).toHaveCount(0);
+	await expect(graph.getByRole("button", { name: /e2e: update a.txt/ })).toBeVisible({ timeout: 15_000 });
+	// A commit made outside the UI must also arrive through the repository watcher.
+	appendFileSync(join(repoDir, "a.txt"), "external commit\n");
+	git("add a.txt");
+	git('commit -m "external: graph refresh"');
+	await expect(graph.getByRole("button", { name: /external: graph refresh/ })).toBeVisible({ timeout: 15_000 });
+	await window.evaluate(() => {
+		document.documentElement.dataset.theme = "dark";
+	});
+	const laneColors = await graph.locator("svg path").evaluateAll((paths) => [...new Set(paths.map((path) => getComputedStyle(path).stroke))]);
+	expect(laneColors.length).toBeGreaterThan(1);
+	expect(laneColors).not.toContain("rgb(250, 250, 250)");
+	await panel.screenshot({ path: "test-results/git-graph-dark-preview.png" });
 
 	// 仓库侧复核：提交真实存在且为最新一条
 	const log = git("log --oneline -2");
-	expect(log.split("\n")[0]).toContain("e2e: update a.txt");
+	expect(log.split("\n")[1]).toContain("e2e: update a.txt");
 });

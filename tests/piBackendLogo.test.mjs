@@ -88,6 +88,6 @@ test("切换 pi logo 风格不改变 DSH 或其他会话来源品牌", () => {
 test("输入框后端选择、下拉选项和锁定按钮全部复用统一 PiLogo", () => {
 	const source = readFileSync("src/renderer/src/components/session/ComposerComponents.tsx", "utf8");
 	assert.match(source, /import\s*\{[^}]*\bPiLogo\b[^}]*\}\s*from\s*["']\.\/SessionSourceBadge["']/u);
-	assert.equal((source.match(/<PiLogo\b/gu) ?? []).length, 3);
+	assert.match(source, /function ComposerBackendPicker[\s\S]*?return null/);
 	assert.doesNotMatch(source, /viewBox\s*=\s*["']140 140 520 520["']/u);
 });

@@ -6,7 +6,6 @@ const appSource = readFileSync("src/renderer/src/App.tsx", "utf8");
 const desktopApiSource = readFileSync("src/renderer/src/desktopApi.ts", "utf8");
 const mainSource = readFileSync("src/main/index.ts", "utf8");
 const systemIpcSource = readFileSync("src/main/ipc/systemIpc.ts", "utf8");
-const petWindowSource = readFileSync("src/main/pet/PetWindow.ts", "utf8");
 const preloadPathSource = readFileSync("src/main/preloadPath.ts", "utf8");
 const preloadSource = readFileSync("src/preload/index.ts", "utf8");
 const ipcSource = readFileSync("src/shared/ipc.ts", "utf8");
@@ -28,8 +27,6 @@ test("packaged main and pet windows never load the dev server URL", () => {
 	assert.match(mainSource, /!app\.isPackaged/);
 	assert.match(mainSource, /mainWindow\.loadURL\(devRendererUrl\)/);
 	assert.doesNotMatch(mainSource, /is\.dev\s*&&\s*process\.env\.ELECTRON_RENDERER_URL[\s\S]*mainWindow\.loadURL/);
-	assert.match(petWindowSource, /shouldUseDevRendererUrl\(/);
-	assert.match(petWindowSource, /!app\.isPackaged/);
 });
 
 test("main window logs configured preload file and preload reports initialization", () => {
@@ -41,7 +38,6 @@ test("main window logs configured preload file and preload reports initializatio
 	assert.match(mainSource, /existsSync\(mainPreloadPath\)/);
 	assert.match(mainSource, /Main window preload failed/);
 	assert.match(mainSource, /webContents\.on\("preload-error"/);
-	assert.match(petWindowSource, /preparePreloadPath\(sourcePreloadPath, "pet-preload\.js"\)/);
 	assert.match(systemIpcSource, /ipcMain\.on\(ipcChannels\.preloadReady/);
 	assert.match(systemIpcSource, /ipcMain\.on\(ipcChannels\.preloadError/);
 	assert.match(preloadSource, /ipcChannels\.preloadReady/);

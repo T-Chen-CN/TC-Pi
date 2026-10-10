@@ -59,14 +59,14 @@ function makeDshHost({ ready = true, home = undefined } = {}) {
 	};
 }
 
-test("一键安装：pi models.json 写入 provider（baseUrl/归因头/模型），DSH 走 host 写入", async () => {
+test("一键安装：pi models.json 写入 provider（baseUrl/归因头/模型），不调用旧后端", async () => {
 	const configManager = makeConfigManager();
 	const dshHost = makeDshHost({ ready: true });
 	const result = await installer.installTokendanceProvider({ configManager, dshHost, tokendanceCatalog: makeCatalog() }, {});
 	assert.equal(result.ok, true);
 	assert.equal(result.modelCount, 2);
 	assert.equal(result.piSaved, true);
-	assert.equal(result.dshSaved, true);
+	assert.equal(result.dshSaved, false);
 
 	const provider = configManager._dump()["tokendance"];
 	assert.equal(provider.baseUrl, "https://tokendance.space/gateway/v1");
@@ -82,12 +82,7 @@ test("一键安装：pi models.json 写入 provider（baseUrl/归因头/模型�
 	assert.equal(byId(provider.models, "deepseek-v4-flash").contextWindow, 128000);
 
 	// DSH 侧：llm-pi-ai.providers.tokendance（displayName/baseURL/api/apiKeyEnv/models）+ 凭证
-	const dshCall = dshHost._calls.updateSettings[0];
-	assert.equal(dshCall.ns, "llm-pi-ai");
-	assert.equal(dshCall.patch.providers.tokendance.displayName, "TokenDance");
-	assert.equal(dshCall.patch.providers.tokendance.baseURL, "https://tokendance.space/gateway/v1");
-	assert.equal(dshCall.patch.providers.tokendance.apiKeyEnv, "TOKENDANCE_API_KEY");
-	assert.equal(dshCall.patch.providers.tokendance.models.length, 2);
+	assert.equal(dshHost._calls.updateSettings.length, 0);
 	// 未传 apiKey 时不写凭证（Key 由用户后续经 OAuth/粘贴提供）
 	assert.equal(dshHost._calls.setCredential.length, 0);
 });
@@ -99,7 +94,7 @@ test("传入 apiKey：写入 pi provider.apiKey（与 ModelsTab 编辑器一致�
 	assert.equal(result.ok, true);
 	assert.equal(configManager._dump()["tokendance"].apiKey, "sk-test-123");
 	// Key 同步写入 DSH 凭证
-	assert.equal(dshHost._calls.setCredential[0]?.value, "sk-test-123");
+	assert.equal(dshHost._calls.setCredential.length, 0);
 });
 
 test("幂等：models.json 已有 tokendance 条目时保留既有 apiKey，仅更新模型/端点", async () => {
@@ -125,7 +120,7 @@ test("目录为空：返回 ok=false，不写任何配置", async () => {
 	assert.equal(dshHost._calls.updateSettings.length, 0);
 });
 
-test("DSH 写入失败：pi 侧仍成功（dshSaved=false 且 dshError 带回原因）", async () => {
+test("旧后端不可用时仍只保存 pi", async () => {
 	const configManager = makeConfigManager();
 	const dshHost = makeDshHost({ ready: true });
 	dshHost.updateSettings = async () => {
@@ -135,7 +130,7 @@ test("DSH 写入失败：pi 侧仍成功（dshSaved=false 且 dshError 带回原
 	assert.equal(result.ok, true);
 	assert.equal(result.piSaved, true);
 	assert.equal(result.dshSaved, false);
-	assert.equal(result.dshError, "settings rejected");
+	assert.equal(result.dshError, undefined);
 	assert.equal(configManager._dump()["tokendance"].models.length, 2);
 });
 
@@ -159,9 +154,7 @@ test("contextWindow 非正整数（0）不写入：pi 报 invalid contextWindow 
 	assert.equal(byId(savedModels, "seedream-5.0-lite").contextWindow, undefined);
 	assert.equal(byId(savedModels, "glm-4.7").contextWindow, 200000);
 	// DSH 侧同步过滤：DSH schema contextWindow min(1) 拒绝 0，必须不写入
-	const dshModels = dshHost._calls.updateSettings[0].patch.providers.tokendance.models;
-	assert.equal(byId(dshModels, "seedream-5.0-lite").contextWindow, undefined);
-	assert.equal(byId(dshModels, "glm-4.7").contextWindow, 200000);
+	assert.equal(dshHost._calls.updateSettings.length, 0);
 });
 
 test("安装前强制 refresh 目录（旧缓存可能含坏数据；refresh 失败降级 getModels）", async () => {

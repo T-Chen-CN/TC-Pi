@@ -72,8 +72,9 @@ test("the dev workspace toolbar persists for inactive agents and the empty state
 	assert.match(appSource, /const sessionToolActions: SessionToolAction\[\] = \[/);
 	assert.match(appSource, /id: "terminal"/);
 	assert.match(appSource, /toolActions=\{sessionToolActions\}/);
-	// files/git/browser 由右侧抽屉活动栏统一承载；Git 仍受设置与项目上下文门控。
-	assert.match(appSource, /<WorkspaceDrawerRail[\s\S]*?id: "files"[\s\S]*?id: "git"[\s\S]*?id: "browser"/);
+	// 文件树常驻左栏；Git/browser 留在右侧活动栏。
+	assert.match(appSource, /workspaceFiles=\{<WorkspaceFileExplorer\s+projectId=\{activeProjectId\}/);
+	assert.match(appSource, /<WorkspaceDrawerRail[\s\S]*?id:\s*"git"[\s\S]*?id:\s*"browser"/);
 });
 
 test("typing in the current Composer prewarms its runtime once", () => {

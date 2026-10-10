@@ -162,9 +162,6 @@ export class WebWorkspaceRoutes {
 			if (url.pathname === "/api/git/log") return await this.gitLog(url, response);
 			if (url.pathname === "/api/files") return await this.listFiles(url, response);
 			if (url.pathname === "/api/file-content") return await this.fileContent(url, response);
-			if (url.pathname === "/api/prompts") return await this.listPrompts(url, response);
-			const promptDetailMatch = url.pathname.match(/^\/api\/prompts\/([^/]+)$/);
-			if (promptDetailMatch) return await this.promptDetail(promptDetailMatch[1], url, response);
 			if (url.pathname === "/api/skills" && request.method === "GET") return await this.listSkills(response);
 			if (url.pathname === "/api/skills/toggle" && request.method === "POST") return await this.toggleSkill(request, response);
 			if (url.pathname === "/api/extensions" && request.method === "GET") return await this.listExtensions(response);

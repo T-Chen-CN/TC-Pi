@@ -4,7 +4,6 @@ import test from "node:test";
 import { readRendererStyles } from "./helpers/rendererStyles.mjs";
 
 const pagination = readFileSync("src/renderer/src/components/ui-shadcn/pagination.tsx", "utf8");
-const yao = readFileSync("src/renderer/src/config/YaoPromptTab.tsx", "utf8");
 const styles = readRendererStyles();
 
 test("shared Pagination provides labeled prev/next, page window and jump input", () => {
@@ -18,13 +17,6 @@ test("shared Pagination provides labeled prev/next, page window and jump input",
 	assert.match(pagination, /t\("pagination\.jumpTo"\)/);
 	assert.match(pagination, /Math\.max\(1, page - 1\)/);
 	assert.match(pagination, /Math\.min\(totalPages, page \+ 1\)/);
-});
-
-test("YaoPrompt pagination uses the shared component and no legacy CSS remains", () => {
-	assert.match(yao, /<Pagination[\s\S]*page=\{page\}[\s\S]*totalPages=\{totalPages\}[\s\S]*onPageChange=\{setPage\}/);
-	assert.doesNotMatch(yao, /yao-pagination/);
-	assert.doesNotMatch(styles, /\.yao-pagination\b/);
-	assert.doesNotMatch(styles, /\.yao-pagination-info/);
 });
 
 test("dead CSS sweep removed unreferenced classes from style files", () => {

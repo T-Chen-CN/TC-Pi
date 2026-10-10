@@ -49,6 +49,11 @@ import {
 	toggleRpcLoggingAgent,
 } from "./atoms";
 import { type SidebarActions } from "./components/sidebar/SidebarContent";
+import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation";
+import { useHomeOverview } from "./hooks/useHomeOverview";
+import { HomeOverview } from "./components/home/HomeOverview";
+import { HomeProviders } from "./components/home/HomeProviders";
+import { WorkspaceFileExplorer } from "./components/sidebar/WorkspaceFileExplorer";
 import { AppSidebar } from "./components/sidebar/AppSidebar";
 import { AppBootstrap } from "./components/app/AppBootstrap";
 import { SettingsFeatureRoot } from "./components/app/SettingsFeatureRoot";
@@ -136,16 +141,11 @@ import {
 } from "./atoms";
 import { isSameSessionPath } from "./agentListDisplay";
 import { t } from "./i18n";
-import { isChatProject, loadSessionSourceFilter, saveSessionSourceFilter, isReplacementForPendingAgent, isPendingAgentId, migrateAgentRecord, stampIdleSessionDuration, type PendingAgentTab } from "./rendererUtils";
+import { isChatProject, isReplacementForPendingAgent, isPendingAgentId, migrateAgentRecord, stampIdleSessionDuration, type PendingAgentTab } from "./rendererUtils";
 import { reorderProjectList } from "./utils/projectOrder";
-import { MiniOverlaySurface } from "./components/mini-overlay/MiniOverlaySurface";
-import type { SessionFilterPill } from "./sessionFilterPills";
 import { useResize } from "./hooks/useResize";
 import { ARCHIVED_SESSION_TOAST_MS, archivedSessionToastMessage, useSessionActions } from "./hooks/useSessionActions";
 import { useScratchPad } from "./hooks/useScratchPad";
-import { useDshRuntimeStatusSync } from "./hooks/useDshRuntimeStatusSync";
-import { useDshRuntimeMigrationNotice } from "./hooks/useDshRuntimeMigrationNotice";
-import { useDshRuntimeInstallProgressSync } from "./hooks/useDshRuntimeInstallProgressSync";
 import { useWorktreeActions } from "./hooks/useWorktreeActions";
 import { ChatSessionPane } from "./components/session/ChatSessionPane";
 import { SessionSplitStage } from "./components/session/SessionSplitStage";
@@ -172,7 +172,6 @@ import { WorkbenchContent } from "./components/workspace/WorkbenchContent";
 import { RenameModals } from "./components/RenameModals";
 import { SessionActionOverlays } from "./components/overlays/SessionActionOverlays";
 import { SessionProxyDialog } from "./components/session/SessionProxyDialog";
-import { CuaApprovalDialog, useCuaApproval } from "./components/overlays/CuaApprovalDialog";
 
 import { ImportOverlayHost } from "./components/overlays/ImportOverlayHost";
 import { EnvironmentOverlay } from "./components/overlays/EnvironmentOverlay";
@@ -334,7 +333,6 @@ export function App() {
 	} | null>(null);
 	const [renamingFileInput, setRenamingFileInput] = useState("");
 	/** 历史会话来源过滤（按项目）：undefined=显示全部，Record 含项目ID对应 Set（含 DSH 类别） */
-	const [sessionSourceFilter] = useState<Record<string, Set<SessionFilterPill> | null>>(() => loadSessionSourceFilter());
 	/** 编辑器展示模式：弹框或侧栏 */
 	// showToast 必须是稳定回调：文件树 / overlay 等 effect 若把它当依赖，
 	// 每次 render 新建函数会把 setFiles([]) 打成无限更新（设置/关窗点不动）。
@@ -351,27 +349,6 @@ export function App() {
 			})
 			.catch(() => undefined);
 	}, [showToast]);
-	// ACP 工具表（settings.acpTools 快照）：挂载时拉一次供新建会话菜单/设置页共享；
-	// 后续变更由设置页保存后整表回写 acpToolsAtom，不做事件订阅（改动频率极低）。
-	// 同一次拉取顺带同步 acpEnabled 快照：菜单组仅在开关开启时渲染（主进程同规则门控注册）。
-	useEffect(() => {
-		let cancelled = false;
-		void api.acp
-			.listTools()
-			.then((tools) => {
-				if (!cancelled) store.set(acpToolsAtom, tools);
-			})
-			.catch(() => undefined);
-		void api.settings
-			.get()
-			.then((settings) => {
-				if (!cancelled) store.set(acpEnabledAtom, settings.acpEnabled === true);
-			})
-			.catch(() => undefined);
-		return () => {
-			cancelled = true;
-		};
-	}, [store]);
 	// 历史命令：按 agent 隔离，agent 关闭即清除（不持久化）
 	const promptHistoryRef = useRef<Record<string, string[]>>({});
 
@@ -409,15 +386,16 @@ export function App() {
 		loadPersistedWidth: loadDrawerWidth,
 		persistWidth: persistDrawerWidth,
 	});
-	const drawer = workspace.drawer;
+	// 兼容旧布局缓存：文件树已迁左栏，历史 files 面板在右侧展示 Git。
+	const drawer = workspace.drawer === "files" ? "git" : workspace.drawer;
 	const drawerCollapsed = workspace.drawerCollapsed;
-	// 右侧栏总开关：已打开则关闭，否则打开 files（默认关闭，手动打开）
+	// 右侧工具栏总开关：已打开则关闭，否则打开 Git。
 	const toggleRightDrawer = useCallback(() => {
 		if (workspace.drawer) {
 			workspace.closeDrawer();
 			return;
 		}
-		workspace.openDrawer("files");
+		workspace.openDrawer("git");
 	}, [workspace]);
 	const browserFullscreen = workspace.browserFullscreen;
 	const externalEditors = workspace.externalEditors;
@@ -786,16 +764,6 @@ export function App() {
 	});
 
 	const scratchPad = useScratchPad(workspace);
-	// CUA 操作审批：根级订阅主进程推送的审批请求并渲染确认弹框（事件驱动，全局唯一一份）。
-	const cuaApproval = useCuaApproval();
-	// DSH runtime 安装态同步：全进程只挂这一份（IPC 拉取 + 变更订阅 → dshRuntimeStatusAtom）。
-	// 必须早于任何按安装态门控的 UI 计算，否则首帧会用 checking 初值渲染。
-	useDshRuntimeStatusSync();
-	// DSH runtime 安装进度同步：App 级订阅（常驻，不随 DshRuntimeSection 卸载），
-	// 保证切配置分页/关弹窗后进度仍保留；完成/失败时弹全局 toast。
-	useDshRuntimeInstallProgressSync();
-	// 存量 dsh 用户升级后 runtime 不在时给一次直达提示（有 dsh 会话才提示，只提示一次）。
-	useDshRuntimeMigrationNotice();
 
 	const activeProjectRuntimeCapabilities = useProjectRuntimeCapabilities(activeProjectId);
 	const activeProject = projects.find((project) => project.id === activeProjectId);
@@ -1085,6 +1053,7 @@ export function App() {
 	// 会话内文件链接路由：两个口子分开——
 	// 会话文件链接域（分级打开/安全门/抽屉切换）收口到 useSessionFileLinks
 	const { openSessionFilePath, requestExternalPathOpen, externalPathOpenDialog, handleOpenLinkedFile, handleToolDrawerAction } = useSessionFileLinks({
+		onRevealFiles: () => setListCollapsed(false),
 		activeAgent,
 		activeProject,
 		currentSessionId,
@@ -1115,7 +1084,6 @@ export function App() {
 		copySidebarSession: runCopySidebarSession,
 		exportSidebarSession: runExportSidebarSession,
 		createSessionDraft: runCreateSessionDraft,
-		createAnonymousSession: runCreateAnonymousSession,
 		dismissSessionTree,
 	} = useSessionActions({
 		openSessionRequestRef,
@@ -1244,15 +1212,6 @@ export function App() {
 		[runCreateSessionDraft, workspaceChrome],
 	);
 
-	const createAnonymousSessionWithTab = useCallback(
-		async (projectId?: string, preferences: SessionLaunchPreferences = {}) => {
-			const session = await runCreateAnonymousSession(projectId, preferences);
-			if (session) workspaceChrome.registerOpenSession(session.id, "permanent");
-			return session;
-		},
-		[runCreateAnonymousSession, workspaceChrome],
-	);
-
 	/**
 	 * 问题反馈「新建会话分析」：在活动项目新建草稿会话并选中，把 AI 提示词预填进
 	 * 该会话输入框（composer 草稿）。pi 启动后会自动加载项目 AGENTS.md 与技能，
@@ -1319,8 +1278,7 @@ export function App() {
 				const welcomeModel = draftBackend === "dsh" ? readWelcomeDshModelPreference()?.model : readWelcomeModelPreference()?.model;
 				const welcomeThinking = readWelcomeThinkingPreference()?.thinkingLevel;
 				// 统一创建 draft 会话（Chat 项目也走普通会话、可保存）：创建不拉 pi，
-				// selectSessionCommand 同步切页、立即进入会话页；匿名会话仅保留给侧栏
-				// 「新建临时对话」入口（createAnonymousSessionWithTab）。
+				// selectSessionCommand 同步切页、立即进入会话页。
 				// 默认后端跟随设置项（settings.defaultAgentBackend，默认 pi），
 				// 且经 DSH runtime 安装态钳制——runtime 不可用时不会尝试建 dsh 会话。
 				// 激活时 SessionRuntimeCoordinator.applyPreferences → DshAgentManager.setModel
@@ -1416,10 +1374,6 @@ export function App() {
 
 	useEffect(() => {
 		void workspace.loadExternalEditors().catch(() => undefined);
-		void api.imagegen
-			.getConfig()
-			.then(setImageGenConfig)
-			.catch(() => undefined);
 		void api.settings
 			.get()
 			.then((next) => {
@@ -1547,15 +1501,6 @@ export function App() {
 	}, [activeAgentId, activeQueuedPrompts.length, composerRef]);
 
 	// Outline jumps through the same timeline controller that owns pagination and scroll state.
-
-	// 持久化会话来源过滤配置
-	useEffect(() => {
-		try {
-			saveSessionSourceFilter(sessionSourceFilter);
-		} catch (error) {
-			// 静默失败
-		}
-	}, [sessionSourceFilter]);
 
 	// 汇报聚焦会话给主进程：非聚焦会话收到 Ask 请求时触发桌面通知（Task 9）
 	useEffect(() => {
@@ -1722,6 +1667,7 @@ export function App() {
 		await refreshProjects();
 		setActiveProjectId(project.id);
 		await refreshProjectSessions(project.id);
+		return project.id;
 	}
 
 	function updateAfterProjectRemoved(removedProjectId: string, next: Project[]) {
@@ -1809,7 +1755,7 @@ export function App() {
 			if (!images?.length) return;
 			// 历史消息里的参考图是落盘引用（ref），附件栏与后续请求体要的是 base64：
 			// 异步回填，取不到字节的条目丢掉（不阻断提示词回填）。
-			void hydrateImageContents(images, (ref) => window.piDesktop.imagegen.readImageBlob(ref))
+			void hydrateImageContents(images, (ref) => window.piDesktop.images.readBlob(ref))
 				.then((hydrated) => {
 					if (hydrated.length > 0) {
 						setSessionAttachments({ sessionId, value: hydrated });
@@ -2018,12 +1964,6 @@ export function App() {
 			createDraft: async (projectId) => {
 				await createSessionDraftWithTab(projectId);
 			},
-			createAnonymous: async (projectId) => {
-				await createAnonymousSessionWithTab(projectId);
-			},
-			// ACP 工具会话：backend 固定 acp、acpToolId 指向 settings.acpTools 条目。
-			// 工具表已加载进 acpToolsAtom，此处只按 id 取名称作草稿标题；找不到（刚被删）
-			// 提示引导而不是静默失败。创建后与 createDraft 同一条选中/登记链。
 			createAcp: async (projectId, toolId) => {
 				const tool = store.get(acpToolsAtom).find((candidate) => candidate.id === toolId);
 				if (!tool) {
@@ -2135,46 +2075,8 @@ export function App() {
 		},
 	};
 
-	const sidebarContentNode = (
-		<AppSidebar
-			simple={settings.navigationMode === "simple"}
-			listCollapsed={listCollapsed}
-			toggleListCollapsed={toggleListCollapsed}
-			actions={sidebarActions}
-			currentProjectId={activeProjectId}
-			currentSessionId={currentSessionId}
-			worktreesByProject={worktreesByProject}
-			branchByProject={branchByProject}
-			creatingWorktree={worktreeCreating}
-			removingWorktreePaths={removingWorktreePaths}
-			isLanWeb={isLanWeb}
-			// 「新建会话」：清空当前会话并选中活动项目 → 落到初始引导页（居中输入框 + 项目下拉切换），
-			// 用户选择项目后可直接输入对话（首次发送才创建真实会话）。无项目时保持引导页「添加项目」空态。
-			onOpenNewSession={() => {
-				if (activeProjectId) selectProjectCommand(activeProjectId);
-			}}
-			onOpenFeedback={() => overlays.setFeedbackOpen(true)}
-			settingsExpandedProjectIds={settings.sidebarExpandedProjectIds}
-			settingsNavTab={settings.sidebarNavTab}
-			settingsPinnedSessionIds={settings.pinnedSessionIds}
-			settingsSessionSortMode={settings.sessionSortMode}
-			settingsLoaded={settingsLoaded}
-			onExpandedProjectsReady={() => setExpandedProjectsReady(true)}
-			// 关于弹框：版本号/官网/GitHub 链接数据来自 AppInfo IPC（上方 useEffect 已拉取）
-			appInfo={appInfo}
-			// 底栏主题按钮：点击在浅/暗之间翻转；跟随系统/跟随时间退出自动时按当前实际明暗翻到对面，
-			// 保证每次点击都有可见变化。落库后只合并 theme 字段，data-theme 由外观 effect 依赖 settings.theme 重应用。
-			themeMode={settings.theme}
-			onToggleTheme={() => {
-				void api.settings
-					.update({
-						theme: toggleThemeMode(settings, window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false),
-					})
-					.then((saved) => setSettings((current) => ({ ...current, theme: saved.theme })))
-					.catch(() => undefined);
-			}}
-		/>
-	);
+	const workspaceNavigation = useWorkspaceNavigation(sidebarActions, activeProjectId, currentSessionId);
+	const refreshHomeOverview = useHomeOverview(workspaceNavigation.page === "home" && !quickTask.active);
 
 	// Gate 4.6 — Session view wrapped in SessionRuntimeInjector / ChatSessionPane
 
@@ -2801,7 +2703,6 @@ export function App() {
 		sessionsProjectId,
 		files,
 		sessions,
-		sessionSourceFilter,
 		sessionHistoryLoading,
 		expandedDirs,
 		onToggleDirectory: toggleDirectory,
@@ -2888,6 +2789,47 @@ export function App() {
 		},
 	});
 
+	const sidebarContentNode = (
+		<AppSidebar
+			navigation={workspaceNavigation}
+			workspaceFiles={<WorkspaceFileExplorer projectId={activeProjectId} files={drawerPorts.files} />}
+			simple={settings.navigationMode === "simple"}
+			listCollapsed={listCollapsed}
+			toggleListCollapsed={toggleListCollapsed}
+			actions={workspaceNavigation.actions}
+			currentProjectId={activeProjectId}
+			currentSessionId={currentSessionId}
+			worktreesByProject={worktreesByProject}
+			branchByProject={branchByProject}
+			creatingWorktree={worktreeCreating}
+			removingWorktreePaths={removingWorktreePaths}
+			isLanWeb={isLanWeb}
+			// 「新建会话」：清空当前会话并选中活动项目 → 落到初始引导页（居中输入框 + 项目下拉切换），
+			// 用户选择项目后可直接输入对话（首次发送才创建真实会话）。无项目时保持引导页「添加项目」空态。
+			onOpenNewSession={() => {
+				if (activeProjectId) workspaceNavigation.welcome(activeProjectId);
+			}}
+			onOpenFeedback={() => overlays.setFeedbackOpen(true)}
+			settingsExpandedProjectIds={settings.sidebarExpandedProjectIds}
+			settingsPinnedSessionIds={settings.pinnedSessionIds}
+			settingsLoaded={settingsLoaded}
+			onExpandedProjectsReady={() => setExpandedProjectsReady(true)}
+			// 关于弹框：版本号/官网/GitHub 链接数据来自 AppInfo IPC（上方 useEffect 已拉取）
+			appInfo={appInfo}
+			// 底栏主题按钮：点击在浅/暗之间翻转；跟随系统/跟随时间退出自动时按当前实际明暗翻到对面，
+			// 保证每次点击都有可见变化。落库后只合并 theme 字段，data-theme 由外观 effect 依赖 settings.theme 重应用。
+			themeMode={settings.theme}
+			onToggleTheme={() => {
+				void api.settings
+					.update({
+						theme: toggleThemeMode(settings, window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false),
+					})
+					.then((saved) => setSettings((current) => ({ ...current, theme: saved.theme })))
+					.catch(() => undefined);
+			}}
+		/>
+	);
+
 	return (
 		// 非会话静态区域使用当前焦点作为兜底；每个 SessionRuntimeInjector 会用本栏 cwd/project 覆盖。
 		<FileLinkBaseProvider baseDir={activeAgent?.cwd ?? activeProject?.path} projectId={activeProject?.id} projectRoot={activeProject?.path} sessionId={currentSessionId}>
@@ -2910,24 +2852,7 @@ export function App() {
 						) : undefined
 					}
 					compactContent={
-						// 极简浮窗模式：渲染当前活跃会话（不是 quickTask）
-						new URLSearchParams(window.location.search).get("mini-overlay") === "1" ? (
-							<MiniOverlaySurface
-								activeProjectId={activeProjectId}
-								onCreateSession={createSessionDraftWithTab}
-								onOpenSession={openSidebarSessionByIdWithTab}
-								onSwitchToQuickTask={() => {
-									const projectPath = currentSession ? projects.find((item) => item.id === currentSession.projectId)?.path : undefined;
-									void api.miniOverlay.switchToQuickTask(projectPath).catch(() => showToast(t("miniOverlay.windowActionFailed"), 4000, "error"));
-								}}
-							>
-								{currentSession ? (
-									<SessionPaneServicesProvider value={sessionPaneServices}>
-										<ChatSessionPane sessionId={currentSession.id} focused onFocusPane={() => focusSessionPane(currentSession.id)} splitPane={false} />
-									</SessionPaneServicesProvider>
-								) : null}
-							</MiniOverlaySurface>
-						) : quickTask.active ? (
+						quickTask.active ? (
 							<QuickTaskSurface task={quickTask}>
 								<SessionPaneServicesProvider value={sessionPaneServices}>{quickTask.session && <ChatSessionPane sessionId={quickTask.session.id} focused onFocusPane={() => focusSessionPane(quickTask.session!.id)} splitPane={false} />}</SessionPaneServicesProvider>
 							</QuickTaskSurface>
@@ -2946,18 +2871,11 @@ export function App() {
 					outlineContentOffset={workbenchContentWidth}
 					sidebarContent={sidebarContentNode}
 					chatPaneContent={chatPaneContentNode}
+					overview={workspaceNavigation.page === "home" ? { content: <HomeOverview actions={workspaceNavigation.actions} onRefresh={refreshHomeOverview} />, sidebar: <HomeProviders /> } : undefined}
 					drawerRail={
 						<WorkspaceDrawerRail
 							addLabel={t("drawer.addPanel")}
 							actions={[
-								{
-									id: "files",
-									label: t("app.files"),
-									icon: <FolderOpen size={16} />,
-									active: drawer === "files",
-									pinned: true,
-									onClick: () => handleToolDrawerAction("files"),
-								},
 								// 编辑器入口已迁到分屏（SessionTabsBar），右侧抽屉不再提供 editor 面板
 								// Git 面板受设置开关与项目上下文双重门控，与 outline 入口保持一致
 								...(settings.enableGitManagement && activeProjectId
@@ -2972,7 +2890,7 @@ export function App() {
 											},
 										]
 									: []),
-								// 轨迹固定在内置浏览器前面：有 Git 时是第 3 个（files / git / trajectory / browser）。
+								// 轨迹固定在内置浏览器前面。
 								{
 									id: "trajectory",
 									label: t("session.view.trajectory"),
@@ -3364,7 +3282,6 @@ export function App() {
 				<DataEnvMismatchDialog />
 
 				{/* CUA 操作审批弹框：pi Agent 注入鼠标/键盘前的用户确认（事件驱动，根级渲染） */}
-				<CuaApprovalDialog request={cuaApproval.request} pendingCount={cuaApproval.pendingCount} responding={cuaApproval.responding} open={cuaApproval.open} onOpenChange={cuaApproval.setOpen} onRespond={(allowed) => void cuaApproval.respond(allowed)} onCancel={cuaApproval.cancel} />
 			</>
 		</FileLinkBaseProvider>
 	);

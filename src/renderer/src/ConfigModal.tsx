@@ -31,7 +31,6 @@ import { BridgeGuiSingleSlot } from "./components/bridge/BridgeSlot";
 import { guiPageSectionId, useBridgeConfigPages } from "./hooks/useBridgeConfigPages";
 import { SecuritySection, type SecuritySectionHandle } from "./components/config/SecuritySection";
 import { DshLogo, PiLogo } from "./components/session/SessionSourceBadge";
-import { DshConfigTab, type DshConfigTabHandle } from "./config/DshConfigTab";
 import { t } from "./i18n";
 import { CodeMirrorEditor } from "./components/app/CodeMirrorEditor";
 import { translateBuiltinPromptDescription } from "./composerBehavior";
@@ -74,14 +73,8 @@ const CONFIG_LAST_TAB_KEY = "pideck-config-last-tab";
 
 /** localStorage 键：配置管理顶层后端分页（Pi/DSH）上次选择（重开弹窗时恢复）。 */
 const CONFIG_BACKEND_PANE_KEY = "pideck-config-backend-pane";
-
-/** 读取上次选定的配置管理后端分页；无记录/值失效时回退 Pi（默认后端，Pi 标签在左）。 */
 function loadLastConfigBackendPane(): "dsh" | "pi" {
-	try {
-		return localStorage.getItem(CONFIG_BACKEND_PANE_KEY) === "dsh" ? "dsh" : "pi";
-	} catch {
-		return "pi";
-	}
+	return "pi";
 }
 
 /** 全部合法 section / config 组子 tab，用于校验持久化值（避免版本更新后残留旧值导致无高亮）。 */
@@ -431,13 +424,13 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	/** 配置管理顶层后端分页：以 Pi 为主（默认 Pi，且 Pi 标签在左），dsh 页在右。
 	 *  新建会话默认后端跟随设置项 defaultAgentBackend（默认 pi），与此处配置管理入口相互独立。
 	 *  弹窗每次打开都会重建 state，这里从 localStorage 恢复上次选定的后端分页。 */
-	const [backendPane, setBackendPane] = useState<"dsh" | "pi">(resourceOnly ? "pi" : (focusBackendPane ?? loadLastConfigBackendPane));
+	const [backendPane, setBackendPane] = useState<"dsh" | "pi">("pi");
 	/**
 	 * 用户隐藏了 DSH 模块（设置 → 外观 → 功能模块）：不渲染 Pi/DSH 分页头，弹窗固定在 Pi 页。
 	 * 深链点名 DSH 页（runtime 提示「去安装」等）时例外：用户是主动要去，此时保留分页头供切回 Pi。
 	 */
 	const dshModuleHidden = useAtomValue(dshModuleHiddenAtom);
-	const dshPaneHidden = dshModuleHidden && focusBackendPane !== "dsh";
+	const dshPaneHidden = true;
 	useEffect(() => {
 		// 上次停在 DSH 页、或弹窗开着时在设置里隐藏了 DSH：回到 Pi 页，避免停在一个没有入口的页面。
 		// 只改本次弹窗的 state，不覆写 localStorage 记忆——恢复显示后仍回到用户上次的选择。
@@ -445,7 +438,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	}, [dshPaneHidden]);
 	/** 切换后端分页并持久化：退出配置管理再进入时停留在上次选定的后端。 */
 	const selectBackendPane = useCallback((value: string) => {
-		const next = value === "pi" ? "pi" : "dsh";
+		const next = "pi";
 		setBackendPane(next);
 		// 用量查询弹窗是 per-provider 的：切换 Pi/DSH 页时关闭，
 		// 避免「从认证页点开、切到模型页后弹窗还挂着」的越界出现（用户反馈的闪现 bug）。
@@ -1091,9 +1084,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 			// 主进程已直接落盘 models.json：以磁盘为准整页重载（force 清空草稿保留集——
 			// 安装是明确的落盘动作，与保存/导入同语义）；DSH 侧若写入成功同步刷新配置页。
 			void loadConfig("models", { force: true }).catch(() => undefined);
-			if (outcome.dshSaved) {
-				void dshConfigRef.current?.reload().catch(() => undefined);
-			}
 		},
 		[loadConfig],
 	);
@@ -2306,8 +2296,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 
 	/** 安全管理面板句柄（顶部统一保存按钮经 saveByKey 调用其 save） */
 	const securitySectionRef = useRef<SecuritySectionHandle>(null);
-	/** DSH 配置页句柄（顶部统一保存按钮经 saveByKey 调用其 save）。 */
-	const dshConfigRef = useRef<DshConfigTabHandle>(null);
 
 	// DSH runtime 安装态门控：runtime 不可用时整 Tab 换成安装引导（含下载与手动导入），
 	// 不渲染任何 dsh 配置表单（表单此时项项都会失败）。
@@ -2350,7 +2338,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 				if (!dshUi.showDshConfigForms) return true;
 				// DSH 页保存成功后显式清未保存标记：子分区草稿已清空并上报 false，
 				// 但卸载/收起的分区可能残留脏来源，这里兜底保证黄点消失。
-				const ok = (await dshConfigRef.current?.save()) ?? false;
+				const ok = false;
 				if (ok) clearDirty("dsh");
 				return ok;
 			}
@@ -2544,35 +2532,9 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		<>
 			{/* 顶层后端分页：Pi 配置管理（默认，在左）/ DSH 配置管理（在右） */}
 			<Tabs value={backendPane} onValueChange={selectBackendPane} className="flex min-h-0 min-w-0 flex-1 flex-col">
-				{!resourceOnly && !dshPaneHidden && (
-					<TabsList
-						// 嵌入设置窗口时 Pi/DSH 用 shadcn line variant（下划线式）：与顶层「系统设置/配置管理」
-						// 的分段条（default variant）区分层级——上层页面级、下层内容级，避免两条同款 tab 冲突。
-						variant={embedded ? "line" : "default"}
-						className={cn("shrink-0", embedded ? "justify-start gap-1 px-3" : "config-backend-switch h-9 justify-start gap-1 border-b border-border/60 px-3")}
-					>
-						<TabsTrigger variant={embedded ? "line" : "default"} value="pi" className={cn("h-8 gap-1.5 px-3 text-control font-medium", !embedded && "config-backend-tab")}>
-							<PiLogo className="size-3.5 shrink-0" />
-							{t("config.backend.pi")}
-							{hasPiDirty ? <span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" /> : null}
-						</TabsTrigger>
-						<TabsTrigger variant={embedded ? "line" : "default"} value="dsh" className={cn("h-8 gap-1.5 px-3 text-control font-medium", !embedded && "config-backend-tab")}>
-							<DshLogo className="size-3.5 shrink-0" />
-							{t("config.backend.dsh")}
-							{/* 后端分页黄点：该后端任意分区有草稿时提醒 */}
-							{hasDshDirty ? <span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" /> : null}
-						</TabsTrigger>
-					</TabsList>
-				)}
 				{/* forceMount + inactive hidden：Pi/DSH 两个后端页都保持挂载，切换后端不会丢草稿；
 				    与 config:mcp 同款做法，inactive 必须 hidden 避免叠在另一页上。 */}
-				<TabsContent value="dsh" forceMount className="flex min-h-0 min-w-0 flex-1 data-[state=inactive]:hidden">
-					{/* runtime 安装态不再整页替换：概览页内嵌 DshRuntimeSection 状态自适应区块，
-					    未装→安装引导，已装→版本/目录/卸载/导入，一个页面操作完。 */}
-					{dshRuntimeStatus.state !== "checking" ? (
-						<DshConfigTab ref={dshConfigRef} onDirtyChange={handleDshDirtyChange} dirtyNavIds={dshDirtyNavIds} onOpenUsageProbeDialog={(provider) => openUsageProbeDialogFor(provider, "dsh")} providerOrder={dshProviderOrder} onReorderProviders={handleReorderDshProviders} onResetProviders={handleResetDshProviderOrder} />
-					) : null}
-				</TabsContent>
+
 				<TabsContent value="pi" forceMount className="flex min-h-0 min-w-0 flex-1 data-[state=inactive]:hidden">
 					{/* 默认浅色主题整页同底（bg-background），避免顶栏白 / 下方多层灰的割裂感。
 			  左侧导航 = shadcn Vertical Tabs：TabsList 竖排（orientation=vertical），

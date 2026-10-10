@@ -198,22 +198,21 @@ type GuiSlotOptions = { title?: string; order?: number; placement?: "above" | "b
 | `tool.extra` | `ToolCallComponents` 的 `ToolCard` 内（`matchKey` = toolName） |
 | `message.extra` | `turn/TurnRow` 的 `</article>` 前（`matchKey` = `"assistant"`） |
 | `thinking.extra` | `TimelineEventCards` 的 `ThinkingBlock` 展开区内 |
-| `sidebar.panel` | `SidebarContent` 的 `conversation-list` 内 `ProjectTree` 之后 |
+| `sidebar.panel` | `SidebarContent` 的文件管理区之后 |
 | `sidebar.section` | 同上 |
 | `banner` | `SessionView` 标题栏之下、`SessionBranchBar` 之前 |
 | `titlebar.action` | `AppHeader`，与 `window-controls` 同级；**显式 no-drag** |
 | `settings.section` | `SettingsModal` 全部设置 tab 之下（不改 tab 注册表） |
 | `content.view` | `WorkbenchStage` 的 `workbench-content-frame` 内 |
-| `session.item` | `SessionTree` 的历史会话行之后 |
+| `session.item` | 当前侧栏 `WorkspaceSessionList` 的每条会话行之后（旧 `SessionTree` 的历史行也保留挂载） |
 | `dialog.body` | `ConfirmDialog` 头部之下（`AlertDialogHeader` 之后） |
 | `dialog.action` | `ConfirmDialog` 的 `AlertDialogFooter` 内，既有按钮之前 |
 | `context.menu` | `SidebarComponents` 的 `MenuShell`（侧边栏各右键菜单的共享壳） |
 
-> **关于 `session.item` 与 `context.menu` 的覆盖范围**：计划指出这两个点没有统一宿主
-> —— `session.item` 在仓库里**四处分散实现**，`context.menu` **无统一菜单项注册表**。
-> 当前只接了覆盖面最广的那处（`SessionTree` 的历史会话行 / `MenuShell`）。
-> `ActiveSessionsTree` / `RecentSessionsSection` / `SessionTabsBar` 上的会话条目，
-> 以及非 `MenuShell` 的右键菜单，仍未接 —— 属**已知覆盖缺口**，不是实现遗漏。
+> **关于 `session.item` 与 `context.menu` 的覆盖范围**：当前侧栏的每条会话行已接入
+> `session.item`，侧栏右键菜单统一经 `MenuShell` 接入 `context.menu`。旧活动页及其
+> 最近会话区已按用户取舍删除。`SessionTabsBar` 上的会话条目与非 `MenuShell` 的
+> 右键菜单仍未接入，属于已知覆盖缺口。
 
 > **pending 的语义**：桥仍然接受这些 `set*` 调用并正常推送，只是宿主没有对应挂载点
 > → 表现为「该位置没出现」，**不报错、不影响其他位置**（符合 §7.4 与 fail-safe 承诺）。

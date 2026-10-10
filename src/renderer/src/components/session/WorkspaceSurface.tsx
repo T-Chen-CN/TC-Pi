@@ -111,7 +111,7 @@ export function DrawerContent(props: {
 	);
 }
 
-function FilesPanel(props: {
+export function FilesPanel(props: {
 	/** 搜索用项目 id（由抽屉按当前文件树项目传入）：缺省时不渲染搜索入口、快捷键也不响应 */
 	projectId?: string;
 	files: FileTreeNode[];
@@ -240,7 +240,7 @@ function FilesPanel(props: {
 	};
 	return (
 		<div
-			className="files-panel flex min-h-0 flex-1 flex-col overflow-x-hidden"
+			className="files-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable] [&>*]:shrink-0"
 			ref={panelRef}
 			tabIndex={-1}
 			onMouseDown={handlePanelMouseDown}

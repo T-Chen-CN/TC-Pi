@@ -146,6 +146,6 @@ test("SessionTree marks pending asks per session row, not only on the project he
 	assert.match(sessionTree, historyRow, "历史会话行必须有会话级待确认标记");
 	assert.match(sessionTree, draftRow, "草稿会话行必须有会话级待确认标记");
 
-	// 与 ActiveSessionsTree / 项目行共用同一徽章组件，视觉与无障碍语义不得分叉。
+	// 与项目行共用同一徽章组件，视觉与无障碍语义不得分叉。
 	assert.match(sessionTree, /<PendingAskBadge count=\{1\} \/>/);
 });

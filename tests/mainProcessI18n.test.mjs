@@ -231,16 +231,6 @@ test("main-process user surfaces use stable copy and keep caught details in logs
 		"wsl.piNotInstalled",
 		"wsl.connectionFailed",
 		"session.stopBeforeDelete",
-		"store.promptSearchFailed",
-		"store.promptDetailFailed",
-		"store.promptImportFailed",
-		"store.skillSearchFailed",
-		"store.skillImportFailed",
-		// 注：store.skillsShInstallFailed 已不再被引用——安装失败改为返回真实错误（npx 输出/网络/权限），
-		// 渲染层 toast 直接展示，不用通用文案；key 定义保留在 mainProcessCopy.ts 以兼容旧调用
-		"store.yaoListFailed",
-		"store.yaoDetailFailed",
-		"store.yaoImportFailed",
 	]) {
 		assert.match(source, new RegExp(`mainCopy\\("${key.replaceAll(".", "\\.")}"`));
 	}
@@ -250,7 +240,6 @@ test("main-process user surfaces use stable copy and keep caught details in logs
 	assert.doesNotMatch(source, /throw new Error\(`(?:搜索|获取|导入|读取)[^`]*\$\{message\}`\)/);
 	assert.doesNotMatch(source, /state:\s*"failed",\s*error:\s*error\.message/);
 	assert.match(source, /appLogger\.warn\("wsl", "WSL connection validation failed"/);
-	assert.match(source, /appLogger\.warn\("skill-hub", "Install failed"/);
 	assert.match(source, /"webService\.invalidPort"/);
 	assert.match(source, /"webService\.startFailed"/);
 	assert.match(source, /throw sessionCommandIpcError\(/);
@@ -270,14 +259,4 @@ test("main-process user surfaces use stable copy and keep caught details in logs
 	const projectStore = readFileSync("src/main/projects/ProjectStore.ts", "utf8");
 	assert.match(projectStore, /title: this\.chooseProjectTitle\(\)/);
 	assert.doesNotMatch(projectStore, /title:\s*"选择项目目录"/);
-
-	const petSystem = readFileSync("src/main/pet/index.ts", "utf8");
-	const petBridge = readFileSync("src/main/pet/PetStateBridge.ts", "utf8");
-	assert.doesNotMatch(petSystem, /text:\s*"(?:Agent 出错了|任务完成，记得 Review)"/);
-	assert.doesNotMatch(petSystem, /label:\s*"(?:切换宠物|关闭宠物)"/);
-	assert.doesNotMatch(petBridge, /text:\s*`?\$\{errored\.title\} 出错了/);
-
-	const feishuConfig = readFileSync("src/main/feishu/FeishuConfig.ts", "utf8");
-	assert.match(feishuConfig, /name: parsed\.name \|\| defaultBotName/);
-	assert.doesNotMatch(feishuConfig, /parsed\.name \|\| "默认机器人"/);
 });

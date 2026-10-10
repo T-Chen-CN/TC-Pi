@@ -10,8 +10,6 @@ import type {
 	AppSettings,
 	AvailableModel,
 	ChatMessage,
-	CreateAnonymousSessionInput,
-	CreateAnonymousSessionResult,
 	CreateSessionDraftInput,
 	ImageContent,
 	PiCommand,
@@ -135,7 +133,6 @@ type WebServiceDependencies = {
 	listSessions: (projectId: string) => Promise<SessionSummary[]>;
 	listCatalogSessions: (projectId?: string) => Promise<SessionRecord[]>;
 	createSessionDraft: (input: CreateSessionDraftInput) => Promise<SessionRecord>;
-	createAnonymousSession: (input: CreateAnonymousSessionInput) => Promise<CreateAnonymousSessionResult>;
 	updateSessionRecord: (sessionId: string, patch: UpdateSessionRecordInput) => Promise<SessionRecord>;
 	deleteSessionRecord: (sessionId: string) => Promise<boolean>;
 	copySessionRecord: (sessionId: string) => Promise<{ cancelled?: boolean; targetSessionId?: string }>;
@@ -622,101 +619,6 @@ export class WebServiceManager {
 			this.sendJson(response, { todo: (await this.deps.listSessionTodo(decodeURIComponent(todoMatch[1]))) ?? null });
 			return;
 		}
-		// ── DSH 工具面板路由（S6.3：goals/subagents/skills；无活跃 runtime 返回空）──
-		const dshSubagentsMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/dsh\/subagents$/);
-		if (dshSubagentsMatch && request.method === "GET") {
-			const agentId = this.runtimeAgentIdForSession(decodeURIComponent(dshSubagentsMatch[1]));
-			if (!agentId || !this.deps.listDshSubagents) {
-				this.sendJson(response, { subagents: [] });
-				return;
-			}
-			this.sendJson(response, { subagents: await this.deps.listDshSubagents(agentId) });
-			return;
-		}
-		const dshSubagentHistoryMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/dsh\/subagents\/([^/]+)\/history$/);
-		if (dshSubagentHistoryMatch && request.method === "GET") {
-			const agentId = this.runtimeAgentIdForSession(decodeURIComponent(dshSubagentHistoryMatch[1]));
-			const childSessionId = decodeURIComponent(dshSubagentHistoryMatch[2]);
-			if (!agentId || !this.deps.readDshSubagentHistory) {
-				this.sendJson(response, { messages: [], hasMore: false });
-				return;
-			}
-			const beforeSeq = this.queryNumber(url, "beforeSeq");
-			const maxMessages = this.queryNumber(url, "maxMessages");
-			this.sendJson(response, await this.deps.readDshSubagentHistory(agentId, childSessionId, beforeSeq, maxMessages));
-			return;
-		}
-		const dshSkillsMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/dsh\/skills$/);
-		if (dshSkillsMatch && request.method === "GET") {
-			const agentId = this.runtimeAgentIdForSession(decodeURIComponent(dshSkillsMatch[1]));
-			if (!agentId || !this.deps.listDshSkills) {
-				this.sendJson(response, { skills: [] });
-				return;
-			}
-			this.sendJson(response, { skills: await this.deps.listDshSkills(agentId) });
-			return;
-		}
-		const dshGoalMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/dsh\/goal$/);
-		if (dshGoalMatch && request.method === "GET") {
-			const target = this.runtimeTargetForSession(decodeURIComponent(dshGoalMatch[1]));
-			if (!target) {
-				this.sendJson(response, { goal: null });
-				return;
-			}
-			const result = await this.deps.getSessionRuntimeState(target);
-			const state = result.ok && result.value && "value" in result.value ? (result.value as { value?: AgentRuntimeState }).value : undefined;
-			this.sendJson(response, { goal: state?.goal ?? null });
-			return;
-		}
-		// ── DSH 插件路由（S6.5：动态插件清单/安装/启停/卸载，与桌面配置页同源）──
-		if (url.pathname === "/api/dsh/plugins" && request.method === "GET") {
-			this.sendJson(response, {
-				dynamic: this.deps.listDshDynamicPlugins ? await this.deps.listDshDynamicPlugins() : [],
-				static: this.deps.listDshStaticPlugins ? await this.deps.listDshStaticPlugins() : [],
-			});
-			return;
-		}
-		if (url.pathname === "/api/dsh/plugins/install" && request.method === "POST") {
-			const body = await this.readJson<import("../../shared/types").DshPluginInstallInput>(request);
-			if (!body.sessionId?.trim() || !this.deps.installDshPlugin) {
-				this.sendError(response, 400, "webError.pluginInstallRequired", "plugin install requires sessionId");
-				return;
-			}
-			try {
-				this.sendJson(response, { receipt: await this.deps.installDshPlugin(body) });
-			} catch (error) {
-				this.sendError(response, 400, "webError.pluginInstallFailed", error instanceof Error ? error.message : "plugin install failed");
-			}
-			return;
-		}
-		const dshPluginActionMatch = url.pathname.match(/^\/api\/dsh\/plugins\/([^/]+)\/(run|stop|uninstall)$/);
-		if (dshPluginActionMatch && request.method === "POST") {
-			const pluginId = decodeURIComponent(dshPluginActionMatch[1]);
-			const action = dshPluginActionMatch[2];
-			const body = await this.readJson<{ sessionId?: string; packageId?: string }>(request);
-			if (!body.sessionId?.trim()) {
-				this.sendError(response, 400, "webError.pluginActionRequired", "plugin action requires sessionId");
-				return;
-			}
-			const fn = action === "run" ? this.deps.runDshPlugin : action === "stop" ? this.deps.stopDshPlugin : this.deps.uninstallDshPlugin;
-			if (!fn) {
-				this.sendError(response, 400, "webError.pluginUnavailable", "DSH plugins are not available");
-				return;
-			}
-			try {
-				this.sendJson(response, {
-					ok: true,
-					value: await fn({
-						sessionId: body.sessionId,
-						pluginId,
-						...(typeof body.packageId === "string" ? { packageId: body.packageId } : {}),
-					}),
-				});
-			} catch (error) {
-				this.sendError(response, 400, "webError.pluginActionFailed", error instanceof Error ? error.message : `plugin ${action} failed`);
-			}
-			return;
-		}
 		if (url.pathname === "/api/sessions/runtimes" && request.method === "GET") {
 			this.sendJson(response, { runtimes: this.deps.listSessionRuntimes() });
 			return;
@@ -729,16 +631,6 @@ export class WebServiceManager {
 			}
 			const session = await this.deps.createSessionDraft(body);
 			this.sendJson(response, { session });
-			return;
-		}
-		if (url.pathname === "/api/sessions/anonymous" && request.method === "POST") {
-			const body = await this.readJson<CreateAnonymousSessionInput>(request);
-			if (!body.projectId?.trim()) {
-				this.sendError(response, 400, "webError.projectIdRequired", "projectId is required");
-				return;
-			}
-			const result = await this.deps.createAnonymousSession(body);
-			this.sendJson(response, result);
 			return;
 		}
 		const sessionRecordActionMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/(update|delete|copy|export-html)$/);

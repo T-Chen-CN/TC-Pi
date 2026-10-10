@@ -65,8 +65,9 @@ test("renderer startup reports bootstrap mount and global errors", () => {
 	assert.match(rendererMainSource, /window\.setTimeout\(dismissBootOverlay, 1500\)/);
 });
 
-test("agent create IPC and process handlers keep structured crash diagnostics", () => {
-	assert.match(indexSource, /Agent create IPC failed/);
+test("ordinary Agent startup and process handlers keep structured crash diagnostics", () => {
+	assert.match(mainSource, /Agent pi process start threw/);
+	assert.match(mainSource, /diagnostics:\s*failedProcess\?\.getDiagnostics\(\)/);
 	assert.match(indexSource, /Child process gone/);
 	assert.match(indexSource, /platform: process\.platform/);
 	assert.match(mainSource, /attachPiProcessLifecycle/);

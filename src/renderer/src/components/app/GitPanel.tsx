@@ -232,7 +232,7 @@ function adjacentVisiblePane(open: PaneOpenState, pane: PaneId, direction: -1 | 
 function paneStateStorageKey(projectId: string, repoScopeKey: string, layout: NonNullable<GitPanelProps["layout"]> = "full"): string {
 	// 多仓同时挂载时，项目级 key 会让其中一个面板覆盖另一个的折叠和高度偏好。
 	// historyOnly 必须与各仓 changesOnly 隔离，否则共享 Graph 会把某个仓的折叠态写回去。
-	const suffix = layout === "full" ? "v4" : `v4-${layout}`;
+	const suffix = layout === "full" ? "v5" : `v5-${layout}`;
 	return `pideck:git-panel:${projectId}:${encodeURIComponent(repoScopeKey)}:pane-state:${suffix}`;
 }
 
@@ -303,8 +303,8 @@ function writeSmartCommitPreference(projectId: string, value: SmartCommitPrefere
 
 function defaultPaneState(): PaneState {
 	return {
-		heights: { changes: 100, graph: 200, compare: 160 },
-		open: { changes: true, graph: false, compare: false },
+		heights: { changes: 180, graph: 320, compare: 160 },
+		open: { changes: true, graph: true, compare: false },
 	};
 }
 
@@ -1596,6 +1596,14 @@ export function GitPanel(props: GitPanelProps) {
 					onOpenCommitFileDiff={props.onOpenCommitFileDiff}
 					branches={props.branches}
 					currentBranch={props.currentBranch}
+					repoScopeKey={repoScopeKey}
+					groups={layout === "historyOnly" ? undefined : groups}
+					getStatus={props.getStatus}
+					onRefreshWorkspace={() => void refresh(true)}
+					onOpenWorkspaceFileDiff={props.onOpenWorkspaceFileDiff}
+					watchRefs={props.watchRefs}
+					unwatchRefs={props.unwatchRefs}
+					onRefsChanged={props.onRefsChanged}
 					open={paneState.open.graph}
 					height={paneState.heights.graph}
 					onToggle={() => togglePane("graph")}

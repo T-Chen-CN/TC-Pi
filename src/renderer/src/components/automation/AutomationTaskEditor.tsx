@@ -321,9 +321,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 							<SelectItem value="pi" className="text-xs">
 								{t("automation.backendPi")}
 							</SelectItem>
-							<SelectItem value="dsh" className="text-xs">
-								{t("automation.backendDsh")}
-							</SelectItem>
 						</SelectContent>
 					</Select>
 					{isDsh && dshBlockReason ? (

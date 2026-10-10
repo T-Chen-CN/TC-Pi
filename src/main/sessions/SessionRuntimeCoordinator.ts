@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 import type {
 	AgentBackend,
 	AgentGatewayCapability,
@@ -1173,6 +1174,7 @@ export class SessionRuntimeCoordinator {
 	async restartSession(sessionId: string, agentId: string): Promise<AgentTab> {
 		const entry = this.catalog.get(sessionId);
 		if (!entry) throw new Error(`Session not found: ${sessionId}`);
+		requireSupportedBackend(entry.backend);
 		// 直接读绑定表做「是否被其他 agent 抢占」的校验，不能走 getAgentId：
 		// getAgentId 对终态（error/closed）agent 有解绑副作用，会清掉绑定后导致
 		// 紧随其后的 reserveBoundRuntime 误抛「binding changed」（重启终态 Agent
@@ -1344,6 +1346,7 @@ export class SessionRuntimeCoordinator {
 		}
 		const entry = this.catalog.get(sessionId);
 		if (!entry) throw new Error(`Session not found: ${sessionId}`);
+		requireSupportedBackend(entry.backend);
 		if (this.replacementBySession.has(sessionId)) {
 			throw new Error(`Session runtime replacement reservation conflict: ${sessionId}`);
 		}

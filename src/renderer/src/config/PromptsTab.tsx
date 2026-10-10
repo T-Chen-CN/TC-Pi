@@ -7,7 +7,6 @@ import { Loader2, Check, FileEdit, FileText, Pencil, ShoppingBag, Trash2, X } fr
 import type { PiPromptTemplateListResult, PiPromptTemplateSummary, ProjectResourceOverrides } from "../../../shared/types";
 import { t } from "../i18n";
 import { CodeMirrorEditor } from "../components/app/CodeMirrorEditor";
-import { PromptStoreTab } from "./PromptStoreTab";
 import { ContentTabs } from "./ContentTabs";
 import { Input } from "../components/ui-shadcn/input";
 import { Textarea } from "../components/ui-shadcn/textarea";
@@ -138,7 +137,7 @@ export function PromptsTab(props: {
 	const canCreate = props.newName.trim().length > 0 && props.newDescription.trim().length > 0;
 
 	// tab 切换："local"（本地模板） 或 "store"（在线商店）
-	const [promptTab, setPromptTab] = useState<"local" | "store">("local");
+	const [promptTab, setPromptTab] = useState<"local">("local");
 
 	// Prompt 重命名状态
 	const [renamingTemplate, setRenamingTemplate] = useState<string | null>(null);
@@ -295,23 +294,18 @@ export function PromptsTab(props: {
 				<ContentTabs
 					value={promptTab}
 					onValueChange={(v) => {
-						if (v !== "local" && v !== "store") return;
+						if (v !== "local") return;
 						setPromptTab(v);
 						// 切回本地时刷新列表（原 TabsTrigger onClick 行为迁到 onValueChange 统一处理）
 						if (v === "local") props.onRefresh();
 					}}
-					items={[
-						{ value: "local", label: t("config.nav.prompts") },
-						{ value: "store", label: t("config.promptStoreTab"), icon: <ShoppingBag size={14} strokeWidth={1.8} /> },
-					]}
+					items={[{ value: "local", label: t("config.nav.prompts") }]}
 				/>
 				{/* 全局下拉：商店 tab 右侧、Tabs 行内（不进 Table） */}
 				<div className="shrink-0">{props.scopeSelector}</div>
 			</div>
 
-			{promptTab === "store" ? (
-				<PromptStoreTab projectId={props.scope === "project" ? props.projectId : undefined} onImported={props.onRefresh} />
-			) : (
+			{
 				<>
 					<div className="mb-3 flex items-center justify-between gap-3">
 						<div>
@@ -412,7 +406,7 @@ export function PromptsTab(props: {
 						</div>
 					)}
 				</>
-			)}
+			}
 		</div>
 	);
 }

@@ -54,7 +54,7 @@ describe("Git panel VS Code Source Control contract", () => {
 
 	test("uses exactly three independently collapsible persisted panes with Changes open by default", () => {
 		assert.match(panel, /type PaneId = "changes" \| "graph" \| "compare"/);
-		assert.match(panel, /open: \{ changes: true, graph: false, compare: false \}/);
+		assert.match(panel, /open: \{ changes: true, graph: true, compare: false \}/);
 		assert.match(panel, /\[id\]: !current\.open\[id\]/);
 		assert.doesNotMatch(panel, /id === "changes" \? true/);
 		assert.match(panel, /pideck:git-panel:\$\{projectId\}:\$\{encodeURIComponent\(repoScopeKey\)\}:pane-state:\$\{suffix\}/);
@@ -106,7 +106,7 @@ describe("Git panel VS Code Source Control contract", () => {
 		assert.match(graph, /function GraphLanes/);
 		assert.match(graph, /function buildGraphRows/);
 		assert.match(graph, /<svg\s+className="block max-w-none/);
-		assert.match(graph, /const GRAPH_ROW_HEIGHT = 28/);
+		assert.match(graph, /const GRAPH_ROW_HEIGHT = 52/);
 		assert.match(graph, /lastNodeIndex\(\s*output,\s*commit\.parents\[parentIndex\],?\s*\)/);
 		assert.match(gitService, /"--topo-order"/);
 		assert.doesNotMatch(graph, /graphPrefix/);
@@ -168,7 +168,7 @@ describe("Git panel VS Code Source Control contract", () => {
 		assert.match(i18n, /"git\.smartCommitPrompt"/);
 		assert.match(i18n, /"git\.smartCommitAlways"/);
 		assert.match(i18n, /"git\.smartCommitNever"/);
-		assert.match(graph, /min-w-\[48px\] flex-\[0_1_78px\]/);
+		assert.match(graph, /<GitCommitSummary commit=\{commit\}/);
 		assert.doesNotMatch(graph, /git-history-date/);
 		assert.doesNotMatch(graph, /selectedHash/);
 		assert.doesNotMatch(graph, /git-commit-detail/);
@@ -236,7 +236,7 @@ describe("Git panel VS Code Source Control contract", () => {
 		assert.match(graph, /onMouseLeave=\{handleCardMouseLeave\}/);
 		assert.match(graph, /role="list"/);
 		assert.match(graph, /role="listitem"/);
-		assert.match(graph, /className=\{`git-history-row grid h-7/);
+		assert.match(graph, /className=\{`git-history-row grid h-\[52px\]/);
 		assert.match(graph, /type="button"/);
 		assert.match(graph, /aria-expanded=\{expanded\}/);
 		assert.doesNotMatch(graph, /role="tree"/);

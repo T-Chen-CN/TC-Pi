@@ -106,5 +106,14 @@ test("worktree removal keeps a fade-out animation (removingWorktreePaths -> work
 	assert.match(projectTree, /removingWorktreePaths\?: ReadonlySet<string>/);
 	assert.match(projectTree, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
 	assert.match(sidebarContent, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
+	const navigation = readFileSync("src/renderer/src/components/sidebar/WorkspaceNavigation.tsx", "utf8");
+	assert.match(navigation, /removingWorktreePaths\?:\s*ReadonlySet<string>/);
+	assert.match(navigation, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
+	const projectList = readFileSync("src/renderer/src/components/sidebar/WorkspaceProjectList.tsx", "utf8");
+	assert.match(projectList, /props\.removingWorktreePaths\s*\?\?\s*\[\]/);
+	assert.match(projectList, /\.map\(normalizeWorkspacePath\)/);
+	assert.match(projectList, /removing\.has\(normalizeWorkspacePath\(project\.path\)\)/);
+	assert.match(projectList, /transition-\[opacity,transform\]\s+duration-250/);
+	assert.match(projectList, /pointer-events-none\s+-translate-x-3\s+opacity-0/);
 	assert.match(workspaceStyles + readFileSync("src/renderer/src/styles/foundation.css", "utf8"), /\.workspace-tree-row\.worktree-removing\s*\{[\s\S]*?opacity: 0;/);
 });

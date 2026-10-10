@@ -142,13 +142,6 @@ const TARGETS = [
 		spread: ["...mainProcessZhCN,", "...mainProcessZhTW,"],
 		imports: ['import { mainProcessZhTW } from "../../shared/i18n/mainProcessCopy.zh-TW";', 'import type { WebTranslationKey } from "./WebI18n";', "", "export const webZhTW: Record<WebTranslationKey, string> = {"],
 	},
-	{
-		out: "src/main/feishu/FeishuI18n.zh-TW.ts",
-		source: "src/main/feishu/FeishuI18n.ts",
-		startMarker: "const zhCN = {",
-		endMarker: "} as const;",
-		imports: ['import type { FeishuTranslationKey } from "./FeishuI18n";', "", "export const feishuZhTW: Record<FeishuTranslationKey, string> = {"],
-	},
 ];
 
 /**

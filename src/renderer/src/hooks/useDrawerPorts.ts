@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import type { WorkspaceDrawerPanel } from "./useWorkspacePanels";
-import type { SessionFilterPill } from "../sessionFilterPills";
 import { openGitFileInEditor } from "../utils/gitFileOpen";
 import type { RpcLogEntry } from "../../../shared/types/rpcLog";
 import type { DrawerBrowserPort, DrawerChromePort, DrawerFilesPort, DrawerGitPort, DrawerRpcLogPort } from "../components/workspace/DrawerSurface";
@@ -18,7 +17,6 @@ type FilesPortInput = Pick<
 	| "sessionsProjectId"
 	| "files"
 	| "sessions"
-	| "sessionSourceFilter"
 	| "sessionHistoryLoading"
 	| "expandedDirs"
 	| "onToggleDirectory"
@@ -114,7 +112,6 @@ export function useDrawerPorts(input: UseDrawerPortsInput) {
 			sessionsProjectId: input.sessionsProjectId,
 			files: input.files,
 			sessions: input.sessions,
-			sessionSourceFilter: input.sessionSourceFilter,
 			sessionHistoryLoading: input.sessionHistoryLoading,
 			expandedDirs: input.expandedDirs,
 			onToggleDirectory: input.onToggleDirectory,
@@ -172,7 +169,6 @@ export function useDrawerPorts(input: UseDrawerPortsInput) {
 		input.sessionsProjectId,
 		input.files,
 		input.sessions,
-		input.sessionSourceFilter,
 		input.sessionHistoryLoading,
 		input.expandedDirs,
 		input.onToggleDirectory,

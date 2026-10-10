@@ -161,7 +161,7 @@ jobs:
           node scripts/sync-refs-to-atomgit.mjs $REFS_ARGS
 
       # 等待 Release 资产清单稳定后再同步：release:published 在第一个构建 job 发布
-      # Release 时就触发，此时安装包 / runtime tgz / runner-node 往往只传了一部分；
+      # Release 时就触发，此时安装包 往往只传了一部分；
       # 不等待就会把半成品同步到 AtomGit（v0.7.5 旧敕）。对多个 tag 逐个等待。
       # 手动触发（workflow_dispatch）通常用于补同步，资产已稳定，但同样走一遍窗口
       # 只是立即生效（对每个 tag 也采样，稳定即过，不会白等）。
@@ -176,30 +176,26 @@ jobs:
           for TAG in $(echo "$TAGS" | tr ',' ' '); do
             stable=0
             last_sig="__init__"
-            runtime_count=-1
             echo "等待 ${TAG} 资产稳定（最长 ${ASSET_WAIT_DEADLINE_SECONDS}s）…"
             while [ $SECONDS -lt $deadline ]; do
-              # 一次 API 调用同时取：全量签名单（名字+大小，任一变化都算在传）与
-              # runtime tgz 数量（预期 6 份：release.yml 产出 win32-x64/darwin-arm64/linux-x64/linux-arm64 4 份 + 本链补 win32-arm64/darwin-x64 2 份）。
+              # 比较全部资产的名称与大小，等待上传清单稳定。
               sig=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" \
                 --jq '[.assets[] | (.name + ":" + (.size | tostring))] | sort | join("|")' 2>/dev/null) || sig=""
-              runtime_count=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" \
-                --jq '[.assets[] | select(.name | startswith("dsh-runtime-") and endswith(".tgz"))] | length' 2>/dev/null) || runtime_count=0
-              if [ -n "$sig" ] && [ "$sig" = "$last_sig" ] && [ "$runtime_count" -ge 6 ]; then
+              if [ -n "$sig" ] && [ "$sig" = "$last_sig" ]; then
                 stable=$((stable + 1))
               else
                 stable=0
               fi
               last_sig="$sig"
-              echo "  采样：资产签名长度 ${#sig}，runtime tgz ${runtime_count}/6，稳定计数 ${stable}/${ASSET_STABLE_REQUIRED}"
+              echo "  采样：资产签名长度 ${#sig}，稳定计数 ${stable}/${ASSET_STABLE_REQUIRED}"
               if [ "$stable" -ge "$ASSET_STABLE_REQUIRED" ]; then
-                echo "${TAG} 资产已稳定（runtime tgz ${runtime_count}/6）"
+                echo "${TAG} 资产已稳定"
                 break
               fi
               sleep "$ASSET_POLL_INTERVAL_SECONDS"
             done
             if [ "$stable" -lt "$ASSET_STABLE_REQUIRED" ]; then
-              echo "::warning::${TAG} 资产清单在 ${ASSET_WAIT_DEADLINE_SECONDS}s 内未达到稳定（runtime tgz ${runtime_count}/6）。按当前资产继续同步；缺失部分可等 post-release-sidecars 完成后的再次触发或手动重跑本 workflow 补齐。"
+              echo "::warning::${TAG} 资产清单在 ${ASSET_WAIT_DEADLINE_SECONDS}s 内未达到稳定。按当前资产继续同步；缺失部分可等 post-release-sidecars 完成后的再次触发或手动重跑本 workflow 补齐。"
             fi
           done
 

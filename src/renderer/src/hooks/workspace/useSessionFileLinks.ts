@@ -1,4 +1,6 @@
 import { useCallback } from "react";
+import { useSetAtom } from "jotai";
+import { workspacePageAtom } from "../../atoms/workspace-navigation-atoms";
 import { t } from "../../i18n";
 import { resolveFileLinkPath } from "../../utils/filePathLinks";
 import type { SessionFileOpenContext } from "../../components/session/SessionPaneServices";
@@ -9,6 +11,7 @@ import type { AgentTab } from "../../../../shared/types";
 import type { WorkspaceDrawerPanel } from "../useWorkspacePanels";
 
 export interface SessionFileLinksDeps {
+	onRevealFiles: () => void;
 	activeAgent: AgentTab | undefined;
 	activeProject: Project | undefined;
 	currentSessionId: string | undefined;
@@ -36,7 +39,8 @@ export interface SessionFileLinksDeps {
  * 3) handleOpenLinkedFile：会话内文件链接打开路由（项目内分级打开 / 项目外安全门）；
  * 4) handleToolDrawerAction：工具抽屉（files/git/browser）统一切换语义，浮动按钮与活动栏共用。
  */
-export function useSessionFileLinks({ activeAgent, activeProject, currentSessionId, activeProjectId, showToast, setPreviewImage, viewFilePath, workspace, gitDrawerDiff, closeGitDiff, refreshVisibleFiles, restoreExpandedDirs }: SessionFileLinksDeps) {
+export function useSessionFileLinks({ onRevealFiles, activeAgent, activeProject, currentSessionId, activeProjectId, showToast, setPreviewImage, viewFilePath, workspace, gitDrawerDiff, closeGitDiff, refreshVisibleFiles, restoreExpandedDirs }: SessionFileLinksDeps) {
+	const setPage = useSetAtom(workspacePageAtom);
 	const openSessionFilePath = useSessionFilePathOpener({ onPreviewImage: setPreviewImage, viewFilePath });
 	const { requestExternalPathOpen, dialog: externalPathOpenDialog } = useExternalPathOpenGate();
 
@@ -87,26 +91,28 @@ export function useSessionFileLinks({ activeAgent, activeProject, currentSession
 	// 保证两个入口行为一致。注意必须放在 gitDrawerDiff 依赖之后。
 	const handleToolDrawerAction = useCallback(
 		(panel: WorkspaceDrawerPanel) => {
+			if (panel === "files") {
+				setPage("workspace");
+				onRevealFiles();
+				if (activeProjectId)
+					void restoreExpandedDirs(activeProjectId)
+						.then((repaired) => {
+							if (!repaired) return refreshVisibleFiles(activeProjectId, true);
+						})
+						.catch(() => showToast(t("workspace.navigationFailed")));
+				return;
+			}
 			if (workspace.drawer === panel && !workspace.drawerCollapsed) {
 				if (panel === "git" && gitDrawerDiff) {
 					closeGitDiff();
 					return;
 				}
 				workspace.closeDrawer();
-			} else if (panel === "files" && activeProjectId) {
-				// 打开文件抽屉时先做一次「展开目录自愈」：若树里存在已展开但 children
-				// 缺失、hasChildren 仍为 true 的目录（代次丢失/加载失败等历史残留），
-				// 按需补拉消掉「加载中...」；返回 false 表示没有需要修复的目录，
-				// 才走一次常规静默 refreshFiles。自愈本身不阻塞抽屉打开。
-				void restoreExpandedDirs(activeProjectId).then((repaired) => {
-					if (!repaired) void refreshVisibleFiles(activeProjectId, true);
-				});
-				workspace.openDrawer(panel);
 			} else {
 				workspace.openDrawer(panel);
 			}
 		},
-		[workspace, gitDrawerDiff, closeGitDiff, activeProjectId, refreshVisibleFiles, restoreExpandedDirs],
+		[workspace, gitDrawerDiff, closeGitDiff, activeProjectId, refreshVisibleFiles, restoreExpandedDirs, onRevealFiles, setPage, showToast],
 	);
 
 	return { openSessionFilePath, requestExternalPathOpen, externalPathOpenDialog, handleOpenLinkedFile, handleToolDrawerAction };

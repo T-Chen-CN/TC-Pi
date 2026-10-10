@@ -97,8 +97,6 @@ import type {
 	UpdateAutomationSettingsInput,
 	ResolveLaunchDefaultsInput,
 	ResolvedLaunchDefaults,
-	CreateAnonymousSessionInput,
-	CreateAnonymousSessionResult,
 	UpdateSessionRecordInput,
 	SessionRecord,
 	SessionProcessEvent,
@@ -245,31 +243,6 @@ const api = {
 		getState: () => ipcRenderer.invoke(ipcChannels.quickTaskGetState) as Promise<import("../shared/types/quickTask").QuickTaskState>,
 		onChanged: (callback: (state: import("../shared/types/quickTask").QuickTaskState) => void) => subscribe(ipcChannels.quickTaskChanged, callback),
 		exit: () => ipcRenderer.invoke(ipcChannels.quickTaskExit) as Promise<void>,
-		/** 任务模式 → 小窗：退出 quick-task 并展开极简浮窗。 */
-		switchToMiniOverlay: () => ipcRenderer.invoke(ipcChannels.quickTaskSwitchToMiniOverlay) as Promise<void>,
-	},
-	floatingBall: {
-		getState: () => ipcRenderer.invoke(ipcChannels.floatingBallGetState) as Promise<import("../main/floating/FloatingController").FloatingBallState>,
-		onStateChanged: (callback: (state: import("../main/floating/FloatingController").FloatingBallState) => void) => subscribe(ipcChannels.floatingBallState, callback),
-		enter: () => ipcRenderer.invoke(ipcChannels.floatingBallEnter) as Promise<void>,
-		exit: () => ipcRenderer.invoke(ipcChannels.floatingBallExit) as Promise<void>,
-		setEnabled: (enabled: boolean) => ipcRenderer.invoke(ipcChannels.floatingBallSetEnabled, enabled) as Promise<void>,
-		setExpandTarget: (target: "mini" | "compact") => ipcRenderer.invoke(ipcChannels.floatingBallSetExpandTarget, target) as Promise<void>,
-		dragStart: () => ipcRenderer.invoke(ipcChannels.floatingBallDragStart) as Promise<void>,
-		dragMove: (x: number, y: number) => ipcRenderer.invoke(ipcChannels.floatingBallDragMove, x, y) as Promise<void>,
-		dragEnd: () => ipcRenderer.invoke(ipcChannels.floatingBallDragEnd) as Promise<void>,
-		contextMenu: () => ipcRenderer.invoke(ipcChannels.floatingBallContextMenu) as Promise<void>,
-	},
-
-	miniOverlay: {
-		getState: () => ipcRenderer.invoke(ipcChannels.miniOverlayGetState) as Promise<import("../main/floating/MiniOverlayWindow").MiniOverlayState | null>,
-		onStateChanged: (callback: (state: import("../main/floating/MiniOverlayWindow").MiniOverlayState) => void) => subscribe(ipcChannels.miniOverlayState, callback),
-		jumpToSession: (sessionId: string, projectId: string) => ipcRenderer.invoke(ipcChannels.miniOverlayJumpToSession, sessionId, projectId) as Promise<void>,
-		quickPrompt: (projectId: string, text: string) => ipcRenderer.invoke(ipcChannels.miniOverlayQuickPrompt, projectId, text) as Promise<{ ok: boolean; message?: string }>,
-		close: () => ipcRenderer.invoke(ipcChannels.miniOverlayClose) as Promise<void>,
-		collapse: () => ipcRenderer.invoke(ipcChannels.miniOverlayCollapse) as Promise<void>,
-		/** 小窗 → 任务模式：隐藏小窗，主窗口以 quick-task 紧凑形态打开（projectPath 缺省用桌面）。 */
-		switchToQuickTask: (projectPath?: string) => ipcRenderer.invoke(ipcChannels.miniOverlaySwitchToQuickTask, projectPath) as Promise<void>,
 	} /**
 	 * pi 供应商认证（`/login`）：pi 的登录只在它的 CLI 交互层存在，应用内登录走
 	 * 这条例外通道（见 AGENTS.md「认证例外通道」）。调用方就是登录弹框。
@@ -488,7 +461,6 @@ const api = {
 		createDraft: (input: CreateSessionDraftInput) => ipcRenderer.invoke(ipcChannels.sessionsCatalogCreateDraft, input) as Promise<SessionRecord>,
 		/** 按当前 pi 配置解析默认启动偏好（引导页预选展示用，与 createDraft 缺省同源）。 */
 		resolveLaunchDefaults: (input: ResolveLaunchDefaultsInput = {}) => ipcRenderer.invoke(ipcChannels.sessionsResolveLaunchDefaults, input) as Promise<ResolvedLaunchDefaults>,
-		createAnonymous: (input: CreateAnonymousSessionInput) => ipcRenderer.invoke(ipcChannels.sessionsCreateAnonymous, input) as Promise<CreateAnonymousSessionResult>,
 		updateRecord: (sessionId: string, patch: UpdateSessionRecordInput) => ipcRenderer.invoke(ipcChannels.sessionsCatalogUpdate, sessionId, patch) as Promise<SessionRecord>,
 		/** DSH host 级模型目录（llm.models），未装配时返回空列表。 */
 		listDshModels: () => ipcRenderer.invoke(ipcChannels.dshListModels) as Promise<AvailableModel[]>,
@@ -1033,6 +1005,9 @@ const api = {
 		setWatching: (agentId: string, watching: boolean) => ipcRenderer.invoke(ipcChannels.rpcLogsSetWatching, agentId, watching) as Promise<boolean>,
 	},
 	app: {
+		onFocusTarget: (callback: (target: FocusTargetPayload) => void) => subscribe(ipcChannels.appFocusTarget, callback),
+		getPendingFocusTarget: () => ipcRenderer.invoke(ipcChannels.appGetPendingFocusTarget) as Promise<FocusTargetPayload | null>,
+
 		info: () => ipcRenderer.invoke(ipcChannels.appInfo) as Promise<AppInfo>,
 		networkAddresses: () => ipcRenderer.invoke(ipcChannels.appNetworkAddresses) as Promise<WebNetworkAddress[]>,
 		preferredSystemLanguages: () => ipcRenderer.invoke(ipcChannels.appPreferredSystemLanguages) as Promise<string[]>,
@@ -1109,25 +1084,6 @@ const api = {
 		toggle: (filePath: string, enabled: boolean) => ipcRenderer.invoke(ipcChannels.promptsToggle, filePath, enabled) as Promise<PiPromptTemplateSummary>,
 		toggleInProject: (projectId: string, name: string, enabled: boolean) => ipcRenderer.invoke(ipcChannels.promptsToggleInProject, projectId, name, enabled) as Promise<PiPromptTemplateSummary>,
 	},
-	promptStore: {
-		search: (query: string, options?: { limit?: number; type?: string; category?: string; tag?: string }) => ipcRenderer.invoke(ipcChannels.promptStoreSearch, query, options) as Promise<PromptStoreSearchResult>,
-		get: (id: string) => ipcRenderer.invoke(ipcChannels.promptStoreGet, id) as Promise<PromptStoreItem>,
-		import: (data: { title: string; description: string; content: string; projectId?: string }) => ipcRenderer.invoke(ipcChannels.promptStoreImport, data) as Promise<PiPromptTemplateSummary>,
-	},
-	skillStore: {
-		search: (query: string) => ipcRenderer.invoke(ipcChannels.skillStoreSearch, query) as Promise<PromptStoreSearchResult>,
-		import: (item: PromptStoreItem, locationId?: string, projectId?: string) => ipcRenderer.invoke(ipcChannels.skillStoreImport, item, locationId, projectId) as Promise<PiSkillSummary>,
-	},
-	skillHub: {
-		search: (query: string, page?: number, pageSize?: number, sortBy?: string, order?: string) => ipcRenderer.invoke(ipcChannels.skillHubSearch, { query, page, pageSize, sortBy, order }) as Promise<import("../shared/types").SkillHubSearchResult>,
-		detail: (slug: string) => ipcRenderer.invoke(ipcChannels.skillHubDetail, slug) as Promise<import("../shared/types").SkillHubDetail | null>,
-		install: (slug: string, projectId?: string) => ipcRenderer.invoke(ipcChannels.skillHubInstall, slug, projectId) as Promise<import("../shared/types").SkillHubInstallResult>,
-	},
-	yaoPrompts: {
-		list: (opts?: { category?: string; search?: string; page?: number; pageSize?: number }) => ipcRenderer.invoke(ipcChannels.yaoPromptsList, opts) as Promise<YaoPromptListResult>,
-		detail: (slug: string, category: string) => ipcRenderer.invoke(ipcChannels.yaoPromptsDetail, slug, category) as Promise<YaoPromptDetailResult>,
-		import: (slug: string, category: string, projectId?: string) => ipcRenderer.invoke(ipcChannels.yaoPromptsImport, slug, category, projectId) as Promise<PiPromptTemplateSummary>,
-	},
 	extensions: {
 		list: (forceRefresh?: boolean) => ipcRenderer.invoke(ipcChannels.extensionsList, forceRefresh) as Promise<PiExtensionListResult>,
 		uninstall: (source: string, scope?: "user" | "project" | "unknown") => ipcRenderer.invoke(ipcChannels.extensionsUninstall, source, scope) as Promise<void>,
@@ -1137,7 +1093,6 @@ const api = {
 		restoreBuiltIn: (source: string) => ipcRenderer.invoke(ipcChannels.extensionsRestoreBuiltIn, source) as Promise<void>,
 		update: () => ipcRenderer.invoke(ipcChannels.extensionsUpdate) as Promise<PiCliUpdateResult>,
 		updateOne: (source: string) => ipcRenderer.invoke(ipcChannels.extensionsUpdateOne, source) as Promise<PiCliUpdateResult>,
-		catalog: (query: import("../shared/types").PiPackageCatalogQuery) => ipcRenderer.invoke(ipcChannels.extensionsCatalog, query) as Promise<import("../shared/types").PiPackageCatalog>,
 		// ── 内置扩展热更新（版本号不跟应用版本走；检测走 AtomGit，更新写 userData 覆盖层）──
 		builtInStatus: () => ipcRenderer.invoke(ipcChannels.extensionsBuiltInUpdateStatus) as Promise<BuiltInExtensionsUpdateStatus>,
 		builtInCheck: (branch?: "main" | "dev") => ipcRenderer.invoke(ipcChannels.extensionsBuiltInUpdateCheck, branch) as Promise<BuiltInExtensionsCheckResult>,
@@ -1391,8 +1346,6 @@ const api = {
 		listUsageProbeStates: (payload: { providers?: string[]; backend?: "pi" | "dsh" } = {}) => ipcRenderer.invoke(ipcChannels.configListUsageProbeStates, payload) as Promise<UsageProbeStatesResult>,
 		/** 单条模板测试（模板 id + 覆盖字段；provider 端点与密钥由主进程解析，不回传渲染层） */
 		testUsageProbe: (payload: UsageProbeTestInput) => ipcRenderer.invoke(ipcChannels.configTestUsageProbe, payload) as Promise<ProviderUsageResult>,
-		/** 安装内置「图片生成」技能模板到 ~/.pi/agent/skills/image-gen */
-		installImageGenSkill: () => ipcRenderer.invoke(ipcChannels.configInstallImageGenSkill) as Promise<{ success: boolean; path?: string; error?: string }>,
 		/** 安装内置「MCP 配置助手」技能模板到 ~/.pi/agent/skills/mcp-setup */
 		installMcpSetupSkill: () => ipcRenderer.invoke(ipcChannels.configInstallMcpSetupSkill) as Promise<{ success: boolean; path?: string; error?: string }>,
 	},
@@ -1412,44 +1365,6 @@ const api = {
 		deleteMany: (ids: string[]) => ipcRenderer.invoke(ipcChannels.configBackupDeleteMany, ids) as Promise<import("../shared/types/backup").ConfigBackupDeleteManyResult>,
 		/** 清空全部备份。 */
 		deleteAll: () => ipcRenderer.invoke(ipcChannels.configBackupDeleteAll) as Promise<import("../shared/types/backup").ConfigBackupActionResult>,
-	},
-	pet: {
-		/** 宠物窗监听主进程推送的聚合状态 */
-		onState: (callback: (state: PetAggregateState) => void) => subscribe(ipcChannels.petState, callback),
-		/** 列出可用宠物包（内置 + petdex） */
-		list: () => ipcRenderer.invoke(ipcChannels.petList) as Promise<PetManifest[]>,
-		/** 开关宠物 */
-		setEnabled: (value: boolean) => ipcRenderer.invoke(ipcChannels.petSetEnabled, value) as Promise<void>,
-		/** 切换当前宠物 */
-		setId: (id: string) => ipcRenderer.invoke(ipcChannels.petSetId, id) as Promise<void>,
-		/** 拖拽移动宠物窗 */
-		moveWindow: (pos: { x: number; y: number }) => ipcRenderer.invoke(ipcChannels.petMoveWindow, pos) as Promise<void>,
-		/** 点击宠物跳转活跃 Agent */
-		focusAgent: () => ipcRenderer.invoke(ipcChannels.petFocusAgent) as Promise<void>,
-		onFocusTarget: (callback: (target: FocusTargetPayload) => void) => subscribe(ipcChannels.petFocusAgentTarget, callback),
-		/** 冷启动/页面加载期间点击通知或右键菜单的跳转目标：挂载后主动拉取（一次性） */
-		getPendingFocusTarget: () => ipcRenderer.invoke(ipcChannels.petGetFocusTargetPending) as Promise<FocusTargetPayload | null>,
-		/** 主进程推送当前选中宠物的 manifest，据此加载 spritesheet */
-		onSprite: (callback: (manifest: PetManifest) => void) => subscribe(ipcChannels.petCurrentSprite, callback),
-		/** 挂载时主动拉取当前选中宠物 manifest（避免推送竞态） */
-		getCurrent: () => ipcRenderer.invoke(ipcChannels.petGetCurrent) as Promise<PetManifest | null>,
-		/** 主进程推送通知气泡（出错/完成/等待操作；null 表示清空当前提醒） */
-		onNotify: (callback: (n: PetNotification | null) => void) => subscribe(ipcChannels.petNotify, callback),
-		setPreviewMode: (mode: string) => ipcRenderer.invoke(ipcChannels.petPreviewMode, mode) as Promise<void>,
-		onPreviewMode: (callback: (mode: string) => void) => subscribe(ipcChannels.petPreviewMode, callback),
-		onCaps: (callback: (caps: PetWindowCaps) => void) => subscribe(ipcChannels.petCaps, callback),
-		/** 调试：发送测试通知弹窗 */
-		testNotify: (type: "error" | "done") => ipcRenderer.invoke(ipcChannels.petTestNotify, type) as Promise<void>,
-		/** 双击宠物触发逗弄：主进程注入一次 jumping 后恢复真实聚合态 */
-		tease: () => ipcRenderer.invoke(ipcChannels.petTease) as Promise<void>,
-		/** 通知主进程拖拽起止：开始时暂停巡游，结束时若处于 idle 则恢复巡游 */
-		setDragging: (dragging: boolean) => ipcRenderer.invoke(ipcChannels.petDragState, dragging) as Promise<void>,
-		/** 拖拽相对位移（连续 screenX 差值），主进程读取当前窗口位置 + 增量 */
-		moveBy: (delta: { dx: number; dy: number }) => ipcRenderer.invoke(ipcChannels.petMoveBy, delta) as Promise<void>,
-		/** 通知主进程：宠物窗 React 已挂载，IPC 监听器已注册，可以安全推送初始状态 */
-		ready: () => ipcRenderer.send(ipcChannels.petReady),
-		/** 右键上下文菜单 */
-		contextMenu: () => ipcRenderer.invoke(ipcChannels.petContextMenu) as Promise<void>,
 	},
 	sounds: {
 		/** 订阅主进程推送的声音提醒播放事件（完成/出错/等待输入） */
@@ -1491,52 +1406,6 @@ const api = {
 		onExit: (callback: (payload: TerminalExitEvent) => void) => subscribe(ipcChannels.terminalExit, callback),
 	},
 
-	// ===== 飞书桥接 =====
-	feishu: {
-		connect: (input: FeishuConnectInput) =>
-			ipcRenderer.invoke(ipcChannels.feishuConnect, input) as Promise<{
-				success: boolean;
-				message: string;
-				detail?: string;
-			}>,
-		connectTemp: (input: FeishuConnectInput) =>
-			ipcRenderer.invoke(ipcChannels.feishuConnectTemp, input) as Promise<{
-				success: boolean;
-				message: string;
-				detail?: string;
-				botInfo?: { id: string; name: string };
-			}>,
-		disconnect: () => ipcRenderer.invoke(ipcChannels.feishuDisconnect) as Promise<{ success: boolean }>,
-		connectByBot: (botId: string) =>
-			ipcRenderer.invoke(ipcChannels.feishuConnectByBot, botId) as Promise<{
-				success: boolean;
-				message: string;
-				detail?: string;
-			}>,
-		statusRequest: () => ipcRenderer.invoke(ipcChannels.feishuStatusRequest) as Promise<FeishuBridgeStatus>,
-		onStatus: (callback: (status: FeishuBridgeStatus) => void) => subscribe(ipcChannels.feishuStatus, callback),
-		botsList: () => ipcRenderer.invoke(ipcChannels.feishuBotsList) as Promise<FeishuBotConfig[]>,
-		botAdd: (input: FeishuConnectInput) =>
-			ipcRenderer.invoke(ipcChannels.feishuBotAdd, input) as Promise<{
-				success: boolean;
-				bot?: FeishuBotConfig;
-				error?: string;
-			}>,
-		botRemove: (botId: string) => ipcRenderer.invoke(ipcChannels.feishuBotRemove, botId) as Promise<boolean>,
-		botConfig: (botId: string, patch: Partial<FeishuBotConfig>) => ipcRenderer.invoke(ipcChannels.feishuBotConfig, botId, patch) as Promise<FeishuBotConfig | undefined>,
-		botSecret: (botId: string) => ipcRenderer.invoke(ipcChannels.feishuBotSecret, botId) as Promise<string>,
-		testConnection: (appId: string, appSecret: string) => ipcRenderer.invoke(ipcChannels.feishuTestConnection, appId, appSecret) as Promise<FeishuTestResult>,
-		bindingsList: () => ipcRenderer.invoke(ipcChannels.feishuBindingsList) as Promise<FeishuChatBinding[]>,
-		bindingRemove: (chatId: string) => ipcRenderer.invoke(ipcChannels.feishuBindingRemove, chatId) as Promise<boolean>,
-		bindingUpdate: (chatId: string, patch: Partial<FeishuChatBinding>) => ipcRenderer.invoke(ipcChannels.feishuBindingUpdate, chatId, patch) as Promise<FeishuChatBinding | undefined>,
-		onMessages: (callback: (message: FeishuChatMessage) => void) => subscribe(ipcChannels.feishuMessages, callback),
-		onBindingsChanged: (callback: (bindings: FeishuChatBinding[]) => void) => subscribe(ipcChannels.feishuBindingsChanged, callback),
-		onWhoamiResult: (callback: (openId: string) => void) => subscribe(ipcChannels.feishuWhoamiResult, callback),
-		onBotsChanged: (callback: (bots: FeishuBotConfig[]) => void) => subscribe(ipcChannels.feishuBotsChanged, callback),
-		sessionBotGet: (sessionId: string) => ipcRenderer.invoke(ipcChannels.feishuSessionBotGet, sessionId) as Promise<string | null>,
-		sessionBotSet: (sessionId: string, botId: string | null) => ipcRenderer.invoke(ipcChannels.feishuSessionBotSet, sessionId, botId) as Promise<FeishuSessionBotResult>,
-	},
-
 	// ===== 内置浏览器 =====
 	browser: {
 		/** 在系统默认浏览器中打开外部链接。
@@ -1552,15 +1421,7 @@ const api = {
 		save: (draftPath: string, content: string, cursorPosition: number) => ipcRenderer.invoke(ipcChannels.scratchPadSave, draftPath, content, cursorPosition) as Promise<void>,
 		export: (draftPath: string) => ipcRenderer.invoke(ipcChannels.scratchPadExport, draftPath) as Promise<boolean>,
 	},
-
-	// ── 生图：独立 imagegen.json 凭据 + OpenAI 兼容 /images/generations ──
-	imagegen: {
-		generate: (request: ImageGenRequest) => ipcRenderer.invoke(ipcChannels.imagegenGenerate, request) as Promise<ImageGenResult>,
-		getConfig: () => ipcRenderer.invoke(ipcChannels.imagegenGetConfig) as Promise<ImageGenConfigFile>,
-		saveConfig: (config: ImageGenConfigFile) => ipcRenderer.invoke(ipcChannels.imagegenSaveConfig, config) as Promise<ImageGenSaveResult>,
-		/** 按 blob 引用名取回落盘图片 base64（历史消息只带 ref，展示走 pideck-img://） */
-		readImageBlob: (ref: string) => ipcRenderer.invoke(ipcChannels.imagegenReadImageBlob, ref) as Promise<ImageBlobPayload | null>,
-	},
+	images: { readBlob: (ref: string) => ipcRenderer.invoke(ipcChannels.imagesReadBlob, ref) as Promise<import("../shared/types").ImageBlobPayload | null> },
 
 	// ── 提示词增强：独立 sidecar 复用用户那套 pi 的 ModelRuntime，流式事件按 runId 推送 ──
 	enhance: {
@@ -1640,18 +1501,6 @@ const api = {
 		updateSettings: (patch: UpdateAutomationSettingsInput) => ipcRenderer.invoke(ipcChannels.automationUpdateSettings, patch) as Promise<AutomationSettings>,
 		previewCron: (expression: string, count?: number) => ipcRenderer.invoke(ipcChannels.automationPreviewCron, expression, count) as Promise<AutomationCronPreview>,
 		onChanged: (callback: (event: AutomationChangedEvent) => void) => subscribe<AutomationChangedEvent>(ipcChannels.automationChanged, callback),
-	},
-
-	// ── CUA 审批门 ──
-	cua: {
-		/** 监听审批请求（主进程 → 渲染层）。 */
-		onApprovalRequest: (callback: (request: { requestId: string; action: string; sessionId: string; detail: unknown; timestampMs: number }) => void) => subscribe(ipcChannels.cuaApprovalRequest, callback),
-		/** 回传审批结果（渲染层 → 主进程）。 */
-		sendApprovalResponse: (requestId: string, response: { allowed: boolean; reason?: string }) => ipcRenderer.invoke(ipcChannels.cuaApprovalResponse, requestId, response) as Promise<void>,
-		/** 拉取 CUA 开关状态。 */
-		getState: () => ipcRenderer.invoke(ipcChannels.cuaGetState) as Promise<{ enabled: boolean; sessionOverrides: Record<string, boolean> }>,
-		/** 设置 CUA 开关。 */
-		setState: (patch: { enabled?: boolean; sessionOverride?: { sessionId: string; enabled: boolean | null } }) => ipcRenderer.invoke(ipcChannels.cuaSetState, patch) as Promise<{ enabled: boolean; sessionOverrides: Record<string, boolean> }>,
 	},
 };
 

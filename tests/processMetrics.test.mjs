@@ -79,8 +79,6 @@ test("buildDshHostMonitorRow uses a stable id and keeps full titles for hover", 
 	// 单元格只放首个标题，完整列表走 sessionTitles，避免长串拼接被表格截断
 	assert.equal(named.sessionTitle, "打包体积");
 	assert.deepEqual(named.sessionTitles, ["打包体积", "外部会话"]);
-	assert.equal(isDshHostMonitorId(DSH_HOST_MONITOR_ID), true);
-	assert.equal(isDshHostMonitorId("agent-1"), false);
 	assert.equal(DSH_HOST_MONITOR_ROW_ID, DSH_HOST_MONITOR_ID);
 });
 
@@ -134,15 +132,6 @@ test("PiProcess exposes pid accessor", () => {
 	assert.match(source, /return this\.proc\?\.pid;/);
 });
 
-test("DshHostProcess and DshHost expose host pid for process monitor", () => {
-	const hostProcess = readFileSync("src/main/dsh/DshHostProcess.ts", "utf8");
-	const host = readFileSync("src/main/dsh/DshHost.ts", "utf8");
-	assert.match(hostProcess, /get pid\(\): number \| undefined/);
-	assert.match(hostProcess, /this\.child\?\.pid/);
-	assert.match(host, /getHostPid\(\): number \| undefined/);
-	assert.match(host, /return this\.hostProcess\?\.pid/);
-});
-
 // ===== IPC / preload / UI 接线 =====
 
 test("IPC channel + systemIpc handler + preload exposure", () => {
@@ -156,8 +145,6 @@ test("IPC channel + systemIpc handler + preload exposure", () => {
 	assert.match(systemIpc, /getSessionInfoForAgent\(\s*agent\.agentId,?\s*\)/);
 	assert.match(systemIpc, /\.\.\.agent, kind: "pi" as const, \.\.\.\(sessionInfo \?\? \{\}\)/);
 	assert.match(systemIpc, /getProcessSnapshot\(agents\)/);
-	assert.match(systemIpc, /getDshHostPid\?\.\(\)/);
-	assert.match(systemIpc, /buildDshHostMonitorRow/);
 	assert.doesNotMatch(systemIpc, /getProcessSnapshot\(deps\.agentManager\.listAgentPids\(\)\)/);
 	assert.match(preload, /getProcessMetrics: \(\) =>/);
 	assert.match(preload, /ipcRenderer\.invoke\(ipcChannels\.processMetrics\)/);
@@ -176,8 +163,6 @@ test("stop-agent: full session stop chain (coordinator + detach)", () => {
 	assert.match(systemIpc, /typeof agentId !== "string" \|\| !agentId/);
 	// 关键：不能只调 agentManager.stop（会跳过会话状态收尾 → 运行标记不熄灭）
 	assert.match(systemIpc, /deps\.stopAgentFromMonitor\(agentId\)/);
-	assert.match(systemIpc, /isDshHostMonitorId\(agentId\)/);
-	assert.match(systemIpc, /deps\.stopDshHostFromMonitor/);
 	assert.doesNotMatch(systemIpc, /deps\.agentManager\.stop\(agentId\)/);
 	// coordinator 按 agentId 反查会话 → 走 stopRuntime 完整收尾（无绑定时幂等直停）
 	assert.match(coordinator, /async stopAgentById\(/);
@@ -189,9 +174,6 @@ test("stop-agent: full session stop chain (coordinator + detach)", () => {
 	assert.match(index, /terminalManager\.closeAgent\(agentId\);/);
 	assert.match(index, /emitSessionRuntimeDetach\(result\.value\);/);
 	assert.match(index, /stopAgentFromMonitor,/);
-	assert.match(index, /async function stopDshHostFromMonitor\(/);
-	assert.match(index, /await dshHost\.dispose\(\)/);
-	assert.match(index, /stopDshHostFromMonitor,/);
 	// preload 暴露
 	assert.match(preload, /stopAgent: \(agentId: string\) =>/);
 	assert.match(preload, /ipcRenderer\.invoke\(ipcChannels\.stopAgent, agentId\)/);

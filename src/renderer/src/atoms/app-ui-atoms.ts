@@ -9,7 +9,6 @@ import { isModuleHidden } from "../../../shared/hiddenModules";
 import { dshRuntimeStatusAtom } from "./dsh-atoms";
 import type { SettingsFieldAnchorSlug } from "../utils/settingsFieldAnchors";
 import { defaultExpandedSidebarProjects, readExpandedSidebarProjects } from "../utils/sidebarExpandedProjects";
-import { DEFAULT_SIDEBAR_NAV_TAB, readSidebarNavTab, type SidebarNavTab } from "../utils/sidebarNavTab";
 
 /** Settings overlay visibility is shared by Sidebar, Pi environment flow, and Session surface. */
 export const settingsOpenAtom = atom(false);
@@ -94,7 +93,7 @@ export const defaultAgentBackendAtom = atom<AgentBackend>("pi");
  * （新建会话 / 并行问询 / 启动默认值）同帧收敛，不会留下「设置=dsh 但已不可用」的窗口。
  * 钳制规则是纯函数 resolveEffectiveAgentBackend（shared/types/dshRuntime，有单测）。
  */
-export const effectiveAgentBackendAtom = atom<AgentBackend>((get) => resolveEffectiveAgentBackend(get(defaultAgentBackendAtom), get(dshRuntimeStatusAtom).state));
+export const effectiveAgentBackendAtom = atom<AgentBackend>("pi");
 
 /**
  * 用户隐藏的功能模块（设置项 hiddenModules 的渲染层快照，清单见 shared/hiddenModules.ts）。
@@ -154,9 +153,6 @@ export const sidebarExpandedProjectIdsAtom = atom<ReadonlySet<string>>(
 		return cached ? new Set(cached) : defaultExpandedSidebarProjects();
 	})(),
 );
-
-/** 侧栏 Chats/项目分段：localStorage 首屏缓存，settings.json 作权威来源。 */
-export const sidebarNavTabAtom = atom<SidebarNavTab>(readSidebarNavTab(typeof window === "undefined" ? undefined : window.localStorage) ?? DEFAULT_SIDEBAR_NAV_TAB);
 
 // useStreamdownRendererAtom 已移除：Streamdown 转正为唯一 markdown 引擎（迁移 react-markdown 完成）。
 

@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 /**
  * Session IPC handlers: session list, catalog, runtime management, importers.
  * Phase 3.7: extracted from src/main/index.ts registerIpc().
@@ -14,8 +15,6 @@ import { createSessionModelPreference } from "../../shared/modelDisplayName";
 import { modelThinkingLevelOf } from "../../shared/modelThinkingLevels";
 import type {
 	CreateSessionDraftInput,
-	CreateAnonymousSessionInput,
-	CreateAnonymousSessionResult,
 	UpdateSessionRecordInput,
 	SendSessionPromptInput,
 	SessionUiResponseInput,
@@ -41,9 +40,7 @@ import type {
 } from "../../shared/types";
 import type { BridgeEventInput, BridgeResyncInput } from "../../shared/types/bridge";
 import { parseSessionProcessEventsFromFile } from "../sessions/sessionProcessEventsFile";
-import { dshUnavailablePageFor } from "../dsh/dshManualStop";
-import { validateNpmSpec } from "../dsh/dshPluginNpmRunner";
-import { validateSearchKeyword } from "../dsh/dshPluginMarket";
+import { dshUnavailablePageFor } from "../compatibility/legacyBackendStatus";
 import { downgradeRunningStartedBefore, downgradeStaleRunning } from "../pi/derivedSubagents";
 import { getCachedModelList } from "../pi/modelListCache";
 import { resolveLaunchDefaultOptions, isModelInModelsConfig } from "../sessions/launchDefaults";
@@ -337,7 +334,6 @@ export type SessionIpcDeps = {
 	getMainWindow: () => BrowserWindow | null;
 	emitSessionRuntimeEvent: (agentId: string, channel: string, payload: unknown) => boolean;
 	emitSessionRuntimeDetach: (target: SessionRuntimeTarget) => void;
-	createAnonymousSession: (input: CreateAnonymousSessionInput) => Promise<CreateAnonymousSessionResult>;
 	stopSessionRuntime: (target: SessionRuntimeTarget) => void;
 	emitReplacementState: (runtime: SessionRuntimeInfo, includeMessages: boolean) => void;
 	readCatalogSessionReferenceMessages: (sessionId: string) => Promise<unknown[]>;
@@ -412,7 +408,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		getMainWindow,
 		emitSessionRuntimeEvent,
 		emitSessionRuntimeDetach,
-		createAnonymousSession,
 		stopSessionRuntime,
 		emitReplacementState,
 		readCatalogSessionReferenceMessages,
@@ -614,6 +609,8 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		return cachedRecords;
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogCreateDraft, async (_event, input: CreateSessionDraftInput) => {
+		requireSupportedBackend(input?.backend);
+
 		const project = projectStore.get(input.projectId);
 		if (!project) throw new Error(mainCopy("project.notFound"));
 		// DSH runtime 门控（AgentRuntimeProvider 阶段 1）：runtime 不可用时拒绝新建
@@ -720,7 +717,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		return draft;
 	});
 	ipcMain.handle(ipcChannels.sessionsResolveLaunchDefaults, async (_event, input?: ResolveLaunchDefaultsInput): Promise<ResolvedLaunchDefaults> => {
-		// 渲染层输入不可信：backend 只认白名单枚举，其余按非 DSH（pi）解析。
+		requireSupportedBackend(input?.backend);
 		const backend = input?.backend === "dsh" ? "dsh" : input?.backend === "acp" ? "acp" : undefined;
 		try {
 			const [settingsResult, modelsResult] = await Promise.all([configManager.getSettingsConfig(), configManager.getModelsConfig()]);
@@ -739,22 +736,9 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			return {};
 		}
 	});
-	ipcMain.handle(ipcChannels.sessionsCreateAnonymous, async (_event, input: CreateAnonymousSessionInput) => {
-		// 与 createDraft 同一 DSH runtime 门控：匿名会话同样不能落在不可用后端上。
-		if (input.backend === "dsh" && canCreateDshSession?.() !== true) {
-			if (getDshRuntimeStatus?.().state === "outdated") {
-				throw new Error(mainCopy("session.dshRuntimeOutdated"));
-			}
-			throw new Error(mainCopy("session.dshRuntimeNotInstalled"));
-		}
-		const result = await createAnonymousSession(input);
-		void appLogger.info("session", "Anonymous session created", {
-			sessionId: result.session.id,
-			projectId: input.projectId,
-		});
-		return result;
-	});
 	ipcMain.handle(ipcChannels.sessionsCatalogUpdate, async (_event, sessionId: string, patch: UpdateSessionRecordInput) => {
+		requireSupportedBackend(patch?.backend);
+
 		const normalizedModel = patch.model === undefined ? undefined : patch.model === null ? null : normalizeSessionModelPreference(patch.model);
 		if (patch.model !== undefined && patch.model !== null && !normalizedModel) {
 			throw new Error(mainCopy("session.invalidModel"));
@@ -764,6 +748,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		}
 		const entry = sessionCatalog.get(sessionId);
 		if (!entry) throw new Error(mainCopy("session.notFound"));
+		if (patch.backend !== undefined) requireSupportedBackend(entry.backend);
 		// 后端锁定（草稿期可改，激活后禁止）：pi 会话文件（JSONL）与 DSH 会话
 		// （host session log）格式不同，中途切换会导致消息同步渲染不可靠。
 		// 已 active 或已有 runtime 的会话拒绝 backend 变更（渲染层已隐藏入口，这里是边界防御）。
@@ -1084,18 +1069,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		// 主进程 384MB 堆上限（闪退），而账本只需要前若干条记录。
 		return parseSessionProcessEventsFromFile(entry.filePath);
 	});
-	ipcMain.handle(ipcChannels.sessionsCatalogReadDshSystemPrompt, async (_event, sessionId: string): Promise<string | undefined> => {
-		if (typeof sessionId !== "string" || !sessionId.trim()) return undefined;
-		const entry = sessionCatalog.get(sessionId);
-		// DSH 会话的系统提示由 harness 在请求时组装（persona + sections），PiDeck
-		// 只能从 request/header 事件取；运行时会话读投影缓存，历史会话从 host history
-		// 折叠（未装配/无数据返回 undefined，轨迹不展示，不阻断）。
-		if (entry?.backend === "dsh" && readDshSystemPrompt) {
-			const target = sessionRuntimeCoordinator.getTarget(sessionId);
-			return readDshSystemPrompt(target?.agentId, entry.dshSessionId);
-		}
-		return undefined;
-	});
 	ipcMain.handle(ipcChannels.sessionsCatalogReadReferenceMessages, (_event, sessionId: string) => readCatalogSessionReferenceMessages(sessionId));
 	// 按需读取消息完整文本（工具结果截断后的「查看完整输出」）：
 	// 入参校验在边界（渲染层数据不可信），agentId/messageId 必须为非空字符串。
@@ -1130,251 +1103,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			}
 			throw error;
 		}
-	});
-	// DSH 会话文件路径推导（F5：渲染层右键「复制会话文件路径」，历史会话无运行时 tab 也适用）
-	ipcMain.handle(ipcChannels.sessionsGetDshSessionPath, async (_event, sessionId: unknown): Promise<string | undefined> => {
-		if (typeof sessionId !== "string" || !sessionId.trim()) return undefined;
-		if (!resolveDshSessionFilePath) return undefined;
-		return resolveDshSessionFilePath(sessionId);
-	});
-	// DSH 会话内容搜索（G9：侧栏搜索框全文搜索，结果按 dshSessionId 映射回 catalog）
-	ipcMain.handle(ipcChannels.sessionsSearchDsh, async (_event, query: unknown): Promise<Array<{ sessionId: string; snippet: string }>> => {
-		if (typeof query !== "string" || !query.trim()) return [];
-		if (!searchDshSessions) return [];
-		return searchDshSessions(query);
-	});
-	// DSH 目标创建（G5：goal.create）
-	ipcMain.handle(ipcChannels.dshCreateGoal, async (_event, agentId: unknown, objective: unknown, maxGoalRounds?: unknown): Promise<void> => {
-		if (typeof agentId !== "string" || typeof objective !== "string") {
-			throw new Error("Invalid goal create request");
-		}
-		if (!createDshGoal) throw new Error("dsh goals are not available");
-		await createDshGoal(agentId, objective, typeof maxGoalRounds === "number" ? maxGoalRounds : undefined);
-	});
-	// DSH 目标操作（G5：pause/resume/complete/clear）
-	ipcMain.handle(ipcChannels.dshGoalAction, async (_event, agentId: unknown, action: unknown): Promise<void> => {
-		if (typeof agentId !== "string" || (action !== "pause" && action !== "resume" && action !== "complete" && action !== "clear")) {
-			throw new Error("Invalid goal action request");
-		}
-		if (!runDshGoalAction) throw new Error("dsh goals are not available");
-		await runDshGoalAction(agentId, action);
-	});
-	// DSH 子代理列表（G6）
-	ipcMain.handle(ipcChannels.dshListSubagents, async (_event, agentId: unknown) => {
-		if (typeof agentId !== "string") return [];
-		if (!listDshSubagents) return [];
-		return listDshSubagents(agentId);
-	});
-	// DSH 取消 host 侧排队消息（inbox 投影项的撤回）
-	ipcMain.handle(ipcChannels.dshCancelQueuedMessage, async (_event, agentId: unknown, itemId: unknown) => {
-		if (typeof agentId !== "string" || typeof itemId !== "string" || itemId === "") {
-			throw new Error("Invalid agentId or queue item id");
-		}
-		if (!cancelDshQueuedMessage) throw new Error("dsh queue is not available");
-		await cancelDshQueuedMessage(agentId, itemId);
-	});
-	// DSH 子代理历史（G6）
-	ipcMain.handle(ipcChannels.dshSubagentHistory, async (_event, agentId: unknown, childSessionId: unknown, beforeSeq?: unknown, maxMessages?: unknown) => {
-		if (typeof agentId !== "string" || typeof childSessionId !== "string") {
-			return { messages: [], hasMore: false };
-		}
-		if (!readDshSubagentHistory) return { messages: [], hasMore: false };
-		return readDshSubagentHistory(agentId, childSessionId, typeof beforeSeq === "number" ? beforeSeq : undefined, typeof maxMessages === "number" ? maxMessages : undefined);
-	});
-	// DSH 技能目录（G7：skill.list 只读；/name 斜杠调用提示由渲染层给）
-	ipcMain.handle(ipcChannels.dshListSkills, async (_event, agentId: unknown) => {
-		if (typeof agentId !== "string") return [];
-		if (!listDshSkills) return [];
-		return listDshSkills(agentId);
-	});
-	// DSH 孤儿会话列表（G3/D11：host 有但 catalog 无映射，用于清理提示）
-	ipcMain.handle(ipcChannels.dshListOrphans, async (): Promise<string[]> => {
-		if (!listDshOrphans) return [];
-		return listDshOrphans();
-	});
-	// DSH 外部会话清单（跨工具兼容，2026-12）：dsh-web 等其他工具创建的 host 根会话，
-	// 带标题/cwd，供配置页「导入」把 host 数据映射进 catalog（导入后侧栏可见可加载）。
-	// 已映射进 catalog 的会话从清单过滤掉：导入后即从「待导入」列表消失，避免重复导入。
-	ipcMain.handle(ipcChannels.dshListForeignSessions, async (): Promise<Array<{ dshSessionId: string; title?: string; cwd?: string; updatedAt?: number }>> => {
-		if (!listDshForeignSessions) return [];
-		const items = await listDshForeignSessions();
-		const known = new Set(
-			sessionCatalog
-				.listEntries()
-				.map((entry) => entry.dshSessionId)
-				.filter((id): id is string => Boolean(id)),
-		);
-		const dismissed = sessionCatalog.listDismissedDshSessionIds();
-		// 侧栏删过的 host 会话不要出现在「待导入」：否则看起来像没删掉。
-		// 归档恢复仍走独立入口，会带 restoreDismissed 清墓碑。
-		return items.filter((item) => !known.has(item.dshSessionId) && !dismissed.has(item.dshSessionId));
-	});
-	// DSH 外部会话导入：按 host 会话 id 建 catalog 映射（status=active，重启保留；
-	// 同 dshSessionId 重复导入幂等吸收，见 SessionCatalog.createDraft）。
-	ipcMain.handle(ipcChannels.dshImportForeignSession, async (_event, dshSessionId: unknown): Promise<import("../../shared/types").SessionRecord> => {
-		if (typeof dshSessionId !== "string" || !/^session-[A-Za-z0-9-]+$/.test(dshSessionId)) {
-			throw new Error(mainCopy("session.invalidArchivePath"));
-		}
-		if (!importDshForeignSession) throw new Error("DSH session import is not available");
-		return importDshForeignSession(dshSessionId);
-	});
-	// DSH 外部会话全量同步：把 catalog 未映射的磁盘根会话全部导入（不启动 host），
-	// 返回 { imported, skipped } 供配置页展示。未装配时返回空统计。
-	ipcMain.handle(ipcChannels.dshSyncForeignSessions, async (): Promise<{ imported: number; skipped: number }> => {
-		if (!syncDshForeignSessions) return { imported: 0, skipped: 0 };
-		return syncDshForeignSessions();
-	});
-	// DSH 归档区会话清单（G14：目录已移入 .pideck-archive 的 host 会话，恢复入口用；含标题）
-	ipcMain.handle(ipcChannels.dshListArchived, async (): Promise<ArchivedDshSession[]> => {
-		if (!listArchivedDshSessions) return [];
-		return listArchivedDshSessions();
-	});
-	// DSH 会话恢复（G14）：目录按 manifest 移回 sessions 树，并重建 catalog 记录
-	ipcMain.handle(ipcChannels.dshUnarchive, async (_event, dshSessionId: unknown): Promise<boolean> => {
-		// 入参校验：host 生成的会话 id 固定 "session-" 前缀（host 侧目录名 = sessionId），
-		// 白名单正则挡掉路径穿越类输入（渲染层数据不可信，校验在边界）。
-		if (typeof dshSessionId !== "string" || !/^session-[A-Za-z0-9-]+$/.test(dshSessionId)) {
-			throw new Error(mainCopy("session.invalidArchivePath"));
-		}
-		if (!unarchiveDshSession) throw new Error("DSH archive restore is not available");
-		const restored = await unarchiveDshSession(dshSessionId);
-		if (!restored) throw new Error(mainCopy("session.invalidArchivePath"));
-		// 重建 catalog 记录：按会话自己的 cwd 匹配或注册项目；没有 cwd 才兑底。
-		// 打开会话时 DshAgentManager 用 project.path 当 cwd，挂错项目会 attach 错 workspace。
-		const project = restored.cwd ? (projectStore.findByPath(restored.cwd) ?? (await projectStore.add(restored.cwd, undefined, settingsStore.get().wslEnabled ? "wsl" : "windows"))) : await projectStore.ensureExternalSessionsProject(mainCopy("project.externalSessions"));
-		const draft = await sessionCatalog.createDraft({
-			projectId: project.id,
-			// 恢复时优先用 manifest 里的原标题（旧归档由 DshHost 日志折叠补全），
-			// 缺省才落「新会话」占位——否则侧栏恢复后显示不了真实会话名。
-			title: restored.title ?? mainCopy("session.newTitle"),
-			environment: settingsStore.get().wslEnabled ? "wsl" : "native",
-			backend: "dsh",
-		});
-		// 归档恢复是用户明确找回：必须 active，并清掉删除墓碑，否则下次自动同步仍会跳过。
-		await sessionCatalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId,
-			promoteToActive: true,
-			restoreDismissed: true,
-		});
-		const window = getMainWindow();
-		if (window && !window.isDestroyed()) {
-			window.webContents.send(ipcChannels.sessionsCatalogRefreshed, { projectId: project.id });
-		}
-		void appLogger.info("session", "DSH session restored from archive", {
-			dshSessionId,
-			restoredPath: restored.restoredPath,
-			projectId: project.id,
-		});
-		return true;
-	});
-	// DSH 永久删除已归档会话（G14：归档目录移入系统回收站，区别于恢复）
-	ipcMain.handle(ipcChannels.dshDeleteArchived, async (_event, dshSessionId: unknown): Promise<boolean> => {
-		// 入参校验：host 生成的会话 id 固定 "session-" 前缀（host 侧目录名 = sessionId），
-		// 白名单正则挡掉路径穿越类输入（渲染层数据不可信，校验在边界）。
-		if (typeof dshSessionId !== "string" || !/^session-[A-Za-z0-9-]+$/.test(dshSessionId)) {
-			throw new Error(mainCopy("session.invalidArchivePath"));
-		}
-		if (!deleteArchivedDshSession) throw new Error("DSH archive delete is not available");
-		const deleted = await deleteArchivedDshSession(dshSessionId);
-		if (!deleted) throw new Error(mainCopy("session.invalidArchivePath"));
-		void appLogger.info("session", "DSH archived session deleted", { dshSessionId });
-		return true;
-	});
-	// DSH 动态插件管理（G13 深化：进程内临时扩展，define/run/stop/undefine）。
-	// 语义校验（idPrefix 规则、源码单侧上限、会话归属）在 host 侧桥插件统一执行；
-	// IPC 边界只做第一行类型检查（渲染层数据不可信）。
-	ipcMain.handle(ipcChannels.dshPluginList, async (): Promise<import("../../shared/types").DshPluginView[]> => {
-		if (!listDshDynamicPlugins) return [];
-		return listDshDynamicPlugins();
-	});
-	ipcMain.handle(ipcChannels.dshPluginStaticList, async (): Promise<import("../../shared/types").DshStaticPluginView[]> => {
-		if (!listDshStaticPlugins) return [];
-		return listDshStaticPlugins();
-	});
-	// DSH 用户自装静态插件卸载：从 $DSH_HOME/cordis.patch.yml 移除行（+可选回收插件目录）。
-	// 目标校验在 DshHost 侧（行必须真的来自用户补丁层，内置条目拒绝）；这里只做形状检查。
-	ipcMain.handle(ipcChannels.dshPluginUserUninstall, async (_event, input: unknown): Promise<import("../../shared/types").DshUserPluginUninstallResult> => {
-		if (typeof input !== "object" || input === null) {
-			throw new Error("invalid user plugin uninstall payload");
-		}
-		const record = input as Record<string, unknown>;
-		if (typeof record.entryId !== "string" || !record.entryId || typeof record.moduleName !== "string" || !record.moduleName) {
-			throw new Error("invalid user plugin uninstall payload");
-		}
-		if (!uninstallDshUserPlugin) throw new Error("DSH user plugin uninstall is not available");
-		return uninstallDshUserPlugin({
-			entryId: record.entryId,
-			moduleName: record.moduleName,
-			deleteFiles: record.deleteFiles === true,
-		});
-	});
-	// DSH 插件市场搜索：关键词 1-80 字符、无控制字符（渲染层输入不可信）。
-	ipcMain.handle(ipcChannels.dshPluginMarketSearch, async (_event, keyword: unknown): Promise<import("../../shared/types").DshPluginMarketSearchResult> => {
-		if (typeof keyword !== "string") throw new Error("invalid plugin market search payload");
-		const validated = validateSearchKeyword(keyword);
-		if (!validated.ok) throw new Error(validated.reason);
-		if (!searchDshPluginMarket) throw new Error("DSH plugin market search is not available");
-		return searchDshPluginMarket(validated.value);
-	});
-	// DSH 用户插件安装：spec 只接受 npm 包名或 name@精确版本（路径/range/tag 全拒）。
-	ipcMain.handle(ipcChannels.dshPluginUserInstall, async (_event, input: unknown): Promise<import("../../shared/types").DshUserPluginInstallResult> => {
-		if (typeof input !== "object" || input === null) throw new Error("invalid user plugin install payload");
-		const record = input as Record<string, unknown>;
-		if (typeof record.spec !== "string" || !record.spec.trim()) throw new Error("invalid user plugin install payload");
-		const spec = validateNpmSpec(record.spec);
-		if (!spec.ok) throw new Error(spec.reason);
-		if (!installDshUserPlugin) throw new Error("DSH user plugin install is not available");
-		return installDshUserPlugin(record.spec.trim());
-	});
-	// DSH 用户补丁层清单（安装服务视角；未装配返回空列表与既有 list 通道语义一致）。
-	ipcMain.handle(ipcChannels.dshPluginUserList, async (): Promise<import("../../shared/types").DshUserPluginListEntry[]> => {
-		if (!listDshUserPlugins) return [];
-		return listDshUserPlugins();
-	});
-	ipcMain.handle(ipcChannels.dshPluginInstall, async (_event, input: unknown): Promise<unknown> => {
-		if (typeof input !== "object" || input === null) {
-			throw new Error("invalid plugin install payload");
-		}
-		const record = input as Record<string, unknown>;
-		if (typeof record.sessionId !== "string" || !record.sessionId || typeof record.idPrefix !== "string" || !record.idPrefix || typeof record.name !== "string" || !record.name.trim() || typeof record.purpose !== "string" || !record.purpose.trim()) {
-			throw new Error("invalid plugin install payload");
-		}
-		if (!installDshPlugin) throw new Error("DSH plugin install is not available");
-		return installDshPlugin(input as import("../../shared/types").DshPluginInstallInput);
-	});
-	ipcMain.handle(ipcChannels.dshPluginRun, async (_event, input: unknown): Promise<unknown> => {
-		if (typeof input !== "object" || input === null) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		const record = input as Record<string, unknown>;
-		if (typeof record.sessionId !== "string" || !record.sessionId || typeof record.pluginId !== "string" || !record.pluginId) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		if (!runDshPlugin) throw new Error("DSH plugin run is not available");
-		return runDshPlugin(input as import("../../shared/types").DshPluginLifecycleInput);
-	});
-	ipcMain.handle(ipcChannels.dshPluginStop, async (_event, input: unknown): Promise<unknown> => {
-		if (typeof input !== "object" || input === null) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		const record = input as Record<string, unknown>;
-		if (typeof record.sessionId !== "string" || !record.sessionId || typeof record.pluginId !== "string" || !record.pluginId) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		if (!stopDshPlugin) throw new Error("DSH plugin stop is not available");
-		return stopDshPlugin(input as import("../../shared/types").DshPluginLifecycleInput);
-	});
-	ipcMain.handle(ipcChannels.dshPluginUninstall, async (_event, input: unknown): Promise<unknown> => {
-		if (typeof input !== "object" || input === null) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		const record = input as Record<string, unknown>;
-		if (typeof record.sessionId !== "string" || !record.sessionId || typeof record.pluginId !== "string" || !record.pluginId) {
-			throw new Error("invalid plugin lifecycle payload");
-		}
-		if (!uninstallDshPlugin) throw new Error("DSH plugin uninstall is not available");
-		return uninstallDshPlugin(input as import("../../shared/types").DshPluginLifecycleInput);
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogCopy, async (_event, sessionId: string) => {
 		const result = await copyCatalogSession(sessionId);
@@ -1581,105 +1309,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	// 渲染层切换会话时汇报聚焦会话；主进程据此判断 Ask 类请求是否需要桌面通知
 	ipcMain.handle(ipcChannels.sessionsSetFocusedSession, (_event, sessionId: unknown) => {
 		sessionRuntimeCoordinator.setFocusedSession(typeof sessionId === "string" && sessionId.trim() ? sessionId.trim() : undefined);
-	});
-	ipcMain.handle(ipcChannels.dshListModels, async () => (listDshModels ? listDshModels() : []));
-	ipcMain.handle(ipcChannels.dshDiscoverModels, async (_event, input: unknown) => {
-		if (!isDshModelDiscoveryInput(input)) {
-			throw new Error("Invalid DSH model discovery input");
-		}
-		if (!discoverDshModels) throw new Error("DSH model discovery is not available");
-		return discoverDshModels(input);
-	});
-	ipcMain.handle(ipcChannels.dshListProviders, async () => (listDshProviders ? listDshProviders() : []));
-	ipcMain.handle(ipcChannels.dshAgentPresets, async () => (listDshAgentPresets ? listDshAgentPresets() : []));
-	ipcMain.handle(ipcChannels.dshDefaultModel, async () => (getDshDefaultModel ? getDshDefaultModel() : undefined));
-	ipcMain.handle(ipcChannels.dshGetStatus, async () => (getDshStatus ? getDshStatus() : { started: false, homeDir: "", bootError: null }));
-	// DSH runtime 安装态查询：未装配 dshBackend = 无 DSH 后端，按 notInstalled 返回
-	//（渲染层据此隐藏 DSH UI、显示安装引导，不会出现裸报错）。
-	ipcMain.handle(ipcChannels.dshRuntimeGetStatus, async () => (getDshRuntimeStatus ? getDshRuntimeStatus() : { state: "notInstalled" as const }));
-	// DSH runtime 安装（阶段 2）：进度不走返回值，经 dsh-runtime:install-progress 推送，
-	// 因为下载可能持续数十秒——返回 promise 会让渲染层一直空转等待。
-	ipcMain.handle(ipcChannels.dshRuntimeInstall, async () => {
-		if (!installDshRuntime) throw new Error("DSH runtime installation is not available");
-		return installDshRuntime();
-	});
-	ipcMain.handle(ipcChannels.dshRuntimeInstallLocal, async () => {
-		if (!importDshRuntime) throw new Error("DSH runtime installation is not available");
-		// 对话框在主进程弹：渲染层不参与路径选择，也就没有「传任意路径读文件」的入口。
-		const picked = await dialog.showOpenDialog({
-			title: mainCopy("dsh.runtime.pickArchiveTitle"),
-			// 只收归档：与目录入口分开弹。Windows 上 openFile + openDirectory 同时给会
-			// 退化成只能选目录，.tgz 选不到（见 shared/ipc.ts 的 dshRuntimeInstallLocalDir）。
-			filters: [{ name: "DSH runtime", extensions: ["tgz", "gz"] }],
-			properties: ["openFile"],
-		});
-		if (picked.canceled || picked.filePaths.length === 0) return { ok: false, error: "cancelled" };
-		const filePath = picked.filePaths[0];
-		// 归档文件或已解压目录都允许（目录由 installer 按类型分流处理）。
-		if (!filePath || !existsSync(filePath)) {
-			throw new Error(mainCopy("dsh.runtime.invalidArchivePath"));
-		}
-		return importDshRuntime(filePath);
-	});
-	ipcMain.handle(ipcChannels.dshRuntimeInstallLocalDir, async () => {
-		if (!importDshRuntime) throw new Error("DSH runtime installation is not available");
-		const picked = await dialog.showOpenDialog({
-			title: mainCopy("dsh.runtime.pickDirectoryTitle"),
-			properties: ["openDirectory"],
-		});
-		if (picked.canceled || picked.filePaths.length === 0) return { ok: false, error: "cancelled" };
-		const dirPath = picked.filePaths[0];
-		if (!dirPath || !existsSync(dirPath)) {
-			throw new Error(mainCopy("dsh.runtime.invalidArchivePath"));
-		}
-		return importDshRuntime(dirPath);
-	});
-	ipcMain.handle(ipcChannels.dshRuntimeUninstall, async () => {
-		if (!uninstallDshRuntime) throw new Error("DSH runtime installation is not available");
-		return uninstallDshRuntime();
-	});
-	ipcMain.handle(ipcChannels.dshConfigDescribe, async () => (describeDshSettings ? describeDshSettings() : { writable: false, hasDocument: false, namespaces: [] }));
-	ipcMain.handle(ipcChannels.dshConfigUpdate, async (_event, ns: string, patch: Record<string, unknown>, expectedRevision?: number) => {
-		if (!updateDshSettings) throw new Error("DSH settings are not available");
-		return updateDshSettings(ns, patch, expectedRevision);
-	});
-	ipcMain.handle(ipcChannels.dshConfigMutate, async (_event, ns: string, ops: Array<{ op: "set"; path: string[]; value: unknown } | { op: "unset"; path: string[] }>, expectedRevision?: number) => {
-		if (!mutateDshSettings) throw new Error("DSH settings are not available");
-		return mutateDshSettings(ns, ops, expectedRevision);
-	});
-	ipcMain.handle(ipcChannels.dshCredentialDescribe, async (_event, refs: string[]) => (describeDshCredentials ? describeDshCredentials(refs) : {}));
-	ipcMain.handle(ipcChannels.dshCredentialSet, async (_event, ref: string, value: string) => {
-		if (!setDshCredential) throw new Error("DSH credentials are not available");
-		await setDshCredential(ref, value);
-	});
-	ipcMain.handle(ipcChannels.dshCredentialUnset, async (_event, ref: string) => {
-		if (!unsetDshCredential) throw new Error("DSH credentials are not available");
-		await unsetDshCredential(ref);
-	});
-	// 凭证明文读取：渲染层点「眼睛」时按 ref 取一次（无值返回 undefined）。
-	// ref 格式校验与 DSH credentialRef 同规则，防路径注入。
-	ipcMain.handle(ipcChannels.dshCredentialRead, async (_event, ref: unknown) => {
-		if (!readDshCredential) throw new Error("DSH credentials are not available");
-		if (typeof ref !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {
-			throw new Error(`invalid credential ref: ${String(ref)}`);
-		}
-		return readDshCredential(ref);
-	});
-	ipcMain.handle(ipcChannels.dshOpenDocument, async () => {
-		if (!openDshDocument) throw new Error("DSH settings document is not available");
-		await openDshDocument();
-	});
-	ipcMain.handle(ipcChannels.dshRestartHost, async () => {
-		if (!restartDshHost) throw new Error("DSH host restart is not available");
-		return restartDshHost();
-	});
-	ipcMain.handle(ipcChannels.dshStopHost, async () => {
-		if (!stopDshHost) throw new Error("DSH host stop is not available");
-		return stopDshHost();
-	});
-	ipcMain.handle(ipcChannels.dshStartHost, async () => {
-		if (!startDshHost) throw new Error("DSH host start is not available");
-		return startDshHost();
 	});
 	ipcMain.handle(ipcChannels.sessionsRuntimeStop, (_event, target: SessionRuntimeTarget) => stopSessionRuntime(target));
 	ipcMain.handle(ipcChannels.sessionsRuntimeAbort, (_event, target: SessionRuntimeTarget) => sessionRuntimeCoordinator.abortRuntime(target));

@@ -291,28 +291,7 @@ export function createPreviewApi(): PiDesktopApi {
 		},
 		clipboard: clipboardStub,
 		// 资源管理器右键菜单预览桩：预览环境无注册表操作，一律报不支持
-		quickTask: { getState: async () => ({ active: false, requestId: 0 }), onChanged: () => () => undefined, exit: async () => undefined, switchToMiniOverlay: async () => undefined },
-		floatingBall: {
-			getState: async () => ({ visible: false, alwaysOnTop: true, snapToEdge: true, expandTarget: "mini" as const, showRunningBadge: true, activeCount: 0, runningCount: 0, recentTitles: [], locale: "zh-CN" as const }),
-			onStateChanged: () => () => undefined,
-			enter: async () => undefined,
-			exit: async () => undefined,
-			setEnabled: async () => undefined,
-			setExpandTarget: async () => undefined,
-			dragStart: async () => undefined,
-			dragMove: async () => undefined,
-			dragEnd: async () => undefined,
-			contextMenu: async () => undefined,
-		},
-		miniOverlay: {
-			getState: async () => null,
-			onStateChanged: () => () => undefined,
-			jumpToSession: async () => undefined,
-			quickPrompt: async () => ({ ok: false, message: "preview mode" }),
-			close: async () => undefined,
-			collapse: async () => undefined,
-			switchToQuickTask: async () => undefined,
-		},
+		quickTask: { getState: async () => ({ active: false, requestId: 0 }), onChanged: () => () => undefined, exit: async () => undefined },
 		// 预览模式没有真实 pi 认证宿主；提供与 preload 同形状的安全空实现，
 		// 避免新增认证能力让静态预览整站无法通过类型检查或初始化。
 		piAuth: {
@@ -675,31 +654,6 @@ export function createPreviewApi(): PiDesktopApi {
 				thinkingLevel: input.thinkingLevel,
 				createdAt: now,
 				updatedAt: now,
-			}),
-			createAnonymous: async (input) => ({
-				session: {
-					id: `preview-anonymous:${input.projectId}`,
-					projectId: input.projectId,
-					title: input.title || "Anonymous chat",
-					noSession: true,
-					source: "pi",
-					environment: "native",
-					preview: "",
-					messageCount: 0,
-					status: "active",
-					createdAt: now,
-					updatedAt: now,
-				},
-				runtime: {
-					sessionId: `preview-anonymous:${input.projectId}`,
-					agentId: "preview-anonymous-agent",
-					runtimeGeneration: 1,
-					projectId: input.projectId,
-					cwd: projects.find((project) => project.id === input.projectId)?.path || "",
-					status: "idle",
-					createdAt: now,
-					noSession: true,
-				},
 			}),
 			updateRecord: async (sessionId, patch): Promise<SessionRecord> => ({
 				id: sessionId,
@@ -1139,6 +1093,9 @@ export function createPreviewApi(): PiDesktopApi {
 			}),
 		},
 		app: {
+			onFocusTarget: noop,
+			getPendingFocusTarget: async () => null,
+
 			info: async () => ({
 				version: "preview",
 				releasesUrl: "https://github.com/ayuayue/PiDeck/releases",
@@ -1334,27 +1291,6 @@ export function createPreviewApi(): PiDesktopApi {
 				output: "Preview mode: extension update-one output",
 				updated: false,
 			}),
-			catalog: async () => ({
-				generatedAt: Date.now(),
-				fromCache: false,
-				items: [
-					{
-						name: "preview-extension",
-						description: "Preview mode extension",
-						author: "preview",
-						types: ["extension"],
-						downloadsPerMonth: 1,
-						publishedAt: Date.now(),
-						searchText: "preview-extension",
-						installSource: "npm:preview-extension",
-						pageUrl: "https://pi.dev/packages/preview-extension",
-					},
-				],
-				page: 1,
-				pageSize: 1,
-				total: 1,
-				lastPage: 1,
-			}),
 			// 内置扩展热更新（预览/Web 模式不联网、无覆盖层）
 			builtInStatus: async () => ({
 				builtin: { version: "1.0.0", fileCount: 13 },
@@ -1486,49 +1422,6 @@ export function createPreviewApi(): PiDesktopApi {
 				scope: "project",
 				enabled,
 			}),
-		},
-		promptStore: {
-			search: async (_query, _opts) => ({ query: _query ?? "", count: 0, prompts: [] }),
-			get: async (_id) => ({ id: _id, title: "", description: "", content: "", type: "TEXT", author: "", category: "", tags: [], votes: 0, createdAt: "" }),
-			import: async (data) => ({
-				name: data.title.toLowerCase().replace(/[^\w-]+/g, "-"),
-				path: `C:/Users/preview/.pi/agent/prompts/${data.title.toLowerCase().replace(/[^\w-]+/g, "-")}.md`,
-				description: data.description,
-				content: data.content,
-				userCreated: true,
-			}),
-		},
-		yaoPrompts: {
-			list: async () => ({ categories: [], prompts: [], repoPath: "" }),
-			detail: async () => ({ title: "", description: "", promptContent: "", fullContent: "" }),
-			import: async (_slug, _category) => ({
-				name: _slug,
-				path: `C:/Users/preview/.pi/agent/prompts/${_slug}.md`,
-				description: "Preview import",
-				content: "Preview content",
-				userCreated: true,
-			}),
-		},
-		skillStore: {
-			search: async () => ({ query: "", count: 0, prompts: [] }),
-			import: async (data, _locationId) => ({
-				name: data.title.toLowerCase().replace(/[^\w-]+/g, "-"),
-				path: `C:/Users/preview/.pi/agent/skills/${data.title.toLowerCase().replace(/[^\w-]+/g, "-")}/SKILL.md`,
-				description: data.description,
-				enabled: true,
-				valid: true,
-				warnings: [],
-				id: `pi-global:preview`,
-				dir: "",
-				sourceId: "pi-global",
-				sourceLabel: "Preview",
-				type: "directory",
-			}),
-		},
-		skillHub: {
-			search: async () => ({ query: "", total: 0, items: [] }),
-			detail: async () => null,
-			install: async (slug) => ({ success: true, slug, installDir: "", message: "Preview install" }),
 		},
 		acp: {
 			// 预览模式：无 ACP 工具数据，返回空表/恒过校验保持 PiDesktopApi 形状完整；
@@ -1692,7 +1585,6 @@ export function createPreviewApi(): PiDesktopApi {
 			listUsageProbeStates: async () => ({ providers: {}, errors: [] }),
 			testUsageProbe: async () => ({ success: false, error: "preview" }),
 			installUsageSkill: async () => ({ success: false, error: "preview" }),
-			installImageGenSkill: async () => ({ success: false, error: "preview" }),
 			installMcpSetupSkill: async () => ({ success: false, error: "preview" }),
 		},
 		configBackups: {
@@ -1703,28 +1595,6 @@ export function createPreviewApi(): PiDesktopApi {
 			delete: async () => ({ ok: true }),
 			deleteMany: async () => ({ ok: true, deleted: 0 }),
 			deleteAll: async () => ({ ok: true }),
-		},
-		pet: {
-			onState: noop,
-			list: async () => [{ id: "clawd", displayName: "Clawd", source: "builtin", spritesheetUrl: "" }],
-			setEnabled: async () => undefined,
-			setId: async () => undefined,
-			moveWindow: async () => undefined,
-			moveBy: async () => undefined,
-			ready: () => undefined,
-			contextMenu: async () => undefined,
-			focusAgent: async () => undefined,
-			onFocusTarget: noop,
-			getPendingFocusTarget: async () => null,
-			onSprite: noop,
-			onNotify: noop,
-			setPreviewMode: async () => undefined,
-			onPreviewMode: noop,
-			onCaps: noop,
-			testNotify: async () => undefined,
-			tease: async () => undefined,
-			setDragging: async () => undefined,
-			getCurrent: async () => ({ id: "clawd", displayName: "Clawd", source: "builtin", spritesheetUrl: "" }),
 		},
 		sounds: {
 			// 预览模式：不真实播放，事件订阅空操作（保持 PiDesktopApi 形状完整）
@@ -1781,29 +1651,6 @@ export function createPreviewApi(): PiDesktopApi {
 			],
 			fonts: async () => [],
 		},
-		feishu: {
-			connect: async () => ({ success: true, message: "预览模式" }),
-			connectTemp: async () => ({ success: false, message: "预览模式不支持" }),
-			disconnect: async () => ({ success: true }),
-			connectByBot: async () => ({ success: false, message: "预览模式不支持" }),
-			statusRequest: async () => ({ status: "disconnected" as const, activeBindings: 0 }),
-			onStatus: () => () => {},
-			botsList: async () => [],
-			botAdd: async () => ({ success: false, error: "预览模式不支持" }),
-			botRemove: async () => false,
-			botConfig: async () => undefined,
-			botSecret: async () => "",
-			testConnection: async () => ({ success: false, message: "预览模式不支持" }),
-			bindingsList: async () => [],
-			bindingRemove: async () => false,
-			bindingUpdate: async () => undefined,
-			onMessages: () => () => {},
-			onBindingsChanged: () => () => {},
-			onBotsChanged: () => () => {},
-			onWhoamiResult: () => () => {},
-			sessionBotGet: async () => null,
-			sessionBotSet: async () => ({ success: true }),
-		},
 		browser: {
 			openExternal: async () => {},
 		},
@@ -1815,14 +1662,7 @@ export function createPreviewApi(): PiDesktopApi {
 			save: async () => {},
 			export: async () => false,
 		},
-
-		// 生图预览桩：预览模式不联网、无落盘图片，直接返回未配置 / 空图
-		imagegen: {
-			generate: async (_request) => ({ ok: false, error: "notConfigured" }),
-			getConfig: async () => ({ providers: [], activeProviderId: "", activeModel: "" }),
-			saveConfig: async (config) => ({ ok: true, config }),
-			readImageBlob: async () => null,
-		},
+		images: { readBlob: async () => null },
 		enhance: {
 			run: async () => ({ ok: false, errorKind: "sdk-unavailable", message: "preview mode" }),
 			cancel: async () => ({ ok: true }),
@@ -1973,12 +1813,6 @@ export function createPreviewApi(): PiDesktopApi {
 			}),
 			previewCron: async () => ({ valid: true, nextRuns: [] }),
 			onChanged: () => () => {},
-		},
-		cua: {
-			onApprovalRequest: () => () => {},
-			sendApprovalResponse: async () => {},
-			getState: async () => ({ enabled: false, sessionOverrides: {} }),
-			setState: async () => ({ enabled: false, sessionOverrides: {} }),
 		},
 	};
 }

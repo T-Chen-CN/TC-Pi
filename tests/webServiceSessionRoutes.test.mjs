@@ -380,18 +380,11 @@ test("runtime model listing preserves the generation-validated Session target", 
 	});
 });
 
-test("anonymous Session HTTP route creates a runtime-only Session record", async () => {
+test("removed anonymous Session HTTP route rejects requests without creating a session", async () => {
 	await withServer(async ({ baseUrl, calls }) => {
-		const response = await fetch(`${baseUrl}/api/sessions/anonymous`, {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ projectId: "project-1", title: "Private work" }),
-		});
-		const created = await response.json();
-		assert.equal(created.session.id, "anonymous-1");
-		assert.equal(created.session.noSession, true);
-		assert.equal(created.runtime.noSession, true);
-		assert.equal(calls.createAnonymous, 1);
+		const response = await fetch(`${baseUrl}/api/sessions/anonymous`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: "project-1", title: "Private work" }) });
+		assert.equal(response.status, 404);
+		assert.equal(calls.createAnonymous, 0);
 		assert.equal(calls.createDraft, 0);
 	});
 });

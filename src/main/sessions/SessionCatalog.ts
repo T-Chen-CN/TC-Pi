@@ -544,30 +544,6 @@ export class SessionCatalog {
 		});
 	}
 
-	createAnonymous(input: { projectId: string; title: string; environment: SessionEnvironment; model?: SessionModelPreference; thinkingLevel?: string }): SessionRecord {
-		this.assertLoaded();
-		const now = Date.now();
-		const entry: SessionCatalogEntry = {
-			id: randomUUID(),
-			projectId: input.projectId,
-			title: input.title,
-			titleLocked: true,
-			titleOrigin: "manual",
-			noSession: true,
-			source: "pi",
-			environment: input.environment,
-			wslDistro: input.environment === "wsl" ? this.identityContext.wslDistro : undefined,
-			wslUser: input.environment === "wsl" ? this.identityContext.wslUser : undefined,
-			status: "active",
-			model: cloneModelPreference(input.model),
-			thinkingLevel: input.thinkingLevel,
-			createdAt: now,
-			updatedAt: now,
-		};
-		this.transientEntries.set(entry.id, entry);
-		return this.recordFromEntry(entry);
-	}
-
 	removeTransient(id: string): boolean {
 		this.assertLoaded();
 		return this.transientEntries.delete(id);

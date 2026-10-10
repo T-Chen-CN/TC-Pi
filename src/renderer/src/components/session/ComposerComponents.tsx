@@ -13,7 +13,6 @@ import { showNotice } from "../../utils/notice";
 import { ModelThinkingChip } from "./ModelThinkingChip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
 import { ConfirmDialog } from "../app/AppParts";
-import { ComposerImageGenOptions } from "./ComposerImageGenOptions";
 import { useComposerModeAvailability } from "../../hooks/useComposerModeAvailability";
 import type { ImageGenConfigFile } from "../../../../shared/imageGenConfig";
 import { ProviderUsageInline } from "../app/ProviderUsageInline";
@@ -131,124 +130,9 @@ export function ExtensionWidgetCard(props: {
 		</div>
 	);
 }
-
-/** 输入框底栏的后端选择下拉（pi / dsh / 生图）：跟随会话后端（新建会话默认 pi，由设置项 defaultAgentBackend 决定）。
- * 触发区只显示当前后端 logo（不再带文字）；下拉选项保留文字便于选择时区分。
- * 用户在设置里隐藏了 DSH / 生图模块时不列对应选项；但当前草稿已选中该后端时仍保留，
- * 否则 Select 的当前值在列表里没有对应项，用户也无法看清自己选了什么。 */
-export function ComposerBackendPicker(props: { backend: AgentBackend; disabled?: boolean; onChangeBackend: (backend: AgentBackend, acpToolId?: string) => void }) {
-	const dshHidden = useAtomValue(dshModuleHiddenAtom);
-	const imageGenHidden = useAtomValue(imageGenModuleHiddenAtom);
-	// ACP 是 opt-in：开关开启且登记了工具才列入口；已是 acp 会话时始终保留
-	//（同 dsh/imagegen 的「+当前后端」规则，避免切走后回不来）。
-	const acpEnabled = useAtomValue(acpEnabledAtom);
-	const acpTools = useAtomValue(acpToolsAtom);
-	const showAcp = (acpEnabled && acpTools.length > 0) || props.backend === "acp";
-	const showDsh = !dshHidden || props.backend === "dsh";
-	const showImageGen = !imageGenHidden || props.backend === "imagegen";
-	// 两页式弹层：点「Agent CLI」后弹层不关，原地切成工具列表页——全程在用户
-	// 手势链内（radix Select 支持受控 open 保持打开，但不支持程序化冷开，
-	// 冷开定位不可靠是官方已知限制）；选完工具或点「返回」才关。
-	const [open, setOpen] = useState(false);
-	const [awaitingTool, setAwaitingTool] = useState(false);
-	return (
-		<Select
-			open={open}
-			onOpenChange={(next) => {
-				// 选 Agent CLI 后保持弹层打开（切到工具页）；点外部/ESC 关闭时同时遇回后端页
-				if (!next && awaitingTool) {
-					setAwaitingTool(false);
-					setOpen(false);
-					return;
-				}
-				setOpen(next);
-			}}
-			value={props.backend}
-			disabled={props.disabled}
-			onValueChange={(value) => {
-				if (value === "acp:pick") {
-					setAwaitingTool(true); // 弹层不关：受控 open 维持 true
-					return;
-				}
-				if (value === "acp:back") {
-					setAwaitingTool(false); // 回后端列表页，弹层保持打开
-					return;
-				}
-				if (value.startsWith("acp-tool:")) {
-					const toolId = value.slice("acp-tool:".length);
-					setAwaitingTool(false);
-					setOpen(false);
-					props.onChangeBackend("acp", toolId);
-					return;
-				}
-				setAwaitingTool(false);
-				props.onChangeBackend(value as AgentBackend);
-			}}
-		>
-			<SelectTrigger
-				size="sm"
-				className="composer-bar-btn backend h-7 gap-1 rounded-md border-transparent px-1.5 text-control font-semibold text-foreground hover:bg-muted/60 focus-visible:border-transparent focus-visible:ring-0 data-[state=open]:border-transparent data-[state=open]:ring-0 [&_[data-slot='select-icon']]:hidden"
-				title={t("session.backendPickerHint")}
-			>
-				{/* 不渲染 SelectValue：按当前后端手动渲染 logo，输入框只显示图标不带文字。
-				    隐藏 shadcn SelectTrigger 自带的 chevron（[data-slot='select-icon']），
-				    否则 logo 与 chevron 并排（justify-between）→ 图标偏左不居中、
-				    16px chevron 与 14px logo 混排导致上下不齐。 */}
-				{props.backend === "dsh" ? (
-					<DshLogo className="size-[15px] shrink-0" />
-				) : props.backend === "imagegen" ? (
-					<ImageIcon className="size-[15px] shrink-0 text-muted-foreground" />
-				) : props.backend === "acp" ? (
-					<Terminal className="size-[15px] shrink-0 text-muted-foreground" />
-				) : (
-					<PiLogo className="size-[15px] shrink-0" />
-				)}
-			</SelectTrigger>
-			<SelectContent align="start">
-				{awaitingTool ? (
-					// 第二页：工具列表（点 Agent CLI 后原地切换）。「返回」用非 acp 前缀 value
-					// 触发回退，不走 onValueChange 的后端切换分支。
-					<>
-						<SelectItem value="acp:back">
-							<ChevronLeft className="size-3.5 shrink-0 text-muted-foreground" />
-							{t("common.back")}
-						</SelectItem>
-						{acpTools.map((tool) => (
-							<SelectItem key={tool.id} value={`acp-tool:${tool.id}`}>
-								<Terminal className="size-3.5 shrink-0 text-muted-foreground" />
-								<span className="truncate">{tool.name}</span>
-							</SelectItem>
-						))}
-					</>
-				) : (
-					<>
-						<SelectItem value="pi">
-							<PiLogo className="size-3.5 shrink-0" />
-							{t("sessionSource.pi")}
-						</SelectItem>
-						{showDsh ? (
-							<SelectItem value="dsh">
-								<DshLogo className="size-3.5 shrink-0" />
-								{t("sessionBackend.dsh")}
-							</SelectItem>
-						) : null}
-						{showImageGen ? (
-							<SelectItem value="imagegen">
-								<ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
-								{t("sessionBackend.imagegen")}
-							</SelectItem>
-						) : null}
-						{showAcp ? (
-							<SelectItem value="acp:pick">
-								<Terminal className="size-3.5 shrink-0 text-muted-foreground" />
-								{t("sessionBackend.acp")}
-							</SelectItem>
-						) : null}
-					</>
-				)}
-			</SelectContent>
-		</Select>
-	);
+/** This distribution has a single pi backend, so no backend picker is needed. */
+export function ComposerBackendPicker(_props: { backend: AgentBackend; disabled?: boolean; onChangeBackend: (backend: AgentBackend, acpToolId?: string) => void }) {
+	return null;
 }
 
 /**
@@ -610,21 +494,6 @@ export function ComposerBottomBar(props: {
 					)}
 				</div>
 				<div className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4${isImageGenMode ? " overflow-x-auto overflow-y-hidden [scrollbar-width:none]" : " overflow-hidden"}`}>
-					{isImageGenMode && props.imageGenOptions ? (
-						<ComposerImageGenOptions
-							config={props.imageGenOptions.config}
-							providerId={props.imageGenOptions.providerId}
-							modelId={props.imageGenOptions.modelId}
-							size={props.imageGenOptions.size}
-							outputFormat={props.imageGenOptions.outputFormat}
-							watermark={props.imageGenOptions.watermark}
-							disabled={props.disabled}
-							onSelectionChange={props.imageGenOptions.onSelectionChange}
-							onSizeChange={props.imageGenOptions.onSizeChange}
-							onOutputFormatChange={props.imageGenOptions.onOutputFormatChange}
-							onWatermarkChange={props.imageGenOptions.onWatermarkChange}
-						/>
-					) : null}
 					{/* 生图模式用独立供应商/模型下拉，不展示会话 LLM chip，避免两套配置混用。
 					    ACP 同理：模型/思考由 agent CLI 自持（session/config options 或各自 /model 命令），
 					    PiDeck 维护的 models.json 对 agent CLI 无意义，隐藏 chip 防止两套语义混用。 */}

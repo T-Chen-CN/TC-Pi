@@ -53,7 +53,7 @@ export const sessionSummariesByProjectIdAtomFamily = atomFamily((projectId: stri
 		get(sessionRecordsByProjectIdAtomFamily(projectId))
 			.map(sessionRecordToSummary)
 			.filter((session): session is SessionSummary => Boolean(session))
-			.sort((left, right) => right.updatedAt - left.updatedAt),
+			.sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0) || left.id.localeCompare(right.id)),
 	),
 );
 

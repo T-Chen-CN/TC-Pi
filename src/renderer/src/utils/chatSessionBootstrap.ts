@@ -26,37 +26,11 @@ export const WELCOME_DSH_MODEL_KEY = "pideck:welcome-dsh-model";
 export const WELCOME_THINKING_KEY = "pideck:welcome-thinking";
 /** 欢迎页（未启动 Agent）显式切换的后端存储 key；首次发送时提升到真实会话。 */
 export const WELCOME_BACKEND_KEY = "pideck:welcome-backend";
-
-/** 读取欢迎页最后显式切换的后端（仅认 pi/dsh；无则 undefined）。 */
 export function readWelcomeBackendPreference(): AgentBackend | undefined {
-	try {
-		const raw = localStorage.getItem(WELCOME_BACKEND_KEY);
-		// imagegen 是模式不是后端切换器的取值，历史脏数据一律忽略。
-		if (raw === "pi" || raw === "dsh") return raw;
-	} catch {
-		// localStorage 不可用时视为无偏好
-	}
-	return undefined;
+	return "pi";
 }
-
-/**
- * 引导页实际会创建的后端：用户显式切换优先，但 DSH runtime 不可用时回落 pi。
- *
- * 为什么必须是纯函数并被展示与创建两侧共用：底栏/选择器按它选目录与默认值
- * （pi 读 models.json、DSH 读 host catalog），`ensureSessionForSend` 按它建会话。
- * 两侧各写一份就会分叉——用户看到 DSH 目录却建出 pi 会话（或反之）。
- *
- * 钳制规则与 `resolveEffectiveAgentBackend` 同源：DSH 不可用时不能让新建落到 dsh，
- * 否则首次发送才在 createDraft 的 runtime 门控上抛错。
- */
-export function resolveGuidePageBackend(input: {
-	/** 引导页显式切换的后端（localStorage 偏好，无则 undefined）。 */
-	override?: AgentBackend;
-	/** 设置项默认后端，已经过 DSH runtime 安装态钳制（effectiveAgentBackendAtom）。 */
-	effectiveDefault: AgentBackend;
-}): AgentBackend {
-	if (input.override === "dsh" && input.effectiveDefault !== "dsh") return "pi";
-	return input.override ?? input.effectiveDefault;
+export function resolveGuidePageBackend(_input: { override?: AgentBackend; effectiveDefault?: AgentBackend }): AgentBackend {
+	return "pi";
 }
 
 /** 读取欢迎页最后选择的模型偏好（无则 undefined）。 */

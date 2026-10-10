@@ -152,12 +152,12 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 			}
 			focusBySessionId(target.sessionId);
 		};
-		const unsubscribe = window.piDesktop.pet.onFocusTarget((target) => {
+		const unsubscribe = window.piDesktop.app.onFocusTarget((target) => {
 			handleFocusTarget(target);
 		});
 		// 冷启动/页面加载期间点击通知/右键菜单：主进程直接 send 会在监听注册前丢失，
 		// 挂载后主动拉取一次 pending 目标（与事件推送共用同一解析/重试逻辑）。
-		void window.piDesktop.pet.getPendingFocusTarget?.().then((target) => {
+		void window.piDesktop.app.getPendingFocusTarget?.().then((target) => {
 			if (disposed || !target) return;
 			handleFocusTarget(target);
 		});

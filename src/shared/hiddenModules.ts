@@ -15,16 +15,20 @@
  * 顺序即外观设置里开关的排列顺序，与侧栏分组顺序一致（扩展集成 → 开发者工具 → 开发与维护）。
  * 常用 / 快捷键 / 通知 / 外观 / 代理 / 外部编辑器 / 开发设置 / 缓存 / 备份 是应用基础项，不提供隐藏。
  */
-export const HIDEABLE_SETTINGS_TAB_IDS = ["im", "pet", "vision", "imagegen", "acp", "hostplugins", "web", "git", "usage", "process"] as const;
+import { isRemovedModule } from "./productFeatures";
+
+const LEGACY_SETTINGS_TAB_IDS = ["im", "pet", "vision", "imagegen", "acp", "hostplugins", "web", "git", "usage", "process"] as const;
+export const HIDEABLE_SETTINGS_TAB_IDS = LEGACY_SETTINGS_TAB_IDS.filter((id) => !isRemovedModule(id));
 
 /**
  * 全部可隐藏模块：设置 tab + `dsh`（DSH 后端不是设置 tab，它对应配置管理的 DSH 分页
  * 与新建会话的 DSH 后端选项）+ `composerModes`（输入框底栏的模式选择器）。
  */
-export const HIDEABLE_MODULE_IDS = [...HIDEABLE_SETTINGS_TAB_IDS, "composerModes", "dsh"] as const;
+const LEGACY_MODULE_IDS = [...LEGACY_SETTINGS_TAB_IDS, "composerModes", "dsh"] as const;
+export const HIDEABLE_MODULE_IDS = LEGACY_MODULE_IDS.filter((id) => !isRemovedModule(id));
 
-export type HideableSettingsTabId = (typeof HIDEABLE_SETTINGS_TAB_IDS)[number];
-export type HideableModuleId = (typeof HIDEABLE_MODULE_IDS)[number];
+export type HideableSettingsTabId = (typeof LEGACY_SETTINGS_TAB_IDS)[number];
+export type HideableModuleId = HideableSettingsTabId | "composerModes" | "dsh";
 
 /** 上限：清单本身只有个位数条目，留余量容纳未知 id，同时挡住脏数据把 settings.json 塞爆。 */
 export const MAX_HIDDEN_MODULES = 64;
@@ -48,7 +52,7 @@ export function normalizeHiddenModules(value: unknown): string[] {
 
 /** 某模块当前是否被用户隐藏。 */
 export function isModuleHidden(hiddenModules: readonly string[], moduleId: HideableModuleId): boolean {
-	return hiddenModules.includes(moduleId);
+	return isRemovedModule(moduleId) || hiddenModules.includes(moduleId);
 }
 
 /** 切换某模块的隐藏状态，返回新数组（不改入参）；用于外观设置开关的 onChange。 */

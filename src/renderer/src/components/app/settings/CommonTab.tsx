@@ -193,29 +193,7 @@ export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 						</SelectContent>
 					</Select>
 				</SettingRow>
-				<SettingRow
-					anchor="common-default-agent-backend"
-					title={
-						<>
-							<span>{t("settings.defaultAgentBackend")}</span>
-							<DirtyMarker dirty={isDirty("defaultAgentBackend")} label={t("settings.defaultAgentBackend")} />
-						</>
-					}
-					description={t("settings.defaultAgentBackendDesc")}
-					alignEnd={false}
-				>
-					<Select value={draft.defaultAgentBackend} onValueChange={(value) => updateDraft({ defaultAgentBackend: value as AppSettings["defaultAgentBackend"] })}>
-						<SelectTrigger className="w-full">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="pi">{t("settings.defaultAgentBackendPi")}</SelectItem>
-							<SelectItem value="dsh" disabled={!dshAvailable}>
-								{dshAvailable ? t("settings.defaultAgentBackendDsh") : t("settings.defaultAgentBackendDshUnavailable")}
-							</SelectItem>
-						</SelectContent>
-					</Select>
-				</SettingRow>
+
 				{/* DSH runtime 管理已迁至 DSH 配置 → 概览页（DshRuntimeSection 区块：
             未装→安装引导，已装→版本/目录/卸载/导入），这里不再重复放状态行。 */}
 				{/* 忙碌时投递行为：Agent 回复期间发送消息的默认语义（pi/dsh 统一）。 */}
@@ -378,73 +356,8 @@ export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 			</SettingsSection>
 
 			{/* 悬浮球：主窗口可隐藏为屏幕角落的 64px 常驻小圆点，点开展开小任务浮窗/工作台 */}
-			<SettingsSection title={t("settings.floatingBallSection")} description={t("settings.floatingBallSectionDesc")}>
-				<SettingSwitchRow
-					anchor="common-floating-ball-enabled"
-					title={t("settings.floatingBallEnabled")}
-					description={t("settings.floatingBallEnabledDesc")}
-					checked={draft.floatingBallEnabled ?? false}
-					dirty={isDirty("floatingBallEnabled")}
-					onChange={(checked) => {
-						updateDraft({ floatingBallEnabled: checked });
-						void desktopApi.floatingBall.setEnabled(checked);
-					}}
-				/>
-				<SettingSwitchRow
-					anchor="common-floating-ball-always-on-top"
-					title={t("settings.floatingBallAlwaysOnTop")}
-					description={t("settings.floatingBallAlwaysOnTopDesc")}
-					checked={draft.floatingBallAlwaysOnTop ?? true}
-					disabled={!draft.floatingBallEnabled}
-					dirty={isDirty("floatingBallAlwaysOnTop")}
-					onChange={(checked) => updateDraft({ floatingBallAlwaysOnTop: checked })}
-				/>
-				<SettingSwitchRow
-					anchor="common-floating-ball-show-running-badge"
-					title={t("settings.floatingBallShowRunningBadge")}
-					description={t("settings.floatingBallShowRunningBadgeDesc")}
-					checked={draft.floatingBallShowRunningBadge ?? true}
-					disabled={!draft.floatingBallEnabled}
-					dirty={isDirty("floatingBallShowRunningBadge")}
-					onChange={(checked) => updateDraft({ floatingBallShowRunningBadge: checked })}
-				/>
-				<SettingSwitchRow
-					anchor="common-floating-ball-snap-to-edge"
-					title={t("settings.floatingBallSnapToEdge")}
-					description={t("settings.floatingBallSnapToEdgeDesc")}
-					checked={draft.floatingBallSnapToEdge ?? true}
-					disabled={!draft.floatingBallEnabled}
-					dirty={isDirty("floatingBallSnapToEdge")}
-					onChange={(checked) => updateDraft({ floatingBallSnapToEdge: checked })}
-				/>
-				<SettingRow
-					anchor="common-floating-ball-expand-target"
-					title={
-						<span className="inline-flex items-center gap-1.5">
-							<DirtyMarker dirty={isDirty("floatingBallExpandTarget")} label={t("settings.floatingBallExpandTarget")} />
-							{t("settings.floatingBallExpandTarget")}
-						</span>
-					}
-					description={t("settings.floatingBallExpandTargetDesc")}
-				>
-					<Select value={draft.floatingBallExpandTarget ?? "mini"} onValueChange={(value) => updateDraft({ floatingBallExpandTarget: value as "mini" | "compact" })} disabled={!draft.floatingBallEnabled}>
-						<SelectTrigger className="w-40">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="mini">{t("settings.floatingBallExpandMini")}</SelectItem>
-							<SelectItem value="compact">{t("settings.floatingBallExpandCompact")}</SelectItem>
-						</SelectContent>
-					</Select>
-				</SettingRow>
-			</SettingsSection>
 
 			{/* CUA 桌面操作（实验性）：开启后才监听回环 MCP 端点并注册给 pi；自动审批默认开启，关闭后逐次确认。 */}
-			<SettingsSection title={t("settings.cuaSection")} description={t("settings.cuaSectionDesc")}>
-				<SettingSwitchRow anchor="common-cua-enabled" title={t("settings.cuaEnabled")} description={t("settings.cuaEnabledDesc")} checked={draft.cuaEnabled ?? false} dirty={isDirty("cuaEnabled")} onChange={(checked) => updateDraft({ cuaEnabled: checked })} />
-				{/* 免审批：依赖 CUA 主开关，主开关关闭时置灰；只绕过审批对话框，杀开关仍生效 */}
-				<SettingSwitchRow anchor="common-cua-auto-approve" title={t("settings.cuaAutoApprove")} description={t("settings.cuaAutoApproveDesc")} checked={draft.cuaAutoApprove ?? true} disabled={!draft.cuaEnabled} dirty={isDirty("cuaAutoApprove")} onChange={(checked) => updateDraft({ cuaAutoApprove: checked })} />
-			</SettingsSection>
 
 			{/* 文件资源管理器集成：注册「用 PiDeck 打开」右键菜单（目录与空白处），
           HKCU 写入即时生效；非 Windows 平台开关置灰并提示。 */}

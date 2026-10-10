@@ -47,7 +47,7 @@ test("cold start focus target goes through pending queue", () => {
 	assert.match(indexSource, /pendingFocusTarget = target;/);
 	assert.match(indexSource, /flushPendingFocusTargetOnLoad\(\);/);
 	// 拉取通道必须注册（renderer 挂载后取走即清空）
-	assert.match(indexSource, /ipcMain\.handle\(ipcChannels\.petGetFocusTargetPending/);
+	assert.match(indexSource, /ipcMain\.handle\(ipcChannels\.appGetPendingFocusTarget/);
 
 	const rendererSource = readFileSync("src/renderer/src/hooks/useSessionWorkspaceChrome.ts", "utf8");
 	assert.match(rendererSource, /getPendingFocusTarget\?\.\(\)\.then/);

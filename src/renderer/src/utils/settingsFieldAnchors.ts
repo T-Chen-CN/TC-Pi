@@ -85,12 +85,6 @@ export const SETTINGS_FIELD_ANCHORS: readonly SettingsFieldAnchor[] = [
 	},
 	{
 		tab: "dev",
-		slug: "dsh-runner-node",
-		labelKey: "settings.dshRunnerNode",
-		keywords: ["dsh", "runner node", "node 路径", "沙箱 node", "本机 node"],
-	},
-	{
-		tab: "dev",
 		slug: "dev-auto-download-updates",
 		labelKey: "settings.autoDownloadUpdates",
 		keywords: ["自动下载", "更新", "auto download", "升级", "新版本"],
@@ -186,12 +180,6 @@ export const SETTINGS_FIELD_ANCHORS: readonly SettingsFieldAnchor[] = [
 		slug: "common-send-shortcut",
 		labelKey: "settings.inputShortcut",
 		keywords: ["发送快捷键", "回车发送", "send shortcut", "输入框快捷键", "ctrl enter"],
-	},
-	{
-		tab: "common",
-		slug: "common-default-agent-backend",
-		labelKey: "settings.defaultAgentBackend",
-		keywords: ["默认后端", "pi", "dsh", "backend", "默认 agent"],
 	},
 	{
 		tab: "common",

@@ -313,20 +313,6 @@ export type ResolveLaunchDefaultsInput = {
 	backend?: import("./agent").AgentBackend;
 };
 
-/** Creates a live `--no-session` runtime without writing a session file. */
-export type CreateAnonymousSessionInput = {
-	projectId: string;
-	title?: string;
-	/** 运行时后端；缺省 "pi"。 */
-	backend?: import("./agent").AgentBackend;
-} & SessionLaunchPreferences;
-
-export type CreateAnonymousSessionResult = {
-	session: SessionRecord;
-	/** Runtime creation continues in the background so the composer can open immediately. */
-	runtime?: SessionRuntimeInfo;
-};
-
 export type UpdateSessionRecordInput = {
 	title?: string;
 	/** null = 清空（切后端时丢掉另一套目录里的模型）。 */

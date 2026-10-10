@@ -42,7 +42,7 @@ function loadTranspiledModule(filePath, overrides = new Map()) {
 
 function loadSessionScanner(homePath) {
 	const codexMeta = loadTranspiledModule("src/shared/codexSessionMeta.ts");
-	const messageContent = loadTranspiledModule("src/main/pi/messageContent.ts", new Map([["../feishu/docActions", { stripFeishuDocActionHint: (text) => text }]]));
+	const messageContent = loadTranspiledModule("src/main/pi/messageContent.ts", new Map([["../compatibility/hostInstructions", { stripFeishuDocActionHint: (text) => text }]]));
 	const fsRetry = loadTranspiledModule("src/main/utils/fsRetry.ts");
 	const sessionSummaryCache = loadTranspiledModule(
 		"src/main/sessions/sessionSummaryCache.ts",

@@ -56,7 +56,7 @@ test("用户气泡按会话级 visionBridgeExpected 跳过轮询，而不是只�
 	// 不走 LLM 视觉桥；普通带图消息仍按会话级判定）
 	assert.match(timeline, /visionBridgeExpected=\{\s*imageGenUserMessageIds\.has\(message\.id\) \? false : visionBridgeExpected\s*\}/);
 	assert.match(timeline, /imageGenUserMessageIds/);
-	assert.match(hook, /listModels/);
-	assert.match(hook, /getModels/);
-	assert.match(hook, /modelSupportsNativeImages/);
+	assert.doesNotMatch(hook, /listModels/);
+	assert.doesNotMatch(hook, /getModels/);
+	assert.match(hook, /return false/);
 });

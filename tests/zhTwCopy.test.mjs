@@ -78,20 +78,11 @@ test("Web 客户端：词典含 zh-TW，注入脚本按浏览器语言分流", (
 	assert.match(manager, /"zh-TW"/);
 });
 
-/** 飞书的 zhCN 是模块内局部常量（未导出），从 `const zhCN = {` 到键类型声明之间提取键。 */
-function feishuSourceKeys() {
-	const source = readSource("src/main/feishu/FeishuI18n.ts");
-	const block = source.slice(source.indexOf("const zhCN = {"), source.indexOf("export type FeishuTranslationKey"));
-	return [...block.matchAll(/^\t"([^"]+)":/gm)].map((match) => match[1]);
-}
-
 test("生成物与 zh-CN 源同键：四份 .zh-TW.ts 都不能漏键", () => {
 	const cases = [
 		{ name: "rendererCopy", sourceKeys: Object.keys(load("src/renderer/src/i18n/rendererCopy.zh-CN.ts").zhCN), targetKeys: Object.keys(load("src/renderer/src/i18n/rendererCopy.zh-TW.ts").zhTW) },
 		{ name: "mainProcessCopy", sourceKeys: Object.keys(load("src/shared/i18n/mainProcessCopy.ts").mainProcessZhCN), targetKeys: Object.keys(load("src/shared/i18n/mainProcessCopy.zh-TW.ts").mainProcessZhTW) },
 		{ name: "WebI18n", sourceKeys: Object.keys(load("src/main/web/WebI18n.ts").webZhCN), targetKeys: Object.keys(load("src/main/web/WebI18n.zh-TW.ts").webZhTW) },
-		// 飞书的 zhCN 是模块内局部常量（未导出），键集从源文件文本提取
-		{ name: "FeishuI18n", sourceKeys: feishuSourceKeys(), targetKeys: Object.keys(load("src/main/feishu/FeishuI18n.zh-TW.ts").feishuZhTW) },
 	];
 
 	for (const { name, sourceKeys, targetKeys } of cases) {
@@ -102,7 +93,7 @@ test("生成物与 zh-CN 源同键：四份 .zh-TW.ts 都不能漏键", () => {
 });
 
 test("生成物带生成器标识，且繁体字形确实换过", () => {
-	const generated = ["src/renderer/src/i18n/rendererCopy.zh-TW.ts", "src/shared/i18n/mainProcessCopy.zh-TW.ts", "src/main/web/WebI18n.zh-TW.ts", "src/main/feishu/FeishuI18n.zh-TW.ts"];
+	const generated = ["src/renderer/src/i18n/rendererCopy.zh-TW.ts", "src/shared/i18n/mainProcessCopy.zh-TW.ts", "src/main/web/WebI18n.zh-TW.ts"];
 	for (const path of generated) {
 		assert.match(readSource(path), /由 `node scripts\/genZhTwCopy\.mjs` 生成，请勿手改/, `${path}: 缺少生成器标识头`);
 	}
@@ -118,8 +109,6 @@ test("生成物带生成器标识，且繁体字形确实换过", () => {
 test("设置页提供繁体中文选项，AppLanguageMode 已收录 zh-TW", () => {
 	assert.match(readSource("src/shared/types/settings.ts"), /AppLanguageMode\s*=\s*"system"\s*\|\s*"zh-CN"\s*\|\s*"zh-TW"\s*\|\s*"en-US"\s*\|\s*"pseudo"/);
 	assert.match(readSource("src/renderer/src/components/app/settings/CommonTab.tsx"), /\{\s*value:\s*"zh-TW",\s*label:\s*t\("settings\.languageZhTW"\)\s*\}/);
-	// 浮窗是独立窗口，语言值经 IPC 下发，分支必须认 zh-TW
-	assert.match(readSource("src/main/floating/MiniOverlayWindow.ts"), /settings\.language\s*===\s*"zh-TW"\s*\?\s*"zh-TW"/);
 });
 
 test("日期展示：zh-TW 走中文日历，不回退英文格式", () => {

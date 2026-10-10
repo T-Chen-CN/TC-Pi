@@ -35,7 +35,7 @@ function ImageGenMessage(props: { meta: ImageGenMeta; images?: ImageContent[]; o
 	// 展示源：新图是内联 base64，历史图是落盘引用（pideck-img://，由协议流式加载，
 	// 不把 200 MB base64 搬回渲染进程堆）。复制/保存需要真实字节，走按需 IPC 取回。
 	const imageSrc = imageContentSrc(image);
-	const readImageBlob = useCallback((ref: string) => window.piDesktop.imagegen.readImageBlob(ref), []);
+	const readImageBlob = useCallback((ref: string) => window.piDesktop.images.readBlob(ref), []);
 	/** 取回可复制/可下载的 data URL；取不到返回 null。 */
 	const loadImageDataUrl = async (): Promise<string | null> => {
 		const payload = await loadImageBase64(image, readImageBlob);

@@ -41,7 +41,6 @@ export const BUILT_IN_EXTENSIONS = [
 	"pi-deck-subagents.ts",
 	"pi-deck-todo.ts",
 	"pi-deck-trash-guard.ts",
-	"pi-deck-vision.ts",
 ] as const;
 
 /** Internal adapter loaded after user-facing tool policies; not listed in settings UI. */

@@ -38,12 +38,6 @@ function loadPillsModule() {
 	});
 }
 
-function loadNavTabModule() {
-	return loadTsModule("src/renderer/src/utils/sidebarNavTab.ts", "sidebarNavTab.ts", (specifier) => {
-		throw new Error(`Unexpected import: ${specifier}`);
-	});
-}
-
 function loadSharedSessionSortModule() {
 	return loadTsModule("src/shared/sessionSort.ts", "sessionSort.ts", (specifier) => {
 		throw new Error(`Unexpected import: ${specifier}`);
@@ -63,54 +57,18 @@ function loadControllerModule() {
 		if (specifier === "jotai") return {};
 		if (specifier === "../atoms") return {};
 		if (specifier === "../utils/sidebarExpandedProjects") return loadExpandedProjectsModule();
-		if (specifier === "../utils/sidebarNavTab") return loadNavTabModule();
 		if (specifier === "../sessionFilterPills") return loadPillsModule();
 		if (specifier === "../sessionSortModes") return loadSessionSortModesModule();
 		throw new Error(`Unexpected import: ${specifier}`);
 	});
 }
 
-test("source filters preserve all sources until the user narrows a project", () => {
-	const { filterSidebarSessions, serializeSidebarSourceFilters, readSidebarSourceFilters } = loadControllerModule();
-	const sessions = [{ source: "pi" }, { source: "codex" }, { source: "claude" }];
-	assert.equal(filterSidebarSessions(sessions, null).length, 3);
-	assert.deepEqual(filterSidebarSessions(sessions, new Set(["codex"])), [{ source: "codex" }]);
-	const saved = new Map();
-	const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
-	storage.setItem("pideck-session-source-filter", serializeSidebarSourceFilters({ project: new Set(["pi", "codex"]) }));
-	assert.deepEqual([...readSidebarSourceFilters(storage).project], ["pi", "codex"]);
-});
-
-test("sidebar filter attributes DSH sessions by backend, not by their pi source", () => {
-	const { filterSidebarSessions } = loadControllerModule();
-	const sessions = [
-		{ id: "pi-1", source: "pi", backend: "pi" },
-		{ id: "dsh-1", source: "pi", backend: "dsh" },
-	];
-	assert.equal(
-		filterSidebarSessions(sessions, new Set(["pi"]))
-			.map((s) => s.id)
-			.join(","),
-		"pi-1",
-	);
-	assert.equal(
-		filterSidebarSessions(sessions, new Set(["dsh"]))
-			.map((s) => s.id)
-			.join(","),
-		"dsh-1",
-	);
-	assert.equal(filterSidebarSessions(sessions, new Set(["pi", "dsh"])).length, 2);
-});
-
-test("legacy v1 filter storage migrates dsh in for projects that included pi", () => {
-	const { readSidebarSourceFilters } = loadControllerModule();
-	const saved = new Map();
-	const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
-	// v1 格式：{ [projectId]: string[] | null }
-	storage.setItem("pideck-session-source-filter", JSON.stringify({ project: ["pi", "codex"] }));
-	assert.deepEqual([...readSidebarSourceFilters(storage).project].sort(), ["codex", "dsh", "pi"]);
-	storage.setItem("pideck-session-source-filter", JSON.stringify({ project: ["codex"] }));
-	assert.deepEqual([...readSidebarSourceFilters(storage).project], ["codex"]);
+test("removed source preferences cannot hide sessions through the sidebar controller", () => {
+	const source = readFileSync("src/renderer/src/hooks/useSidebarController.ts", "utf8");
+	assert.doesNotMatch(source, /readSidebarSourceFilters|filterSidebarSessions|sourceFilterFor|pideck-session-source-filter/);
+	const tree = readFileSync("src/renderer/src/components/sidebar/WorkspaceSessionList.tsx", "utf8");
+	assert.match(tree, /workspaceSessionGroups\(records\s*\?\?\s*\[\],\s*controller\.pinnedSessionIds\)/);
+	assert.doesNotMatch(tree, /sourceFilter|filterSessionsByPills/);
 });
 
 test("Sidebar controller derives catalog data from canonical atoms without a writable SessionSummary cache", () => {
@@ -302,23 +260,14 @@ test("AppSidebar owns the controller while App keeps business actions as ports",
 	assert.match(projectTree, /if \(props\.controller\.search\.trim\(\)\) return;/);
 });
 
-test("sidebar uses the dev-style source filter overlay and anonymous Session entry", () => {
-	const projectTree = readFileSync("src/renderer/src/components/sidebar/ProjectTree.tsx", "utf8");
-	const sessionTree = readFileSync("src/renderer/src/components/sidebar/SessionTree.tsx", "utf8");
+test("source filtering, anonymous creation and configurable sorting have no product entry", () => {
 	const content = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
+	const menus = readFileSync("src/renderer/src/components/sidebar/SidebarComponents.tsx", "utf8");
 	const controller = readFileSync("src/renderer/src/hooks/useSidebarController.ts", "utf8");
-	// 新建菜单收敛在 SessionTabsBar 的本地 NewSessionMenu（sidebar 同名孤儿组件已删）；
-	// 匿名会话入口保留在侧栏项目右键菜单。
-	const header = readFileSync("src/renderer/src/components/session/SessionHeader.tsx", "utf8");
-	assert.doesNotMatch(projectTree, /sourceFilterOpenProjectId|session-source-filter-menu/);
-	assert.match(projectTree, /sourceFilter !== null/);
-	// 匿名会话入口：项目右键菜单（SidebarContent）保留 createAnonymous 调用
-	assert.match(content, /createAnonymous\(menuProject\.id\)/);
-	assert.match(content, /SessionSourceFilterMenu/);
-	assert.match(controller, /toggleSourceFilter/);
-	assert.match(sessionTree, /anonymous-indicator/);
-	assert.match(sessionTree, /runtimeBySessionId\[session\.id\]\?\.agentId === child\.agent\.id/);
-	assert.match(header, /anonymous-badge/);
+	assert.doesNotMatch(content, /createAnonymous|SessionSourceFilterMenu|onFilterSessions|onSetSessionSortMode/);
+	assert.doesNotMatch(menus, /onNewAnonymousSession|onFilterSessions|SessionSourceFilterMenu|activePills|onSetSessionSortMode/);
+	assert.doesNotMatch(controller, /setSourceFilters|toggleSourceFilter|setSessionSortModeState/);
+	assert.match(controller, /sessionSortMode:\s*"createdAt"/);
 });
 
 test("Chat section keeps an independent collapse control after the parent project row is hidden", () => {
@@ -412,8 +361,9 @@ test("sidebar uses one persisted project accordion without duplicating current p
 
 	// SidebarContent owns one scroll surface only; every project and its content
 	// are rendered together by ProjectTree instead of duplicating the selection below.
-	assert.match(content, /conversation-list min-h-0 flex-1 overflow-x-hidden overflow-y-auto/);
-	assert.match(content, /currentProjectId=\{currentRootProject\?\.id\}/);
+	assert.match(content, /<WorkspaceNavigation\s+controller=\{controller\}\s+navigation=\{props\.navigation\}\s+projectId=\{props\.currentProjectId\}/);
+	assert.match(content, /\{props\.workspaceFiles\}/);
+	assert.doesNotMatch(content, /<ProjectTree\s/);
 	assert.doesNotMatch(content, /max-h-\[38%\]|<WorktreeTree|<SessionTree/);
 	// 选中高亮只画在会话叶子上，不再把 selectedProjectId 传给工作区行。
 	assert.doesNotMatch(content, /selectedProjectId/);
@@ -445,41 +395,29 @@ test("sidebar uses one persisted project accordion without duplicating current p
 	assert.match(sessionTree, /renderSubagents\(groupKey, child\.codexSubagents, child\.piSubagents\)/);
 });
 
-test("sidebar splits Chats/Projects by navTab without duplicating list logic", () => {
+test("workspace navigation has four fixed entries and inline project/session lists", () => {
+	const navigation = readFileSync("src/renderer/src/components/sidebar/WorkspaceNavigation.tsx", "utf8");
 	const content = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
-	const projectTree = readFileSync("src/renderer/src/components/sidebar/ProjectTree.tsx", "utf8");
-	const controller = readFileSync("src/renderer/src/hooks/useSidebarController.ts", "utf8");
-
-	// 分段切换入口：SidebarContent 的 Tabs 按 controller.navTab 驱动，值经 parseSidebarNavTab 收窄
-	assert.match(content, /value=\{controller\.navTab\}/);
-	assert.match(content, /parseSidebarNavTab\(value\)/);
-	assert.match(content, /value="chats"/);
-	assert.match(content, /value="projects"/);
-	// ProjectTree 按 navTab 分流：active 渲染活动 Agent 页，chats 渲染 Chat 区，projects 渲染项目区
-	assert.match(projectTree, /navTab === "active" \? \(?\s*<ActiveSessionsTree/);
-	assert.match(projectTree, /navTab === "chats" \? chatSection : projectsSection/);
-	assert.match(projectTree, /const chatSection = chatProjects\.map/);
-	assert.match(projectTree, /const projectsSection = \(/);
-	// 两区都不复制列表逻辑：会话树/项目行只出现一份
-	assert.match(projectTree, /renderProject/);
-	// controller 暴露 navTab + setNavTab
-	assert.match(controller, /navTab: SidebarNavTab;/);
-	assert.match(controller, /setNavTab: \(tab: SidebarNavTab\) => void/);
+	for (const key of ["workspace.home", "workspace.add", "workspace.select", "workspace.sessions"]) assert.match(navigation, new RegExp(`t\\("${key.replaceAll(".", "\\.")}"\\)`));
+	assert.match(readFileSync("src/renderer/src/components/sidebar/WorkspaceProjectList.tsx", "utf8"), /id="workspace-inline-list"/);
+	assert.match(readFileSync("src/renderer/src/components/sidebar/WorkspaceSessionList.tsx", "utf8"), /id="workspace-session-list"/);
+	assert.match(navigation, /actions\.sessions\.ensureCatalogsLoaded\(\[projectId\]\)/);
+	assert.doesNotMatch(content, /<Tabs(?:List|Trigger)?\s/);
+	assert.doesNotMatch(navigation, /<Dialog|<DropdownMenu|<Popover/);
 });
 
-test("sidebar nav rail stretches its tabs across the full width", () => {
-	const content = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
-	// beUI pill 的 trigger 外包了一层 <div className="relative">（承载 layoutId 指示器），
-	// 它才是轨道内的 flex item；只在 TabsTrigger 上写 w-full 只能撑满包层自身，
-	// 侧栏拉宽时右侧会留空轨（对比下方 Dock 的 w-full justify-between 分发）。
-	assert.match(content, /<TabsList[\s\S]{0,200}\[&>div\]:flex-1/);
-	assert.match(content, /<TabsList[\s\S]{0,200}\[&>div\]:min-w-0/);
-	// 三档 trigger 都要可收缩（min-w-0 + overflow-hidden），否则窄侧栏会被 nowrap 文案顶开。
-	assert.equal((content.match(/className=\{cn\("w-full min-w-0 gap-1\.5 overflow-hidden px-2 py-1\.5 text-xs"/g) ?? []).length, 3);
-	// 文案截断兜底（窄侧栏 / 英文长标签）：标签必须在 truncate span 内，裸文本会溢出胶囊。
-	assert.equal((content.match(/<span className="truncate">\{t\("app\.sidebar(?:Active|Chats|Projects)"\)\}<\/span>/g) ?? []).length, 3);
+test("inline lists stay bounded and do not squeeze file tree rows", () => {
+	const navigation = readFileSync("src/renderer/src/components/sidebar/WorkspaceNavigation.tsx", "utf8");
+	const explorer = readFileSync("src/renderer/src/components/sidebar/WorkspaceFileExplorer.tsx", "utf8");
+	const projects = readFileSync("src/renderer/src/components/sidebar/WorkspaceProjectList.tsx", "utf8");
+	const sessions = readFileSync("src/renderer/src/components/sidebar/WorkspaceSessionList.tsx", "utf8");
+	assert.match(projects, /max-h-\[22vh\]\s+shrink-0/);
+	assert.match(sessions, /max-h-\[24vh\]\s+shrink-0/);
+	assert.match(projects, /group\s+relative\s+flex\s+shrink-0\s+items-center/);
+	assert.match(sessions, /className="shrink-0"\s+data-testid="workspace-session-row"/);
+	assert.match(explorer, /flex\s+min-h-0\s+flex-1\s+flex-col\s+overflow-hidden/);
+	assert.match(explorer, /<FilesPanel\s+key=\{project\.id\}\s+projectId=\{project\.id\}/);
 });
-
 test("expanded children can be collapsed back via sidebar controller", () => {
 	const controller = readFileSync("src/renderer/src/hooks/useSidebarController.ts", "utf8");
 	const sessionTree = readFileSync("src/renderer/src/components/sidebar/SessionTree.tsx", "utf8");
@@ -524,15 +462,4 @@ test("show-more row renders the count separately and drops the trailing unit", (
 	// 嵌套文案（数字在句中）不拆数字，否则会出现「还有 个会话…」这种断句。
 	// formatter 会把单元素三元/逻辑渲染的包裹括号去掉：断言只锁 !props.nested 门控。
 	assert.match(sessionTree, /\{!props\.nested && \(?/);
-});
-
-test("activity page keeps failed/stopped agents visible (error/closed)", () => {
-	const activeTree = readFileSync("src/renderer/src/components/sidebar/ActiveSessionsTree.tsx", "utf8");
-	// 活动页是 runtime 会话入口：catalog 只含 runtime 绑定的 Agent（detached 已被排除），
-	// 因此不能按 isLiveRuntimeStatus 过滤——否则 error/closed 的失败会话在活动页消失。
-	assert.doesNotMatch(activeTree, /isLiveRuntimeStatus\(agent\.status\)/);
-	// 终态 Agent 仍以状态点区分（error=红点），行主体与 live 行共用同一渲染路径。
-	assert.match(activeTree, /sessionStatusDotClass\(agent\.status\)/);
-	// 右键/重启入口不区分 live：失败会话也能从活动页菜单重启。
-	assert.match(activeTree, /openMenu\(\{ kind: "agent", agentId: agent\.id/);
 });

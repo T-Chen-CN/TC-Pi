@@ -18,9 +18,6 @@ export function QuickTaskSurface({ task, children }: { task: ReturnType<typeof u
 					<strong className="truncate text-sm font-semibold">{t("quickTask.title")}</strong>
 				</div>
 				<div className="flex shrink-0 gap-2">
-					<Button data-testid="quick-task-switch-mini" variant="outline" size="sm" title={t("quickTask.miniMode")} onClick={() => void desktopApi.quickTask.switchToMiniOverlay()}>
-						{t("quickTask.miniMode")}
-					</Button>
 					<Button data-testid="quick-task-new" variant="outline" size="sm" disabled={task.busy || !task.canRetry} onClick={task.startNew}>
 						{t("quickTask.new")}
 					</Button>

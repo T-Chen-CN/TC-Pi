@@ -6,7 +6,6 @@ import { mainIpcSource } from "./helpers/mainIpcSources.mjs";
 const main = readFileSync("src/main/index.ts", "utf8");
 const preload = readFileSync("src/preload/index.ts", "utf8");
 const terminalDock = readFileSync("src/renderer/src/components/terminal/TerminalDock.tsx", "utf8");
-const pet = readFileSync("src/main/pet/index.ts", "utf8");
 const app = readFileSync("src/renderer/src/App.tsx", "utf8");
 const previewApi = readFileSync("src/renderer/src/previewApi.ts", "utf8");
 const browserApi = readFileSync("src/renderer/src/browserApi.ts", "utf8");
@@ -37,15 +36,6 @@ test("RPC logging controls resolve the current Session target before touching Ag
 	assert.match(mainIpcSource, /sessionRuntimeCoordinator\.validateTarget\(target\)/);
 	assert.match(app, /api\.rpcLogs\.setLogging\(target, enabled\)/);
 	assert.doesNotMatch(app, /api\.rpcLogs\.setLogging\(agentId/);
-});
-
-test("pet focus crosses into the renderer as a stable Session ID", () => {
-	assert.match(pet, /resolveSessionId: \(agentId: string\) => string \| undefined/);
-	assert.match(pet, /petFocusAgentTarget, \{ sessionId \}/);
-	assert.doesNotMatch(pet, /petFocusAgentTarget, \{ agentId \}/);
-	// 焦点目标已扩展为 FocusTargetPayload 联合（sessionId/projectId/projectPath）
-	assert.match(app, /onFocusTarget: \(target: FocusTargetPayload\)/);
-	assert.match(app, /sessionRecordByIdAtomFamily\(target\.sessionId\)/);
 });
 
 test("renderer and preload expose no legacy agents command namespace", () => {

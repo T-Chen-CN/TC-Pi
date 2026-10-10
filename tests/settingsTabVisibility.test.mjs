@@ -19,7 +19,7 @@ test("可隐藏 tab 都是真实存在的设置 tab；dsh 与 composerModes 是�
 	for (const id of HIDEABLE_SETTINGS_TAB_IDS) {
 		assert.ok(SETTINGS_TAB_IDS.includes(id), `${id} 不是 SETTINGS_TAB_IDS 里的 tab`);
 	}
-	assert.deepEqual(plain(HIDEABLE_MODULE_IDS), [...plain(HIDEABLE_SETTINGS_TAB_IDS), "composerModes", "dsh"]);
+	assert.deepEqual(plain(HIDEABLE_MODULE_IDS), [...plain(HIDEABLE_SETTINGS_TAB_IDS), "composerModes"]);
 	// 应用基础项不可隐藏（外观放着开关本身，隐藏后无法找回）
 	for (const id of ["common", "appearance", "shortcuts", "notification", "proxy", "dev", "storage", "backup", "editors"]) {
 		assert.equal(HIDEABLE_SETTINGS_TAB_IDS.includes(id), false, `${id} 不应可隐藏`);
@@ -28,9 +28,9 @@ test("可隐藏 tab 都是真实存在的设置 tab；dsh 与 composerModes 是�
 
 test("normalizeHiddenModules：非数组回落空数组，只收非空字符串并去重去空白", () => {
 	assert.deepEqual(plain(normalizeHiddenModules(undefined)), []);
-	assert.deepEqual(plain(normalizeHiddenModules("im")), []);
+	assert.deepEqual(plain(normalizeHiddenModules("hostplugins")), []);
 	assert.deepEqual(plain(normalizeHiddenModules({ im: true })), []);
-	assert.deepEqual(plain(normalizeHiddenModules(["im", " pet ", "", 42, null, "im", "   "])), ["im", "pet"]);
+	assert.deepEqual(plain(normalizeHiddenModules(["hostplugins", " web ", "", 42, null, "hostplugins", "   "])), ["hostplugins", "web"]);
 });
 
 test("normalizeHiddenModules：容忍未知 id（可能来自更新版本），不按清单过滤", () => {
@@ -43,13 +43,13 @@ test("normalizeHiddenModules：按上限截断", () => {
 });
 
 test("toggleHiddenModule 不改入参且幂等；isModuleHidden 读成员关系", () => {
-	const base = Object.freeze(["im"]);
-	assert.deepEqual(plain(toggleHiddenModule(base, "dsh", true)), ["im", "dsh"]);
-	assert.deepEqual(plain(toggleHiddenModule(base, "im", true)), ["im"]);
-	assert.deepEqual(plain(toggleHiddenModule(base, "im", false)), []);
-	assert.deepEqual(plain(toggleHiddenModule(base, "dsh", false)), ["im"]);
+	const base = Object.freeze(["hostplugins"]);
+	assert.deepEqual(plain(toggleHiddenModule(base, "dsh", true)), ["hostplugins", "dsh"]);
+	assert.deepEqual(plain(toggleHiddenModule(base, "hostplugins", true)), ["hostplugins"]);
+	assert.deepEqual(plain(toggleHiddenModule(base, "hostplugins", false)), []);
+	assert.deepEqual(plain(toggleHiddenModule(base, "dsh", false)), ["hostplugins"]);
 	assert.equal(isModuleHidden(["dsh"], "dsh"), true);
-	assert.equal(isModuleHidden(["dsh"], "im"), false);
+	assert.equal(isModuleHidden(["dsh"], "web"), false);
 });
 
 // ── settingsTabVisibility.ts ────────────────────────────────────────────
@@ -62,43 +62,43 @@ test("不可隐藏的 tab 即使出现在 hiddenModules 里也不会消失", () 
 	const visible = resolveVisibleSettingsTabs(["common", "appearance", "dsh", "unknown"], new Set());
 	assert.deepEqual(plain(visible), plain(SETTINGS_TAB_LAYOUT));
 	assert.equal(isSettingsTabHidden(["common"], "common"), false);
-	assert.equal(isSettingsTabHidden(["im"], "im"), true);
+	assert.equal(isSettingsTabHidden(["hostplugins"], "hostplugins"), true);
 });
 
 test("隐藏簇首项时分割线顺延到该簇下一个可见项", () => {
 	// 「扩展集成」簇首项是 im（dividerBefore）；隐藏 im 后 pet 应带上分割线
-	const visible = resolveVisibleSettingsTabs(["im"], new Set());
+	const visible = resolveVisibleSettingsTabs(["hostplugins"], new Set());
 	const ids = visible.map((e) => e.id);
-	assert.equal(ids.includes("im"), false);
-	assert.equal(visible.find((e) => e.id === "pet").dividerBefore, true);
+	assert.equal(ids.includes("hostplugins"), false);
+	assert.equal(visible.find((e) => e.id === "web").dividerBefore, true);
 	// 其余分割线位置不受影响
-	assert.deepEqual(plain(visible.filter((e) => e.dividerBefore).map((e) => e.id)), ["pet", "web", "dev"]);
+	assert.deepEqual(plain(visible.filter((e) => e.dividerBefore).map((e) => e.id)), ["web", "dev"]);
 });
 
 test("整簇隐藏时该簇分割线消失，不留连续两条线", () => {
-	const visible = resolveVisibleSettingsTabs(["im", "pet", "vision", "imagegen", "acp", "hostplugins"], new Set());
+	const visible = resolveVisibleSettingsTabs(["hostplugins"], new Set());
 	// 全簇隐藏后不残留分割线；仅隐部分成员时，分割线顺延到簇内下一个可见项（上一条测试）
 	assert.deepEqual(plain(visible.filter((e) => e.dividerBefore).map((e) => e.id)), ["web", "dev"]);
 });
 
 test("revealedTabs 让隐藏 tab 临时出现在侧栏（深链 / 搜索找回）", () => {
-	const visible = resolveVisibleSettingsTabs(["im", "pet"], new Set(["im"]));
+	const visible = resolveVisibleSettingsTabs(["hostplugins", "web"], new Set(["hostplugins"]));
 	const ids = visible.map((e) => e.id);
-	assert.equal(ids.includes("im"), true);
-	assert.equal(ids.includes("pet"), false);
-	assert.equal(visible.find((e) => e.id === "im").dividerBefore, true);
+	assert.equal(ids.includes("hostplugins"), true);
+	assert.equal(ids.includes("web"), false);
+	assert.equal(visible.find((e) => e.id === "hostplugins").dividerBefore, true);
 });
 
 test("首个可见项永不带分割线", () => {
 	// 把 common 之前人为放一条 divider 的布局：过滤后首项 divider 必须被抑制
-	const layout = [{ id: "im", dividerBefore: true }, { id: "pet" }];
+	const layout = [{ id: "hostplugins", dividerBefore: true }, { id: "web" }];
 	const visible = resolveVisibleSettingsTabs([], new Set(), layout);
 	assert.equal(visible[0].dividerBefore, undefined);
 });
 
 test("初始 tab：深链优先（即使指向隐藏 tab）；记忆值被隐藏时回退 common", () => {
-	assert.equal(resolveInitialSettingsTab("im", "dev", ["im"]), "im");
-	assert.equal(resolveInitialSettingsTab(undefined, "im", ["im"]), "common");
-	assert.equal(resolveInitialSettingsTab(undefined, "dev", ["im"]), "dev");
-	assert.equal(resolveInitialSettingsTab(undefined, "im", []), "im");
+	assert.equal(resolveInitialSettingsTab("hostplugins", "dev", ["hostplugins"]), "hostplugins");
+	assert.equal(resolveInitialSettingsTab(undefined, "hostplugins", ["hostplugins"]), "common");
+	assert.equal(resolveInitialSettingsTab(undefined, "dev", ["hostplugins"]), "dev");
+	assert.equal(resolveInitialSettingsTab(undefined, "hostplugins", []), "hostplugins");
 });

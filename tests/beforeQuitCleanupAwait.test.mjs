@@ -24,10 +24,6 @@ test("before-quit：preventDefault + 有界等待清理后再 quit，重入放�
 	assert.match(block, /setTimeout\(\s*resolve\s*,\s*5000\s*\)\.unref\(\)/, "预算定时器不得阻塞进程退出");
 });
 
-test("feishuBridge 已登记 quitCleanup（闭包读当前实例）", () => {
-	assert.match(src, /quitCleanup\.register\(\s*"feishu-bridge"/);
-});
-
 test("child-process-gone：模块级注册，不在 createWindow 函数体内", () => {
 	assert.match(src, /^app\.on\("child-process-gone"/m, "存在模块级注册");
 	const start = src.search(/^(?:async )?function createWindow/m);

@@ -618,10 +618,7 @@ export type AppSettings = {
 	 * 缺省时由渲染层按「仅展开 chat」处理。
 	 */
 	sidebarExpandedProjectIds?: string[];
-	/**
-	 * 侧栏 活动/聊天/项目分段。可选以兼容旧 settings.json；localStorage 作首屏缓存，
-	 * settings.json 作跨 renderer origin / dev 强杀的可靠恢复来源。缺省为 chats。
-	 */
+	/** 兼容旧 settings.json 的分段字段；当前工作区布局不再读取或写入。 */
 	sidebarNavTab?: "active" | "chats" | "projects";
 	/**
 	 * 侧栏中置顶的会话记录 id。SessionRecord.id 跨重启稳定；缺失或已删除的 id

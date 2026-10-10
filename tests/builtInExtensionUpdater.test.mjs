@@ -73,7 +73,7 @@ function makeFixture() {
 		// 它被 pi-deck-todo.ts 相对 import，是「覆盖层必须自洽」的真实成因。
 		"pi-deck-todo-state.ts": "export const state = 1;\n",
 		"pi-deck-todo.ts": "import './pi-deck-todo-state';\nexport const todo = 1;\n",
-		"pi-deck-vision.ts": "export const vision = 1;\n",
+		"pi-deck-ask-question.ts": "export const vision = 1;\n",
 	};
 	for (const [name, content] of Object.entries(files)) {
 		writeFileSync(join(builtinDir, name), content);
@@ -205,7 +205,7 @@ test("readVerifiedArtifact 对内容/字节数被篡改的目录返回 null", ()
 	withFixture((fixture) => {
 		assert.ok(readVerifiedArtifact(fixture.builtinDir));
 		// 内容被外部改动但清单未更新 → 覆盖层/内置目录都不得带病生效
-		writeFileSync(join(fixture.builtinDir, "pi-deck-vision.ts"), "export const vision = 2;\n");
+		writeFileSync(join(fixture.builtinDir, "pi-deck-ask-question.ts"), "export const vision = 2;\n");
 		assert.equal(readVerifiedArtifact(fixture.builtinDir), null);
 	});
 });
@@ -213,14 +213,14 @@ test("readVerifiedArtifact 对内容/字节数被篡改的目录返回 null", ()
 test("checkRemote 按逐文件 sha256 判定更新，且忽略本地不认识的新文件名", async () => {
 	await withFixture(async (fixture) => {
 		// 1) 只改内容、不改版本号：仍须判定为「有更新」（版本号不是判据）
-		const changed = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.0");
+		const changed = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.0");
 		const { updater, network } = createUpdater(fixture, changed);
 		const result = await updater.checkRemote();
 		assert.equal(result.ok, true);
 		assert.equal(result.hasUpdate, true);
 		assert.equal(result.remoteVersion, "1.0.0");
 		assert.equal(result.localVersion, "1.0.0");
-		assert.deepEqual([...result.changedFiles], ["pi-deck-vision.ts"]);
+		assert.deepEqual([...result.changedFiles], ["pi-deck-ask-question.ts"]);
 		// 默认源是 AtomGit：首个请求必须打到 OpenAPI contents
 		assert.ok(network.calls[0].includes("api.atomgit.com/api/v5/repos/ayuayue/PiDeck/contents/"));
 		assert.ok(network.calls[0].includes(`ref=${BRANCH}`));
@@ -259,7 +259,7 @@ test("update 写入完整自洽覆盖层，解析路径与生效版本随之切�
 		assert.equal(resolveBuiltInExtensionPath("pi-deck-todo.ts", roots), join(fixture.builtinDir, "pi-deck-todo.ts"));
 		assert.equal(readEffectiveBuiltInExtensionsVersion(roots), "1.0.0");
 
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const { updater } = createUpdater(fixture, repoFiles);
 		const result = await updater.update();
 		assert.equal(result.ok, true);
@@ -270,14 +270,14 @@ test("update 写入完整自洽覆盖层，解析路径与生效版本随之切�
 		assert.ok(readVerifiedArtifact(overlayDir), "覆盖层必须通过整体校验");
 
 		// 变化文件取远端内容，未变化文件从内置复制（相对 import 才能解析）
-		assert.equal(readFileSync(join(overlayDir, "pi-deck-vision.ts"), "utf8"), "export const vision = 2;\n");
+		assert.equal(readFileSync(join(overlayDir, "pi-deck-ask-question.ts"), "utf8"), "export const vision = 2;\n");
 		assert.equal(readFileSync(join(overlayDir, "pi-deck-todo-state.ts"), "utf8"), fixture.files["pi-deck-todo-state.ts"]);
 
 		// 缓存失效：同一进程内的解析立刻切到覆盖层，不用等重启（否则「更新成功」只是自欺）
 		assert.equal(resolveBuiltInExtensionPath("pi-deck-todo.ts", roots), join(overlayDir, "pi-deck-todo.ts"));
 		assert.equal(readEffectiveBuiltInExtensionsVersion(roots), "1.0.1");
 		// 随包目录保持原样，可随时还原
-		assert.equal(readFileSync(join(fixture.builtinDir, "pi-deck-vision.ts"), "utf8"), fixture.files["pi-deck-vision.ts"]);
+		assert.equal(readFileSync(join(fixture.builtinDir, "pi-deck-ask-question.ts"), "utf8"), fixture.files["pi-deck-ask-question.ts"]);
 	});
 });
 
@@ -293,7 +293,7 @@ test("半截/被篡改的覆盖层不得参与 -e 注入", async () => {
 		assert.equal(readEffectiveBuiltInExtensionsVersion(roots), "1.0.0");
 
 		// 完整清单但某个文件被外部改动：整份失效，退回内置
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const { updater } = createUpdater(fixture, repoFiles);
 		await updater.update();
 		assert.equal(resolveBuiltInExtensionPath("pi-deck-todo.ts", roots), join(overlayDir, "pi-deck-todo.ts"));
@@ -307,7 +307,7 @@ test("已是最新时不写盘；restoreBuiltin / restorePrevious 正确切换�
 	await withFixture(async (fixture) => {
 		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
 		const roots = { appPath: fixture.root, resourcesPath: fixture.builtinDir, isDev: true, overlayDir };
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const { updater } = createUpdater(fixture, repoFiles);
 
 		// 第一次更新写盘，第二次同源应判定「已是最新」且不动磁盘
@@ -323,7 +323,7 @@ test("已是最新时不写盘；restoreBuiltin / restorePrevious 正确切换�
 		assert.equal(restored.ok, true);
 		assert.equal(restored.updated, true);
 		assert.equal(existsSync(overlayDir), false);
-		assert.equal(resolveBuiltInExtensionPath("pi-deck-vision.ts", roots), join(fixture.builtinDir, "pi-deck-vision.ts"));
+		assert.equal(resolveBuiltInExtensionPath("pi-deck-ask-question.ts", roots), join(fixture.builtinDir, "pi-deck-ask-question.ts"));
 		assert.equal(readEffectiveBuiltInExtensionsVersion(roots), "1.0.0");
 		const status = updater.getStatus();
 		assert.equal(status.hasBackup, true);
@@ -333,7 +333,7 @@ test("已是最新时不写盘；restoreBuiltin / restorePrevious 正确切换�
 		const previous = updater.restorePrevious();
 		assert.equal(previous.ok, true);
 		assert.equal(previous.updated, true);
-		assert.equal(resolveBuiltInExtensionPath("pi-deck-vision.ts", roots), join(overlayDir, "pi-deck-vision.ts"));
+		assert.equal(resolveBuiltInExtensionPath("pi-deck-ask-question.ts", roots), join(overlayDir, "pi-deck-ask-question.ts"));
 		assert.equal(readEffectiveBuiltInExtensionsVersion(roots), "1.0.1");
 		assert.equal(updater.restorePrevious().ok, false);
 	});
@@ -385,14 +385,14 @@ test("远端不可达时返回 network 失败且不触碰磁盘", async () => {
 /**
  * 2026-09-15 线上事故回归：pi 扩展加载器按扩展文件所在目录向上查 node_modules。
  * 随包目录有 extraResources 的 extensions/node_modules/undici 兜底，覆盖层上层没有——
- * pi-deck-vision.ts 顶部 `import "undici"` 在覆盖层路径下 MODULE_NOT_FOUND，pi 启动失败，
+ * pi-deck-ask-question.ts 顶部 `import "undici"` 在覆盖层路径下 MODULE_NOT_FOUND，pi 启动失败，
  * PiDeck 禁用全部扩展重启。覆盖层必须自带 vendored 依赖。
  */
 test("update 把 vendored node_modules 一并写进覆盖层", async () => {
 	await withFixture(async (fixture) => {
 		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
 		const vendorNodeModulesDir = makeVendorDir(fixture.root);
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const { updater } = createUpdater(fixture, repoFiles, { vendorNodeModulesDir });
 
 		const result = await updater.update();
@@ -411,7 +411,7 @@ test("ensureOverlayVendorDependencies 自愈旧覆盖层且幂等", async () => 
 		const vendorNodeModulesDir = makeVendorDir(fixture.root);
 
 		// 1) 旧版热更新器写的覆盖层：没有 vendorNodeModulesDir，因此不带 node_modules
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const legacy = createUpdater(fixture, repoFiles);
 		assert.equal((await legacy.updater.update()).updated, true);
 		assert.equal(existsSync(join(overlayDir, "node_modules", "undici", "package.json")), false);
@@ -437,7 +437,7 @@ test("ensureOverlayVendorDependencies 自愈旧覆盖层且幂等", async () => 
 test("vendorNodeModulesDir 缺省时跳过 vendored 复制（旧调用方兼容）", async () => {
 	await withFixture(async (fixture) => {
 		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-vision.ts": "export const vision = 2;\n" }, "1.0.1");
+		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
 		const { updater } = createUpdater(fixture, repoFiles);
 		assert.equal((await updater.update()).updated, true);
 		assert.equal(existsSync(join(overlayDir, "node_modules")), false);

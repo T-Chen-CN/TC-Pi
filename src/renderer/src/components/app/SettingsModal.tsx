@@ -14,7 +14,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from "../../lib/utils";
 import { deepClone } from "../../utils/deepEqual";
 import { buttonVariants } from "../ui-shadcn/button";
-import { useVisionBridgeDraft } from "./settings/visionDraft.ts";
 import { dirtySettingsTabIds, type SettingsUnsavedTabId } from "./settings/unsavedChangesSummary";
 import { computeDirtyFields } from "./settings/settingsDirtyFields.ts";
 import { SETTINGS_TAB_IDS, SETTINGS_TAB_LABEL_KEYS } from "./settings/settingsTabLayout";
@@ -36,16 +35,11 @@ const WebTab = lazy(() => import("./settings/WebTab").then((m) => ({ default: m.
 const EditorsTab = lazy(() => import("./settings/EditorsTab").then((m) => ({ default: m.EditorsTab })));
 const GitTab = lazy(() => import("./settings/GitTab").then((m) => ({ default: m.GitTab })));
 const DevTab = lazy(() => import("./settings/DevTab").then((m) => ({ default: m.DevTab })));
-const PetTab = lazy(() => import("./settings/PetTab").then((m) => ({ default: m.PetTab })));
 const NotificationTab = lazy(() => import("./settings/NotificationTab").then((m) => ({ default: m.NotificationTab })));
-const ImTab = lazy(() => import("./settings/ImTab").then((m) => ({ default: m.ImTab })));
 const StorageTab = lazy(() => import("./settings/SettingsStorageTab").then((m) => ({ default: m.StorageTab })));
 const BackupTab = lazy(() => import("./settings/SettingsBackupTab").then((m) => ({ default: m.BackupTab })));
 const ProcessMetricsTab = lazy(() => import("./settings/ProcessMetricsTab").then((m) => ({ default: m.ProcessMetricsTab })));
 const UsageStatsTab = lazy(() => import("./settings/UsageStatsTab").then((m) => ({ default: m.UsageStatsTab })));
-const VisionBridgeSettingsTab = lazy(() => import("./settings/VisionBridgeSettingsTab").then((m) => ({ default: m.VisionBridgeSettingsTab })));
-const ImageGenSettingsTab = lazy(() => import("./settings/ImageGenSettingsTab").then((m) => ({ default: m.ImageGenSettingsTab })));
-const AcpToolsTab = lazy(() => import("./settings/AcpToolsTab").then((m) => ({ default: m.AcpToolsTab })));
 const HostPluginsTab = lazy(() => import("../../config/HostPluginsTab").then((m) => ({ default: m.HostPluginsTab })));
 const TerminalTab = lazy(() => import("./settings/TerminalTab").then((m) => ({ default: m.TerminalTab })));
 
@@ -330,8 +324,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 	 * 遍历键并集（computeDirtyFields）而非仅草稿键，避免漏掉「字段被删除」的差异。
 	 */
 	const dirtyFields = useMemo(() => computeDirtyFields(draftSettings as Record<string, unknown>, baseSnapshotRef.current as Record<string, unknown>), [draftSettings, baselineToken]);
-	// ── 视觉桥草稿：独立于全局设置（写 pi-deck-vision.json，走独立 IPC），脏标记/保存/取消由弹框统一管理 ──
-	const visionDraft = useVisionBridgeDraft();
 	// ── 生图草稿：独立文件 userData/imagegen.json，不属于 pi/dsh，放在设置页统一管理 ──
 	const imageGenRef = useRef<{ save: () => Promise<boolean> } | null>(null);
 	const [imageGenDirty, setImageGenDirty] = useState(false);
@@ -344,7 +336,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 	const [shortcutsInvalid, setShortcutsInvalid] = useState(false);
 	const handleShortcutsInvalidChange = useCallback((invalid: boolean) => setShortcutsInvalid(invalid), []);
 	// 左侧导航黄点来源：与关闭确认同一套字段目录，避免两处口径不一致
-	const dirtyTabIds = useMemo(() => dirtySettingsTabIds({ dirtyFields, visionDirty: visionDraft.dirty, imageGenDirty, acpDirty }), [dirtyFields, visionDraft.dirty, imageGenDirty, acpDirty]);
+	const dirtyTabIds = useMemo(() => dirtySettingsTabIds({ dirtyFields, visionDirty: false, imageGenDirty, acpDirty }), [dirtyFields, false, imageGenDirty, acpDirty]);
 	/** 各 tab 的局部编辑态（WSL 输入/Web 端口/宠物预览模式）在取消时通过递增信号重置 */
 	const [devTabResetKey, setDevTabResetKey] = useState(0);
 	const [webTabResetKey, setWebTabResetKey] = useState(0);
@@ -438,21 +430,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 			// dirtyFields 会停在保存前的非空集合（draftSettings 引用未变），关闭弹框误报未保存。
 			setBaselineToken((v) => v + 1);
 		}
-		if (visionDraft.dirty) {
-			// 视觉桥保存失败（如 API Key 缺失/接口不可达）时保留脏标记，头部按钮可重试
-			const visionOk = await visionDraft.save();
-			ok = ok && visionOk;
-		}
-		if (imageGenDirty) {
-			const imageGenOk = (await imageGenRef.current?.save()) ?? false;
-			ok = ok && imageGenOk;
-			// 保存成功后脏标记由子组件通过 onDirtyChange 自动清掉
-		}
-		if (acpDirty) {
-			// 校验失败（必填/重名）时子组件返回 false，保留脏标记供用户修正后重试
-			const acpOk = (await acpToolsRef.current?.save()) ?? false;
-			ok = ok && acpOk;
-		}
 		return ok;
 	};
 
@@ -460,7 +437,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 	const cancelAll = () => {
 		setDraftSettings(deepClone(baseSnapshotRef.current));
 		restoreAppearanceFromSnapshot();
-		visionDraft.reset();
 		setPerAreaFontSize(baseSnapshotRef.current.uiFontSize !== null || baseSnapshotRef.current.tabBarFontSize !== null || baseSnapshotRef.current.chatFontSize !== null || baseSnapshotRef.current.inputFontSize !== null);
 		// tab 局部编辑态（WSL 输入、Web 端口、宠物预览）由各自 tab 监听信号重置
 		setDevTabResetKey((k) => k + 1);
@@ -485,7 +461,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 	/** 关闭弹框：系统设置草稿与配置管理草稿任一有未保存变化都统一弹确认（不再按分区委托），
 	 *  配置分区的脏状态由 ConfigPane 上报（onStateChange.hasDirty）；无任何脏直接关闭。 */
 	const handleClose = () => {
-		const settingsDirty = dirtyFields.size > 0 || visionDraft.dirty || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
 		if (settingsDirty || configPaneState.hasDirty) {
 			setCloseConfirmOpen(true);
 		} else {
@@ -495,7 +471,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 
 	/** 保存关闭/安装前的全部脏来源；任一来源失败时保留弹窗和草稿供用户重试。 */
 	const savePendingChanges = async (): Promise<boolean> => {
-		const settingsDirty = dirtyFields.size > 0 || visionDraft.dirty || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
 		const settingsOk = settingsDirty ? await saveAll() : true;
 		const configOk = configPaneState.hasDirty ? ((await configPaneRef.current?.saveAllDirty()) ?? false) : true;
 		return settingsOk && configOk;
@@ -524,7 +500,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 
 	/** 安装会终止进程；任何内存草稿都必须先由用户保存或明确放弃。 */
 	const handleInstallUpdate = () => {
-		const settingsDirty = dirtyFields.size > 0 || visionDraft.dirty || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
 		if (settingsDirty || configPaneState.hasDirty) {
 			setInstallConfirmOpen(true);
 			return;
@@ -592,17 +568,17 @@ function SettingsModalContent(props: SettingsModalProps) {
 
 	const hasDirtyChanges = dirtyFields.size > 0;
 	// 视觉桥/生图草稿有未保存改动时，头部保存/取消按钮同样点亮（与全局设置脏标记合并判定）
-	const hasAnyDirtyChanges = hasDirtyChanges || visionDraft.dirty || imageGenDirty || acpDirty;
+	const hasAnyDirtyChanges = hasDirtyChanges;
 	// 关闭确认：列出全部变更项（不再只点第一条），多项按设置页 tab/字段顺序逐条展示。
 	const unsavedSummary = useMemo(
 		() =>
 			summarizeSettingsUnsavedChanges({
 				dirtyFields,
-				visionDirty: visionDraft.dirty,
+				visionDirty: false,
 				imageGenDirty,
 				acpDirty,
 			}),
-		[dirtyFields, visionDraft.dirty, imageGenDirty, acpDirty],
+		[dirtyFields, false, imageGenDirty, acpDirty],
 	);
 	const unsavedCloseMessage = useMemo(() => formatSettingsUnsavedMessage(unsavedSummary, t), [unsavedSummary]);
 	// 关闭确认清单 = 系统设置 + 配置管理两区未保存项合并（配置项由 ConfigPane 上报）
@@ -639,9 +615,9 @@ function SettingsModalContent(props: SettingsModalProps) {
 									variant="default"
 									size="sm"
 									onClick={saveAll}
-									disabled={visionDraft.saving || (visionDraft.dirty && visionDraft.modelMissing) || shortcutsInvalid}
+									disabled={shortcutsInvalid}
 									// 视觉桥开启但未选模型时禁用保存：悬停说明原因（对应 visionDraft 的 modelRequired 提示）
-									title={shortcutsInvalid ? t("settings.shortcuts.saveBlocked") : visionDraft.dirty && visionDraft.modelMissing ? t("settings.vision.modelRequired") : undefined}
+									title={shortcutsInvalid ? t("settings.shortcuts.saveBlocked") : false && false ? t("settings.vision.modelRequired") : undefined}
 								>
 									{t("common.save")}
 								</Button>
@@ -761,7 +737,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 							{activeTab === "appearance" && (
 								<TabsContent value="appearance" className="settings-panel min-w-0">
 									<Suspense fallback={<SettingsTabLoading />}>
-										<AppearanceTab draft={draftSettings} updateDraft={updateDraft} isDirty={isDirty} perAreaFontSize={perAreaFontSize} setPerAreaFontSize={setPerAreaFontSize} visionEnabled={visionDraft.draft?.enabled} />
+										<AppearanceTab draft={draftSettings} updateDraft={updateDraft} isDirty={isDirty} perAreaFontSize={perAreaFontSize} setPerAreaFontSize={setPerAreaFontSize} />
 									</Suspense>
 								</TabsContent>
 							)}
@@ -868,22 +844,8 @@ function SettingsModalContent(props: SettingsModalProps) {
 							)}
 
 							{/* ── 外部连接 tab（飞书机器人，由 Pi 管理界面迁入） ── */}
-							{activeTab === "im" && (
-								<TabsContent value="im" className="settings-panel min-w-0">
-									<Suspense fallback={<SettingsTabLoading />}>
-										<ImTab />
-									</Suspense>
-								</TabsContent>
-							)}
 
 							{/* ── 桌面宠物 tab ── */}
-							{activeTab === "pet" && (
-								<TabsContent value="pet" className="settings-panel min-w-0">
-									<Suspense fallback={<SettingsTabLoading />}>
-										<PetTab draft={draftSettings} updateDraft={updateDraft} isDirty={isDirty} resetKey={petTabResetKey} />
-									</Suspense>
-								</TabsContent>
-							)}
 
 							{/* ── 通知设置 tab（系统通知 + 声音提醒） ── */}
 							{activeTab === "notification" && (
@@ -927,26 +889,12 @@ function SettingsModalContent(props: SettingsModalProps) {
 								</TabsContent>
 							)}
 							{/* ── 视觉桥 tab：草稿/脏标记/保存由弹框统一管理，本组件只呈现表单 */}
-							{activeTab === "vision" && (
-								<TabsContent value="vision" className="settings-panel min-w-0">
-									<Suspense fallback={<SettingsTabLoading />}>
-										<VisionBridgeSettingsTab draft={visionDraft.draft} saving={visionDraft.saving} configDir={visionDraft.configDir} notice={visionDraft.notice} onChange={visionDraft.updateDraft} />
-									</Suspense>
-								</TabsContent>
-							)}
+
 							{/* ── 生图 tab：独立 imagegen.json，不属于 pi/dsh，放在设置页统一管理。
 					    草稿保存在 ImageGenSection 内部，切换 tab 时保持挂载（hidden 而非卸载）以免丢失未保存修改。 */}
-							<TabsContent value="imagegen" className="settings-panel min-w-0" hidden={activeTab !== "imagegen"}>
-								<Suspense fallback={<SettingsTabLoading />}>
-									<ImageGenSettingsTab ref={imageGenRef} onDirtyChange={handleImageGenDirtyChange} />
-								</Suspense>
-							</TabsContent>
+
 							{/* ── ACP 工具 tab：独立 settings.acpTools 字段；草稿自持，切换 tab 保持挂载（hidden）以免丢失未保存行 ── */}
-							<TabsContent value="acp" className="settings-panel min-w-0" hidden={activeTab !== "acp"}>
-								<Suspense fallback={<SettingsTabLoading />}>
-									<AcpToolsTab ref={acpToolsRef} onDirtyChange={handleAcpDirtyChange} />
-								</Suspense>
-							</TabsContent>
+
 							{/* ── PiDeck 插件 tab：宿主插件管理（安装/授权/启停）。独立于 pi 配置弹窗，
 							    归属应用设置；无草稿语义，切 tab 即卸载（动作型 IPC 即时生效）。 ── */}
 							<TabsContent value="hostplugins" className="settings-panel min-w-0" hidden={activeTab !== "hostplugins"}>

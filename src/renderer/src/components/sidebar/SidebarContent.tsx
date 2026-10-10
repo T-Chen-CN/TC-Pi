@@ -1,7 +1,7 @@
-import { Activity, Bolt, CirclePlus, Clock, Folder, Globe, MessageSquare, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Bolt, Clock, Folder, Globe, MessageSquare, Monitor, Moon, Search, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { AgentTab, AppThemeMode, ArchivedDshSession, ArchivedPiSession, Project, SessionRecord, SessionSummary, WorktreeEntry } from "../../../../shared/types";
-import { AgentContextMenu, DraftSessionContextMenu, ProjectContextMenu, SessionContextMenu, SessionManagerModal, SessionSourceFilterMenu, WorktreeCreateDialog } from "./SidebarParts";
+import { AgentContextMenu, DraftSessionContextMenu, ProjectContextMenu, SessionContextMenu, SessionManagerModal, WorktreeCreateDialog } from "./SidebarParts";
 import { sessionRecordToSummary } from "../../atoms";
 import { hasPendingUpdateAtom, pendingAppUpdateAtom, pendingCatalogUpdateAtom, pendingPiUpdateAtom, updateStatusAtom } from "../../atoms/update-atoms";
 import { useAtomValue } from "jotai";
@@ -14,11 +14,8 @@ import { getBoundSidebarRuntimeAgent, getBoundSidebarRuntimeAgentByAgentId, type
 import type { RpcLogEntry } from "../../../../shared/types/rpcLog";
 import type { SidebarRunControl } from "./SidebarComponents";
 import { sessionDisplayName } from "../../utils/sessionDisplayName";
-import { DshSearchResults } from "./DshSearchResults";
-import { ProjectTree } from "./ProjectTree";
 import { Button } from "../ui-shadcn/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
-import { Tabs, TabsList, TabsTrigger } from "../motion/tabs";
 import { Dock, DockItem } from "../motion/dock";
 import { UpdateDotHint } from "./UpdateDotHint";
 import { AnnouncementCenter } from "./AnnouncementCenter";
@@ -26,15 +23,15 @@ import { AutomationDockButton } from "../automation/AutomationDockButton";
 import { HostPluginDockButtons } from "../plugins/HostPluginDockButtons";
 import { BridgeGuiSlot } from "../bridge/BridgeSlot";
 import { MorphingSearch, type MorphingSearchItem } from "../motion/morphing-search";
-import { parseSidebarNavTab } from "../../utils/sidebarNavTab";
 import { displayProjectDirectoryName, isChatProject } from "../../rendererUtils";
 import { formatAccelerator } from "../../../../shared/shortcuts";
 import { desktopApi } from "../../desktopApi";
 import { useShortcutBindings } from "../../hooks/useShortcutBindings";
+import { WorkspaceNavigation, type WorkspaceNavigationPort } from "./WorkspaceNavigation";
 
 export type SidebarActions = {
 	projects: {
-		add: () => Promise<void>;
+		add: () => Promise<string | undefined>;
 		select: (projectId: string) => void;
 		refresh: (projectId: string) => Promise<void>;
 		/** 重扫所有项目目录的存在性并刷新侧栏清单。 */
@@ -70,7 +67,6 @@ export type SidebarActions = {
 		beginDrag?: (sessionId: string) => void;
 		endDrag?: () => void;
 		createDraft: (projectId: string) => Promise<void>;
-		createAnonymous: (projectId: string) => Promise<void>;
 		/** 新建 ACP 工具会话(toolId → settings.acpTools 条目);后端固定 acp。 */
 		createAcp: (projectId: string, toolId: string) => Promise<void>;
 		deleteDraft: (session: SessionRecord) => Promise<void>;
@@ -126,6 +122,8 @@ export type SidebarActions = {
 };
 
 export type SidebarContentProps = {
+	navigation: WorkspaceNavigationPort;
+	workspaceFiles: ReactNode;
 	simple?: boolean;
 	controller: SidebarController;
 	actions: SidebarActions;
@@ -184,7 +182,6 @@ export function SidebarContent(props: SidebarContentProps) {
 	const [searchOpen, setSearchOpen] = useState(false);
 	// 生效快捷键绑定（用户设置可改），kbd 提示跟随真实键位；设置保存后自动刷新
 	const { bindings: shortcutBindings, platform } = useShortcutBindings();
-	const newSessionKbd = shortcutBindings ? formatAccelerator(shortcutBindings.openNewSession, platform) : "Ctrl+N";
 	const searchKbd = shortcutBindings ? formatAccelerator(shortcutBindings.openSearch, platform) : "Ctrl+F";
 
 	// 全局快捷键：新建会话（打开引导页）与搜索（打开命令面板）由主进程
@@ -230,8 +227,6 @@ export function SidebarContent(props: SidebarContentProps) {
 		};
 	};
 	const managerProject = controller.sessionManagerProjectId ? controller.catalog.projects.find((project) => project.id === controller.sessionManagerProjectId) : undefined;
-	const currentProject = props.currentProjectId ? controller.catalog.projects.find((project) => project.id === props.currentProjectId) : undefined;
-	const currentRootProject = currentProject?.worktreeParentId ? (controller.catalog.projects.find((project) => project.id === currentProject.worktreeParentId) ?? currentProject) : currentProject;
 
 	// MorphingSearch 检索项：扁平化所有项目 + 会话，供命令面板跳转。
 	// 项目项用目录名（chat 用「Chat」），会话项用标题 + 预览；选中即打开/选中目标。
@@ -271,30 +266,7 @@ export function SidebarContent(props: SidebarContentProps) {
 			{/* 品牌区提到 body 外：贴侧栏顶边，不被 sidebar-body 的 px/py 顶开（logo 怼左上）。 */}
 			{props.chrome}
 			<div className="sidebar-body flex min-h-0 flex-1 flex-col gap-2 px-2 pt-2 pb-1">
-				{/* 顶部两个平铺操作：「新建会话」+「搜索」（无下拉、无外边框）。
-            新建会话 → 打开初始引导页（居中输入框 + 项目下拉切换后可直接对话）；
-            搜索 → 打开 MorphingSearch 命令面板。把搜索从整行输入框收敛成单个动作项，
-            消除与下方胶囊分段的样式重复。底部细分割线与下方分组区分，避免与分段栏粘连。 */}
-				<div className={cn("flex shrink-0 flex-col gap-0.5 pt-1 pb-2", !props.simple && "border-b border-border/40")}>
-					<button type="button" className="group flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-body text-foreground transition-colors hover:bg-muted/60" aria-label={t("app.newSession")} title={t("app.newSession")} onClick={() => props.onOpenNewSession?.()}>
-						<CirclePlus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-						<span className="min-w-0 flex-1 truncate font-medium">{t("app.newSession")}</span>
-						{/* 快捷键默认隐藏，行 hover 时才淡入（无边框，弱化到只剩文字），避免常驻视觉噪音；
-                键位跟随设置页自定义（useShortcutBindings） */}
-						<kbd className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md px-1 text-micro text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">{newSessionKbd}</kbd>
-					</button>
-					<button type="button" className="group flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-body text-foreground transition-colors hover:bg-muted/60" aria-label={t("app.searchSessions")} title={t("app.searchSessions")} onClick={() => setSearchOpen(true)}>
-						<Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-						<span className="min-w-0 flex-1 truncate font-medium">{t("app.searchSessions")}</span>
-						{/* 快捷键默认隐藏，行 hover 时才淡入；键位跟随设置页自定义（useShortcutBindings） */}
-						<kbd className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md px-1 text-micro text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">{searchKbd}</kbd>
-					</button>
-					{/* 定时任务入口：放在新建/搜索下面，避免藏在底栏 Dock 里不好找 */}
-					<AutomationDockButton />
-					{/* 宿主插件面板入口：与定时任务同区，无已启用面板时组件自身不渲染 */}
-					<HostPluginDockButtons />
-				</div>
-
+				<WorkspaceNavigation controller={controller} navigation={props.navigation} projectId={props.currentProjectId} sessionId={props.currentSessionId} removingWorktreePaths={props.removingWorktreePaths} worktreesByProject={props.worktreesByProject} branchByProject={props.branchByProject} />
 				{/* MorphingSearch 命令面板：锚点固定定位到视口水平居中、垂直约 1/5 处，
             （VSCode/Raycast 式 command 弹窗），而不是贴在搜索按钮旁。锚点不可见但保留
             真实尺寸供 getBoundingClientRect 测量，面板从锚点位置展开即居中。 */}
@@ -314,65 +286,24 @@ export function SidebarContent(props: SidebarContentProps) {
 					/>
 				</div>
 
-				{/* 活动 / 聊天 / 项目分段：beUI pill 分段（凹槽轨道 + 凸起高亮胶囊）。
-            活动页收集所有已激活的 Agent 会话（跨项目），聊天页显示历史会话，项目页显示工作区目录。
-            轨道：muted 弱化底 + hairline 边框；高亮块盖掉 beUI 默认的 bg-primary 色块，
-            换成 background 浮起面（细描边 + 投影；暗色用 bg-active 提亮一档做「抬起」感）。
-            激活文字显式给 text-foreground 压掉 beUI 的 text-primary-foreground
-            （反白色落在浅色胶囊上不可见）。选择即记忆（双写 localStorage + settings.json）。
-
-            宽度自适应：beUI pill 的 trigger 外面还包了一层 <div className="relative">（承载
-            layoutId 指示器），它才是轨道里的 flex item；只在 TabsTrigger 上写 w-full 只能撑满
-            这层包层，包层自身仍是内容宽，所以侧栏拉宽时右侧会留一段空轨（下方 Dock 用
-            w-full justify-between 分发才显得自适应）。用后代选择器把包层设为 flex-1，三档
-            平分轨道；包层 min-w-0 + 文案 truncate 作窄侧栏/英文长标签的溢出兜底。 */}
-				{!props.simple && (
-					<Tabs
-						value={controller.navTab}
-						onValueChange={(value) => {
-							const tab = parseSidebarNavTab(value);
-							if (tab) controller.setNavTab(tab);
-						}}
-						variant="pill"
-					>
-						<TabsList className="w-full rounded-full bg-muted/70 p-0.5 [&>div]:min-w-0 [&>div]:flex-1">
-							<TabsTrigger value="active" className={cn("w-full min-w-0 gap-1.5 overflow-hidden px-2 py-1.5 text-xs", controller.navTab === "active" && "text-foreground")} indicatorClassName="bg-background shadow-sm dark:bg-bg-active">
-								<Activity className="size-3.5 shrink-0" aria-hidden="true" />
-								<span className="truncate">{t("app.sidebarActive")}</span>
-							</TabsTrigger>
-							<TabsTrigger value="chats" className={cn("w-full min-w-0 gap-1.5 overflow-hidden px-2 py-1.5 text-xs", controller.navTab === "chats" && "text-foreground")} indicatorClassName="bg-background shadow-sm dark:bg-bg-active">
-								<MessageSquare className="size-3.5 shrink-0" aria-hidden="true" />
-								<span className="truncate">{t("app.sidebarChats")}</span>
-							</TabsTrigger>
-							<TabsTrigger value="projects" className={cn("w-full min-w-0 gap-1.5 overflow-hidden px-2 py-1.5 text-xs", controller.navTab === "projects" && "text-foreground")} indicatorClassName="bg-background shadow-sm dark:bg-bg-active">
-								<Folder className="size-3.5 shrink-0" aria-hidden="true" />
-								<span className="truncate">{t("app.sidebarProjects")}</span>
-							</TabsTrigger>
-						</TabsList>
-					</Tabs>
-				)}
-
-				{/* G9：DSH 全文搜索结果（搜索词非空时展示；结果按 dshSessionId 映射回 catalog） */}
-				{controller.search.trim() && (
-					<DshSearchResults
-						query={controller.search}
-						onOpen={(projectId, sessionId) => {
-							void actions.sessions.open(projectId, sessionId);
-						}}
-					/>
-				)}
-
-				{/* 单一滚动区承载项目与展开内容，避免项目导航/详情双滚动和重复标题。
-            scrollbar-gutter: stable：滚动条出现/消失时列表宽度不跳变（与抽屉一致）。 */}
-				<section className="conversation-list min-h-0 flex-1 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]">
-					<ProjectTree simple={props.simple} controller={controller} actions={actions} currentProjectId={currentRootProject?.id} currentSessionId={props.currentSessionId} worktreesByProject={props.worktreesByProject} branchByProject={props.branchByProject} removingWorktreePaths={props.removingWorktreePaths} />
+				<section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+					{props.workspaceFiles}
 					{/* GUI 扩展桥：侧边栏面板/分区落点（ctx.gui.setSidebarPanel / setSidebarSection）。
-					    **旁插**在 ProjectTree 之后 —— 不改侧边栏原有结构（§7.4 只追加）。
+					    **旁插**在文件树之后，保留扩展贡献独立挂载点。
 					    侧边栏是应用级 chrome，桥状态按「当前聚焦会话」取（桥的运行时状态本就是按
 					    runtimeGeneration 存的，detach 即清）；无贡献时返回 null，不占位。 */}
 					<BridgeGuiSlot sessionId={props.currentSessionId} slot="sidebar.panel" className="flex flex-col gap-2 px-2 py-2" />
 					<BridgeGuiSlot sessionId={props.currentSessionId} slot="sidebar.section" className="flex flex-col gap-2 px-2 py-2" />
 				</section>
+			</div>
+			<div className="flex max-h-[18vh] shrink-0 flex-col gap-0.5 overflow-y-auto border-t border-border/40 px-2 py-1 [&_button]:shrink-0">
+				<Button variant="ghost" className="h-7 justify-start gap-2 px-2 text-caption text-muted-foreground" aria-label={t("app.searchSessions")} onClick={() => setSearchOpen(true)}>
+					<Search className="size-3.5" />
+					{t("app.searchSessions")}
+					<kbd className="ml-auto text-micro">{searchKbd}</kbd>
+				</Button>
+				<AutomationDockButton />
+				<HostPluginDockButtons />
 			</div>
 			{/* 底栏 dock（beUI Dock）：设置/公告/反馈/主题切换收进浮动卡片，铺满底栏宽度
           （w-full + justify-between 让四个动作均匀分布，侧栏最小宽 208px 时也不溢出）。
@@ -450,25 +381,12 @@ export function SidebarContent(props: SidebarContentProps) {
 				</div>
 			)}
 
-			{controller.sourceFilterMenu && (
-				<SessionSourceFilterMenu
-					menu={controller.sourceFilterMenu}
-					filter={controller.sourceFilterFor(controller.sourceFilterMenu.projectId)}
-					onToggleSource={(source) => controller.toggleSourceFilter(controller.sourceFilterMenu!.projectId, source)}
-					onClear={() => controller.clearSourceFilter(controller.sourceFilterMenu!.projectId)}
-					onClose={controller.closeSourceFilter}
-				/>
-			)}
 			{menuProject && menu?.kind === "project" && (
 				<ProjectContextMenu
 					menu={{ x: menu.x, y: menu.y, project: menuProject }}
 					onClose={controller.closeMenu}
 					onNewSession={() => {
 						void actions.sessions.createDraft(menuProject.id);
-						controller.closeMenu();
-					}}
-					onNewAnonymousSession={() => {
-						void actions.sessions.createAnonymous(menuProject.id);
 						controller.closeMenu();
 					}}
 					onRevealProject={() => {
@@ -535,10 +453,6 @@ export function SidebarContent(props: SidebarContentProps) {
 						controller.openSessionManager(menuProject.id);
 						controller.closeMenu();
 					}}
-					onFilterSessions={() => {
-						controller.openSourceFilter(menuProject.id, menu.x, menu.y + 20);
-						controller.closeMenu();
-					}}
 					onToggleWorktree={() => {
 						void actions.projects.toggleWorktree(menuProject);
 						controller.closeMenu();
@@ -556,11 +470,6 @@ export function SidebarContent(props: SidebarContentProps) {
 						controller.closeMenu();
 					}}
 					isPinned={menuProject.pinned === true}
-					sessionSortMode={controller.sessionSortMode}
-					onSetSessionSortMode={(mode) => {
-						controller.setSessionSortMode(mode);
-						controller.closeMenu();
-					}}
 					onTogglePin={
 						menuProject.kind !== "chat" && !menuProject.worktreeParentId
 							? () => {
@@ -798,7 +707,7 @@ export function SidebarContent(props: SidebarContentProps) {
 						.flatMap((project) => controller.catalog.sessionsByProject[project.id] ?? [])
 						.map(sessionRecordToSummary)
 						.filter((summary): summary is SessionSummary => Boolean(summary && isManagerSessionSummary(summary)))
-						.sort((a, b) => b.updatedAt - a.updatedAt)}
+						.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || a.id.localeCompare(b.id))}
 					onClose={controller.closeSessionManager}
 					onRename={(session) => actions.sessions.rename(managerProject.id, session)}
 					onExport={(session) => void actions.sessions.export(managerProject.id, session)}
@@ -813,7 +722,17 @@ export function SidebarContent(props: SidebarContentProps) {
 				/>
 			)}
 			{controller.worktreeCreateProjectId && (
-				<WorktreeCreateDialog projectId={controller.worktreeCreateProjectId} creating={Boolean(props.creatingWorktree)} onCreate={(branchName) => void actions.worktrees.create(controller.worktreeCreateProjectId!, branchName).then(controller.closeWorktreeCreate)} onClose={controller.closeWorktreeCreate} />
+				<WorktreeCreateDialog
+					projectId={controller.worktreeCreateProjectId}
+					creating={Boolean(props.creatingWorktree)}
+					onCreate={(branchName) =>
+						void actions.worktrees
+							.create(controller.worktreeCreateProjectId!, branchName)
+							.then(controller.closeWorktreeCreate)
+							.catch(() => undefined)
+					}
+					onClose={controller.closeWorktreeCreate}
+				/>
 			)}
 			{/* 实时日志面板挂在右侧工作区抽屉（App 层 rpcLog 面板），侧栏不再挂查看器 */}
 		</aside>

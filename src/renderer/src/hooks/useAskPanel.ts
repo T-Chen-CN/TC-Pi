@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useAtom, useAtomValue, useStore } from "jotai";
-import { askPanelCreatingAtom, askPanelOpenAtom, askPanelOriginSessionIdAtom, askPanelSessionIdAtom } from "../atoms/ask-panel-atoms";
+import { askPanelCreatingAtom, askPanelGenerationAtom, askPanelOpenAtom, askPanelOriginSessionIdAtom, askPanelSessionIdAtom } from "../atoms/ask-panel-atoms";
 import { effectiveAgentBackendAtom } from "../atoms/app-ui-atoms";
-import { sessionRecordsAtom } from "../atoms/session-atoms";
+import { upsertSessionAtom } from "../atoms/session-atoms";
 import { sessionRuntimeBySessionIdAtomFamily } from "../atoms/session-selectors";
 import { desktopApi } from "../desktopApi";
 import { t } from "../i18n";
@@ -10,63 +10,73 @@ import { showNotice } from "../utils/notice";
 
 /**
  * 并行问询：
- * - sendToAsk(projectId, text, options)：创建/复用匿名会话 → 等 runtime 就绪 → 投递消息 → 显示悬浮胶囊。
- *   匿名会话是独立子进程（noSession 不落盘），与当前会话并行，不打断其输出。
+ * - sendToAsk(projectId, text, options)：创建/复用问询会话 → 等 runtime 就绪 → 投递消息 → 显示悬浮胶囊。
+ *   问询会话有自己的历史与进程，与当前会话并行，不打断其输出。
  *   options.context：主会话上下文块（见 utils/askPanelContext.ts）。pi RPC 无跨进程上下文注入通道，
  *   改为经 SendPromptInput.agentMessage 传给模型（agentMessage 模型可见、UI 时间线不可见），
  *   因此首条 user 消息仍是用户原文，胶囊时间线不被上下文污染。
  *   options.originSessionId：发起并行问询的主会话 id，「带回主线（插入主会话 composer）」的落点。
- * - sendFollowUp(text)：向已就绪的匿名会话继续追问（复用 sessionId，不重建 runtime）。
- * - close()：停止匿名 runtime（主进程随后回收 transient 内存）并收起胶囊，同时清空 origin 记录。
+ * - sendFollowUp(text)：向已就绪的问询会话继续追问（复用 sessionId，不重建 runtime）。
+ * - close()：停止问询 runtime 并收起胶囊，保留历史，同时清空 origin 记录。
  */
 export function useAskPanel() {
 	const [isOpen, setOpen] = useAtom(askPanelOpenAtom);
 	const [sessionId, setSessionId] = useAtom(askPanelSessionIdAtom);
 	const [originSessionId, setOriginSessionId] = useAtom(askPanelOriginSessionIdAtom);
 	const [creating, setCreating] = useAtom(askPanelCreatingAtom);
-	// 读「有效」后端（经 DSH runtime 安装态钳制）：runtime 不可用时新建不会落在 dsh 上。
+	// 读当前可用后端，与主会话创建策略保持一致。
 	const defaultAgentBackend = useAtomValue(effectiveAgentBackendAtom);
 	const store = useStore();
 
-	// 创建或复用匿名会话；失败返回 null 并 toast
+	// 创建或复用问询会话；失败返回 null 并 toast
 	const ensureSession = useCallback(
 		async (projectId: string): Promise<string | null> => {
-			if (sessionId) return sessionId;
+			if (store.get(askPanelCreatingAtom)) return null;
+			const existing = store.get(askPanelSessionIdAtom);
+			if (existing) return existing;
+			const generation = store.get(askPanelGenerationAtom);
 			setCreating(true);
 			try {
-				const { session } = await desktopApi.sessions.createAnonymous({
+				const session = await desktopApi.sessions.createDraft({
 					projectId,
 					title: t("askPanel.sessionTitle"),
 					// 默认后端跟随设置项（defaultAgentBackend，默认 pi），避免后端分裂（F2）
 					backend: defaultAgentBackend,
 				});
-				// 只登记会话记录供 timeline 渲染，不加入 sessionIdsByProjectAtom：
-				// 匿名会话不落盘、不该出现在左侧项目会话列表（关闭弹框后由 detach 事件清理）
-				store.set(sessionRecordsAtom, {
-					...store.get(sessionRecordsAtom),
-					[session.id]: session,
-				});
+				// 普通会话保留历史，关闭问询只停止进程；与侧栏登记走同一原子入口。
+				store.set(upsertSessionAtom, session);
+				if (generation !== store.get(askPanelGenerationAtom)) return null;
 				setSessionId(session.id);
+				setOpen(true);
+				const activation = await desktopApi.sessions.activateRuntime(session.id);
+				if (generation !== store.get(askPanelGenerationAtom)) {
+					// 关闭发生在启动中：回执持有真实代次，可安全停止这次迟到的进程。
+					if (activation.ok && activation.value.agentId) await desktopApi.sessions.stopRuntime({ sessionId: session.id, agentId: activation.value.agentId, runtimeGeneration: activation.value.runtimeGeneration }).catch(() => undefined);
+					return null;
+				}
+				if (!activation.ok) throw new Error(activation.error.code);
 				return session.id;
 			} catch (error) {
+				if (generation !== store.get(askPanelGenerationAtom)) return null;
 				setOpen(false);
+				setSessionId(null);
 				// 会话创建失败属异常，常驻提示直到用户手动关闭
 				showNotice(error instanceof Error ? error.message : String(error), Number.POSITIVE_INFINITY, "error");
 				return null;
 			} finally {
-				setCreating(false);
+				if (generation === store.get(askPanelGenerationAtom)) setCreating(false);
 			}
 		},
 		[sessionId, setCreating, setOpen, setSessionId, store, defaultAgentBackend],
 	);
 
-	// 轮询等待匿名 runtime 就绪：匿名会话是后台激活（createAnonymous 后主进程
-	// 异步 bind+activate），立即 sendPrompt 会因 runtime 未就绪而丢失/失败。
+	// 激活回执与渲染层 runtime 事件可错位，等待本会话投影就绪后再发送。
 	// 注意 agent 就绪状态是 "idle"（"running" 表示正在处理消息），两者都算可发送。
 	const waitRuntimeReady = useCallback(
 		async (sessionId: string, timeoutMs = 15000): Promise<boolean> => {
 			const deadline = Date.now() + timeoutMs;
 			while (Date.now() < deadline) {
+				if (store.get(askPanelSessionIdAtom) !== sessionId) return false;
 				const runtime = store.get(sessionRuntimeBySessionIdAtomFamily(sessionId));
 				if (runtime?.status === "running" || runtime?.status === "idle") return true;
 				await new Promise((resolve) => setTimeout(resolve, 250));
@@ -76,10 +86,13 @@ export function useAskPanel() {
 		[store],
 	);
 
-	// 向匿名会话投递一条 prompt（共用首条/追问发送路径）
+	// 向问询会话投递一条 prompt（共用首条/追问发送路径）
 	const dispatchPrompt = useCallback(
 		async (id: string, text: string, context?: string): Promise<boolean> => {
-			if (!(await waitRuntimeReady(id))) {
+			const generation = store.get(askPanelGenerationAtom);
+			const ready = await waitRuntimeReady(id);
+			if (generation !== store.get(askPanelGenerationAtom)) return false;
+			if (!ready) {
 				// 启动超时提示含「请重试」指引，常驻直到用户手动关闭
 				showNotice(t("askPanel.runtimeTimeout"), Number.POSITIVE_INFINITY, "error");
 				return false;
@@ -100,13 +113,14 @@ export function useAskPanel() {
 				return false;
 			}
 		},
-		[waitRuntimeReady],
+		[waitRuntimeReady, store],
 	);
 
 	const sendToAsk = useCallback(
 		async (projectId: string, text: string, options?: { context?: string; originSessionId?: string }): Promise<boolean> => {
+			const generation = store.get(askPanelGenerationAtom);
 			const id = await ensureSession(projectId);
-			if (!id) return false;
+			if (!id || generation !== store.get(askPanelGenerationAtom)) return false;
 			// 胶囊先显示：会话创建/启动需要数秒，先给用户即时反馈（创建中/等待响应状态）
 			setOpen(true);
 			setCreating(true);
@@ -116,13 +130,13 @@ export function useAskPanel() {
 				const ok = await dispatchPrompt(id, text, options?.context);
 				return ok;
 			} finally {
-				setCreating(false);
+				if (generation === store.get(askPanelGenerationAtom)) setCreating(false);
 			}
 		},
-		[dispatchPrompt, ensureSession, setCreating, setOpen, setOriginSessionId],
+		[dispatchPrompt, ensureSession, setCreating, setOpen, setOriginSessionId, store],
 	);
 
-	// 追问：复用已创建的匿名会话继续对话（不再走 ensureSession/setCreating，避免胶囊闪烁）
+	// 追问：复用已创建的问询会话继续对话（不再走 ensureSession/setCreating，避免胶囊闪烁）
 	const sendFollowUp = useCallback(
 		async (text: string): Promise<boolean> => {
 			if (!sessionId) return false;
@@ -134,14 +148,19 @@ export function useAskPanel() {
 	);
 
 	const close = useCallback(async () => {
+		store.set(askPanelGenerationAtom, store.get(askPanelGenerationAtom) + 1);
 		setOpen(false);
-		if (!sessionId) return;
-		// 停止匿名 runtime：主进程收到 stop 后回收 transient 会话内存并广播 detach
-		const runtime = store.get(sessionRuntimeBySessionIdAtomFamily(sessionId));
+		setCreating(false);
+		const closingId = store.get(askPanelSessionIdAtom);
+		setSessionId(null);
+		setOriginSessionId(null);
+		if (!closingId) return;
+		// 关闭面板只停止问询进程，普通会话历史仍可从工作区列表打开。
+		const runtime = store.get(sessionRuntimeBySessionIdAtomFamily(closingId));
 		if (runtime?.agentId) {
 			try {
 				await desktopApi.sessions.stopRuntime({
-					sessionId,
+					sessionId: closingId,
 					agentId: runtime.agentId,
 					runtimeGeneration: runtime.runtimeGeneration,
 				});
@@ -149,9 +168,7 @@ export function useAskPanel() {
 				// 停止失败不阻塞关闭（进程可能已退出）
 			}
 		}
-		setSessionId(null);
-		setOriginSessionId(null);
-	}, [sessionId, setOpen, setSessionId, setOriginSessionId, store]);
+	}, [setCreating, setOpen, setSessionId, setOriginSessionId, store]);
 
 	return { isOpen, sessionId, originSessionId, creating, sendToAsk, sendFollowUp, close };
 }

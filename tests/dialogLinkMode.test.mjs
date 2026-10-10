@@ -2,16 +2,6 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// 弹框（Dialog/Modal/Overlay）内的链接必须强制系统浏览器打开：
-// 内置浏览器面板位于 Dialog 下层不可见，linkOpenMode=internal 时跟随设置打开会被遮挡，
-// 用户表现为“点了没反应”。统一规则与 ConfigShared.openDocsInSystemBrowser 一致（forceSystem=true）。
-
-test("skill hub result cards force system browser", () => {
-	const src = readFileSync("src/renderer/src/config/SkillHubStorePanel.tsx", "utf8");
-	// 技能搜索结果卡片：点击跳 skills.sh 网页，弹框内必须系统浏览器
-	assert.match(src, /window\.piDesktop\.app\.openExternal\(\s*`https:\/\/www\.skills\.sh\/search\?q=\$\{encodeURIComponent\(item\.name\)\}`,\s*true\s*\)/);
-});
-
 test("extension recommendation cards force system browser", () => {
 	const src = readFileSync("src/renderer/src/config/extensionsRecommendedPackages.tsx", "utf8");
 	// 扩展推荐卡片：原来裸 window.open（会走 setWindowOpenHandler 跟随设置，internal 时同样被遮挡）

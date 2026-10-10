@@ -344,15 +344,15 @@ test("activation never claims standby for a historical session with a file", asy
 	assert.equal(harness.calls.create, 1);
 });
 
-test("activation never claims standby for a dsh session", async () => {
+test("removed backend activation rejects without claiming or spawning", async () => {
 	const { SessionRuntimeCoordinator } = loadCoordinator();
 	const harness = createClaimHarness({ entry: { backend: "dsh" } });
 	const coordinator = new SessionRuntimeCoordinator(harness.catalog, harness.agents, harness.sender);
 
 	const result = await coordinator.activateRuntime("session-1");
-	assert.equal(result.ok, true);
+	assert.equal(result.ok, false);
 	assert.equal(harness.calls.claim, 0);
-	assert.equal(harness.calls.create, 1);
+	assert.equal(harness.calls.create, 0);
 	assert.deepEqual(harness.calls.ensureStandby, [], "dsh 激活不补 pi standby");
 });
 

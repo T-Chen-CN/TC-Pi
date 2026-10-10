@@ -95,12 +95,13 @@ test("接线：restoreExpandedDirs 只补拉「已展开 + 无 children + 未标
 	assert.match(body, /markFileTreeLoadFailed\(tree, directory\)/);
 });
 
-test("接线：打开文件抽屉先自愈，无待修复目录才静默 refreshFiles", () => {
+test("接线：显示左侧文件树先自愈，无待修复目录才静默 refreshFiles，失败有提示", () => {
 	// 抽屉切换语义已迁入 useSessionFileLinks（App 只接线）
 	const app = readFileSync("src/renderer/src/hooks/workspace/useSessionFileLinks.ts", "utf8");
-	const block = app.match(/void restoreExpandedDirs\(activeProjectId\)\.then\(\(repaired\) => \{[\s\S]{0,200}?\}\);/);
-	assert.ok(block, "drawer-open path should run restoreExpandedDirs");
-	assert.match(block[0], /if \(!repaired\) void refreshVisibleFiles\(activeProjectId, true\)/);
+	const block = app.match(/void\s+restoreExpandedDirs\(activeProjectId\)\s*\.then\(\(repaired\)\s*=>\s*\{[\s\S]{0,400}?\.catch\(/);
+	assert.ok(block, "file explorer reveal must run restoreExpandedDirs with a rejection handler");
+	assert.match(block[0], /if\s*\(!repaired\)\s*return\s+refreshVisibleFiles\(activeProjectId,\s*true\)/);
+	assert.match(app, /onRevealFiles\(\)/);
 });
 
 test("接线：FileNode 占位独立成行并带 spinner，失败档不显示占位", () => {

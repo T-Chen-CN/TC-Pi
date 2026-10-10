@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { normalize, join, dirname } from "node:path";
@@ -26,9 +27,7 @@ import { buildDeclarativeUsageProbeTemplate, USAGE_PROBE_CATEGORY_BY_TEMPLATE_ID
 import { loadUsageProbeProviderConfigs, loadUsageProbeSettings, loadUserUsageProbes, loadUserUsageProbesDetailed } from "./userUsageProbes";
 import type { UserUsageProbe, UsageProbeSettingsLoadResult } from "./userUsageProbes";
 import { usageProbeRequest } from "./usageProbeTransport";
-import { pideckUsageProbesDir } from "../dsh/pideckDshHome";
 import { getPiAiCatalogIndex } from "../pi/piAiBuiltinCatalog";
-import { loadDshUsageProviderProfile } from "./dshUsageEndpoint";
 import type { ConfigProxyTarget } from "../sessions/sessionProxyPolicy";
 
 /** pi 全局配置目录：~/.pi/agent/ */
@@ -954,9 +953,7 @@ export class ConfigManager {
 	 * 全部失败时返回结构化错误，并对响应做密钥脱敏，避免把 token 回传给渲染层。
 	 */
 	async fetchProviderUsage(provider: string, backend: UsageProbeBackend = "pi"): Promise<ProviderUsageResult> {
-		// DSH 官方 DeepSeek 的 provider 名归一化：llm.models 组 id（deepseek-official）与
-		// 配置面规范名（deepseek）不一致，不归一就读不到 DSH 卡片保存的探针配置/端点。
-		if (backend === "dsh") provider = normalizeDshDeepseekProvider(provider);
+		requireSupportedBackend(backend);
 		const settingsDir = this.usageProbeSettingsDir(backend);
 		// 1) 门控：未显式开启（enabled !== true）→ 快速返回，不发请求。
 		// 「默认关」是刻意设计：内置识别/已配模板只表示有可查询路径，自动查询必须用户显式开启；
@@ -1017,8 +1014,7 @@ export class ConfigManager {
 	 * 未命中返回 null（弹窗回落到声明式模板选择）。backend 决定配置目录（pi/dsh）。
 	 */
 	async getUsageProbeSettings(provider: string, backend: UsageProbeBackend = "pi"): Promise<UsageProbeSettingsResult> {
-		// 同 fetchProviderUsage：DSH 组 id 别名先归一，才能读回以规范名保存的配置。
-		if (backend === "dsh") provider = normalizeDshDeepseekProvider(provider);
+		requireSupportedBackend(backend);
 		const { settings: loaded, effectiveDir } = await this.loadUsageSettingsWithFallback(backend, provider, this.usageProbeSettingsDir(backend));
 		// 旧版 probes 数组命中回显：手写/历史探针没有声明式配置，弹窗据此预填 Cookie 模板字段迁移。
 		// 回退语义下旧版 probes 也来自 effectiveDir（Pi 目录），弹窗看到的迁移源与实际查询一致。
@@ -1196,11 +1192,7 @@ export class ConfigManager {
 	 * 文件名仍为 usage-probes.json，与 pi 侧同构）。
 	 */
 	private usageProbeSettingsDir(backend: UsageProbeBackend): string {
-		if (backend === "dsh") {
-			// DSH 链路配置统一落 $DSH_HOME/.pideck/（PiDeck 特有文件收拢目录）。
-			const dshHome = this.dshUsage?.getHomeDir() ?? this.configDir;
-			return pideckUsageProbesDir(dshHome);
-		}
+		requireSupportedBackend(backend);
 		return this.configDir;
 	}
 
@@ -1241,44 +1233,16 @@ export class ConfigManager {
 	 * 无 DSH profile（文件缺失/无该 route）时回落 models.json → pi-ai catalog 兜底。
 	 */
 	private async resolveUsageEndpoint(provider: string, backend: UsageProbeBackend = "pi") {
-		// DSH 官方 DeepSeek 统一用规范名 deepseek：llm.models 组 id（deepseek-official）
-		// 只能命中 pi/catalog 兜底，loadDshUsageProviderProfile 的特判会漏掉它。
-		if (backend === "dsh") provider = normalizeDshDeepseekProvider(provider);
+		requireSupportedBackend(backend);
 		const catalog = getPiAiCatalogIndex();
-		if (backend === "dsh") {
-			const home = this.dshUsage?.getHomeDir();
-			if (home) {
-				const profile = await loadDshUsageProviderProfile(home, provider);
-				if (profile) {
-					const catalogSnapshot = piBuiltinSnapshotFromCatalog(provider, undefined, catalog);
-					const [modelsRes, authRes] = await Promise.all([this.getModelsConfig(), this.getAuthConfig()]);
-					const fromDsh = this.dshUsage ? await this.dshUsage.readCredential(profile.credentialRef) : undefined;
-					const baseUrl = profile.baseUrl ?? catalogSnapshot?.baseUrl;
-					const piKey = resolvePiApiKey(modelsRes.parsed?.providers?.[provider], authRes.parsed?.[provider]);
-					return {
-						provider,
-						// profile 缺 baseURL/api（如 opencode route 未写）时由 pi-ai catalog 兜底。
-						...(baseUrl ? { baseUrl } : {}),
-						...((fromDsh ?? piKey) ? { apiKey: fromDsh ?? piKey } : {}),
-						apiType: profile.api ?? catalogSnapshot?.api ?? "openai-completions",
-						headers: profile.headers,
-						matched: baseUrl != null,
-					};
-				}
-			}
-		}
+		requireSupportedBackend(backend);
 		const lookup = {
 			getModelsConfig: () => this.getModelsConfig(),
 			getAuthConfig: () => this.getAuthConfig(),
 			catalogProvider: (name: string) => piBuiltinSnapshotFromCatalog(name, undefined, catalog),
 		};
 		const resolved = await resolveProviderUsageEndpoint(lookup, provider);
-		// DSH 兜底路径（settings.yaml 无该 route）：DSH 凭据库仍然是本链路的优先密钥来源
-		// （路由的 key 状态点以它为准，pi auth 只是迁移/同步场景的回退）。
-		if (backend === "dsh" && this.dshUsage) {
-			const fromDsh = await this.dshUsage.readCredential(credentialRefFor({}, provider));
-			if (fromDsh) resolved.apiKey = fromDsh;
-		}
+		requireSupportedBackend(backend);
 		return resolved;
 	}
 

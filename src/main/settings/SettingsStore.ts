@@ -22,6 +22,7 @@ import {
 import { normalizePinnedSessionIds } from "../../shared/pinnedSessions";
 import { normalizeSessionSortMode } from "../../shared/sessionSort";
 import { normalizeHiddenModules } from "../../shared/hiddenModules";
+import { productSettings } from "../../shared/productFeatures";
 import { normalizeHiddenComposerFeatures } from "../../shared/composerFeatures";
 import { parseBusySendDelivery } from "../../shared/busySendDelivery";
 import { sanitizeShortcutOverrides } from "../../shared/shortcuts";
@@ -30,7 +31,7 @@ import { normalizeEnhanceModel } from "../../shared/enhanceModelPreference";
 import { normalizeQuickMessages } from "../../shared/quickMessages";
 import { sanitizePiCustomPaths } from "../pi/piCustomPaths";
 import { sanitizeCustomThemeSnapshot } from "../../shared/customThemes";
-import { sanitizeAcpTools } from "../acp/acpToolConfig";
+import { sanitizeAcpTools } from "../compatibility/acpToolConfig";
 import { normalizeFontSizeMode, normalizeOptionalFontSizeMode } from "../../shared/fontSize";
 import { clampSessionTabMaxWidth, SESSION_TAB_MAX_WIDTH_DEFAULT } from "../../shared/sessionTabWidth";
 import { getAppLogger } from "../logging/sharedLogger";
@@ -661,9 +662,9 @@ export class SettingsStore {
 		// showThinking 由 pi agent 的 hideThinkingBlock 动态决定，每次 get() 都重新读取
 		const computed = readPiAgentShowThinking();
 		if (computed !== undefined) {
-			return { ...this.settings, showThinking: computed };
+			return productSettings({ ...this.settings, showThinking: computed });
 		}
-		return { ...this.settings };
+		return productSettings({ ...this.settings });
 	}
 
 	async update(patch: Partial<AppSettings>) {

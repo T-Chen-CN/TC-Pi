@@ -11,7 +11,6 @@ import { LoaderCircle } from "lucide-react";
 import type { WorkspaceDrawerPanel } from "../../hooks/useWorkspacePanels";
 import { SessionBranchTreePanel } from "../session/branch/SessionBranchTreePanel";
 import type { RpcLogEntry } from "../../../../shared/types/rpcLog";
-import { sessionPillOf, type SessionFilterPill } from "../../sessionFilterPills";
 import { t } from "../../i18n";
 import type { CommitEntry, FileTreeNode, GitBranchInfo, GitChangedFile, GitResourceGroupType, Project, SessionSummary } from "../../../../shared/types";
 import type { PiDesktopApi } from "../../../../preload";
@@ -67,7 +66,6 @@ export interface DrawerFilesPort {
 	sessionsProjectId: string | undefined;
 	files: FileTreeNode[];
 	sessions: SessionSummary[];
-	sessionSourceFilter: Record<string, Set<SessionFilterPill> | null>;
 	sessionHistoryLoading: boolean;
 	expandedDirs: Set<string>;
 	onToggleDirectory: (dir: string) => void;
@@ -192,11 +190,7 @@ export function DrawerSurface(props: DrawerSurfaceProps) {
 						project={drawer === "sessions" ? files.sessionsProject : undefined}
 						projectId={git.activeProjectId}
 						files={files.files}
-						sessions={
-							files.sessionsProjectId && files.sessionSourceFilter[files.sessionsProjectId as string]
-								? files.sessions.filter((s) => !s.parentSessionPath && files.sessionSourceFilter[files.sessionsProjectId as string]!!.has(sessionPillOf(s))).concat(files.sessions.filter((s) => s.parentSessionPath && files.sessionSourceFilter[files.sessionsProjectId as string]!!.has(sessionPillOf(s))))
-								: files.sessions
-						}
+						sessions={files.sessions}
 						sessionsLoading={files.sessionHistoryLoading}
 						expandedDirs={files.expandedDirs}
 						onToggleDirectory={files.onToggleDirectory}

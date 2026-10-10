@@ -11,7 +11,7 @@ import { t } from "../../i18n";
 import { formatRelativeTime } from "../../utils/relativeTime";
 import { hasPendingAskForSession } from "../../utils/askUi";
 import { BridgeGuiSlot } from "../bridge/BridgeSlot";
-import { filterSidebarSessions, getBoundSidebarRuntimeAgent, type SidebarController } from "../../hooks/useSidebarController";
+import { getBoundSidebarRuntimeAgent, type SidebarController } from "../../hooks/useSidebarController";
 import { Button } from "../ui-shadcn/button";
 import type { SidebarActions } from "./SidebarContent";
 import { PendingAskBadge } from "./PendingAskBadge";
@@ -76,7 +76,7 @@ function renderRuntimeStatusDot(status?: string | null) {
 }
 
 export function SessionTree(props: { project: Project; sessions: readonly SessionRecord[]; agents: readonly AgentTab[]; currentSessionId?: string; controller: SidebarController; actions: SidebarActions; nested?: boolean; visibleChildCount?: number; onShowMore?: () => void }) {
-	const filter = props.controller.sourceFilterFor(props.project.id);
+	const filter = null;
 	const search = props.controller.search.trim();
 	// 待确认 ask 以**会话**为粒度展示：同一项目下可能多个会话各自在等回答，
 	// 只挂项目/标题栏徽章会分不清是哪一个会话（用户反馈）。
@@ -85,7 +85,7 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 		const summary = sessionRecordToSummary(session);
 		return summary ? [summary] : [];
 	});
-	const summaries = filterSidebarSessions(allSummaries, filter).filter((session) => matchesSearch(`${session.name ?? ""}${session.preview}${session.filePath}`, search));
+	const summaries = allSummaries.filter((session) => matchesSearch(`${session.name ?? ""}${session.preview}${session.filePath}`, search));
 	const projectAgents = props.agents.filter((agent) => agent.projectId === props.project.id);
 	const displayAgents = filterAgentsForSidebarDisplay({
 		agents: projectAgents,
@@ -108,7 +108,6 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 		.filter((session) => session.status === "draft")
 		.filter((session) => !displayedSessionIds.has(session.id))
 		.filter((session) => matchesSearch(session.title, search))
-		.filter((session) => filter === null || filter.has(session.source))
 		.sort((left, right) => compareSessionsForSortMode(left, right, props.controller.sessionSortMode));
 	const catalogLoading = props.controller.catalog.catalogLoadStateByProject[props.project.id]?.status === "loading";
 	const canCollapseChildren = props.controller.hasExpandedChildren(props.project.id);
@@ -178,13 +177,7 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 		return (
 			<div key={session.id} className={rowContainerClass} onContextMenu={(event) => openContext(event, session, false)}>
 				<SessionHoverCard session={session} title={title} projectName={props.project.name} disabled={Boolean(props.controller.menu)}>
-					<button
-						type="button"
-						className={cn(sessionRowClass, "session-row codex-subagent-sidebar-row pl-2", session.id === props.currentSessionId && selectedRowClass)}
-						onClick={() => openSession(session.id)}
-						onDoubleClick={props.actions.sessions.simpleNavigation ? undefined : () => openSession(session.id, "permanent")}
-						{...sessionDragProps(session.id)}
-					>
+					<button type="button" className={cn(sessionRowClass, "session-row codex-subagent-sidebar-row pl-2", session.id === props.currentSessionId && selectedRowClass)} onClick={() => openSession(session.id)} {...sessionDragProps(session.id)}>
 						<div className="conversation-body min-w-0 flex-1 transition-[padding-right] group-hover/row:pr-7 group-focus-within/row:pr-7">
 							<div className="conversation-title flex min-w-0 items-center gap-1.5">
 								<TitleScrollText text={title} />
@@ -264,13 +257,6 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 								onClick={() => {
 									if (agentSession) openSession(agentSession.id);
 								}}
-								onDoubleClick={
-									props.actions.sessions.simpleNavigation
-										? undefined
-										: () => {
-												if (agentSession) openSession(agentSession.id, "permanent");
-											}
-								}
 								{...(agentSession ? sessionDragProps(agentSession.id) : {})}
 							>
 								{props.actions.sessions.simpleNavigation ? <SessionActivityIndicator status={child.agent.status} sessionId={agentSession?.id} /> : renderRuntimeStatusDot(child.agent.status)}
@@ -329,7 +315,6 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 								child.session.id === props.currentSessionId && selectedRowClass,
 							)}
 							onClick={() => openSession(child.session.id)}
-							onDoubleClick={props.actions.sessions.simpleNavigation ? undefined : () => openSession(child.session.id, "permanent")}
 							{...sessionDragProps(child.session.id)}
 						>
 							{props.actions.sessions.simpleNavigation ? <SessionActivityIndicator status={runtimeSnapshot?.status} sessionId={child.session.id} /> : renderRuntimeStatusDot(runtimeSnapshot?.status)}
@@ -343,7 +328,7 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 									{(child.session.backend === "dsh" || child.session.backend === "imagegen") && <SessionBackendMark backend={child.session.backend} />}
 									{/* 待确认 ask：挂在会话行本身，用户一眼看出是哪个会话在等回答
                   （项目/标题栏徽章只给汇总数，多会话同时等待时分不清）。
-                  与 ActiveSessionsTree、项目行共用 PendingAskBadge，语义与视觉一致。 */}
+                  与项目行共用 PendingAskBadge，语义与视觉一致。 */}
 									{hasPendingAskForSession(child.session.id, sessionRuntimeUiById) && <PendingAskBadge count={1} />}
 									{/* 生图角标：imagegen 后端会话的徽标已含生图标识，此处仅对遗留 pi 后端含生图消息的会话补图标 */}
 									{child.session.backend !== "imagegen" && child.session.hasImageGen && <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
@@ -377,7 +362,7 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 				    **追加**在行容器之后、子代理列表之前 —— 不改行本身的结构与 hover/拖拽行为（§7.4 只追加）。
 				    无贡献时返回 null，不占位。
 				    注：仓库无统一 SessionItem 组件，此处只接了 SessionTree 的历史会话行；
-				    ActiveSessionsTree / RecentSessionsSection / SessionTabsBar 仍为 pending。 */}
+				    SessionTabsBar 仍为 pending。 */}
 				<BridgeGuiSlot sessionId={child.session.id} slot="session.item" className="flex flex-col gap-0.5 pl-5" />
 				{renderSubagents(groupKey, child.codexSubagents, child.piSubagents)}
 			</SidebarRemovalRow>
@@ -398,13 +383,7 @@ export function SessionTree(props: { project: Project; sessions: readonly Sessio
 						<SidebarRemovalRow key={`draft:${session.id}`} itemId={session.id}>
 							<div className={cn("draft-session-row group/draft grid items-center gap-1", "grid-cols-[minmax(0,1fr)_2rem]")} onContextMenu={(event) => openDraftContext(event, session)}>
 								<SessionHoverCard session={session} title={session.title} projectName={props.project.name} status={runtime?.status} disabled={Boolean(props.controller.menu)}>
-									<button
-										type="button"
-										className={cn(sessionRowClass, "session-row draft-session-trigger", session.id === props.currentSessionId && selectedRowClass)}
-										onClick={() => openSession(session.id)}
-										onDoubleClick={props.actions.sessions.simpleNavigation ? undefined : () => openSession(session.id, "permanent")}
-										{...sessionDragProps(session.id)}
-									>
+									<button type="button" className={cn(sessionRowClass, "session-row draft-session-trigger", session.id === props.currentSessionId && selectedRowClass)} onClick={() => openSession(session.id)} {...sessionDragProps(session.id)}>
 										<div className="conversation-body min-w-0 flex-1 transition-[padding-right] group-hover/row:pr-7 group-focus-within/row:pr-7">
 											<div className="conversation-title flex min-w-0 items-center gap-1.5">
 												{props.actions.sessions.simpleNavigation ? <SessionActivityIndicator status={runtime?.status} sessionId={session.id} /> : renderRuntimeStatusDot(runtime?.status)}

@@ -83,7 +83,7 @@ test("Tailwind 暴露 text-tab 工具类并接上 token", () => {
 
 test("SessionTabsBar：会话 Tab 与文件 Tab 消费字号及行高 token，字号不再依赖 text-micro", () => {
 	const pills = tabsBar.match(/"session-tab group[^"]*"/g) ?? [];
-	assert.equal(pills.length, 2, "应有会话 Tab 与工作台文件 Tab 两处胶囊");
+	assert.equal(pills.length, 3, "会话、文件与拖拽预览三个胶囊都应使用字号 token");
 	for (const pill of pills) {
 		assert.match(pill, /text-\[length:var\(--font-size-tab\)\]/);
 		assert.match(pill, /leading-\(--line-height-tab\)/);

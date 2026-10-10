@@ -19,7 +19,7 @@ test("project change events re-read presence-aware inventory before replacing at
 });
 
 test("global listener owner handles non-runtime application events only", () => {
-	for (const listener of ["projects.onChanged", "pet.onFocusTarget", "projects.onTrustRequest", "settings.onApplyWindow", "app.onOpenInBrowser"]) {
+	for (const listener of ["projects.onChanged", "app.onFocusTarget", "projects.onTrustRequest", "settings.onApplyWindow", "app.onOpenInBrowser"]) {
 		assert.match(source, new RegExp(listener.replace(".", "\\.")), listener);
 	}
 	// 更新状态由独立的快照订阅 hook 拥有，避免全局 agent listener 再持有旧进度流。

@@ -59,7 +59,8 @@ test("settings changes are logged once, key names only, never values", () => {
 
 test("session write operations are logged", () => {
 	assert.match(sessionIpc, /"Session draft created", \{\s*sessionId: draft\.id,/);
-	assert.match(sessionIpc, /"Anonymous session created", \{\s*sessionId: result\.session\.id,/);
+	// 新会话统一走可保存草稿；已删除的匿名创建入口不能再写入会话。
+	assert.doesNotMatch(sessionIpc, /sessionsCreateAnonymous|"Anonymous session created"/);
 	assert.match(sessionIpc, /"Session renamed \(file\)"/);
 	assert.match(sessionIpc, /"Session copied", \{\s*sessionId,\s*targetSessionId:/);
 	assert.match(sessionIpc, /"Session exported \(catalog HTML\)"/);
@@ -87,7 +88,6 @@ test("second-wave audit: proxy, single-instance, catalog, clone/fork", () => {
 	const singleInstance = read("main/singleInstance.ts");
 	const sessionCatalog = read("main/sessions/SessionCatalog.ts");
 	const sessionScanner = read("main/sessions/SessionScanner.ts");
-	const visionConfig = read("main/settings/visionBridgeConfig.ts");
 	const gitIpc = read("main/ipc/gitIpc.ts");
 	const index = read("main/index.ts");
 	// 桌面代理：只记 mode 不记 proxyRules（URL 可能内嵌凭据）
@@ -105,9 +105,6 @@ test("second-wave audit: proxy, single-instance, catalog, clone/fork", () => {
 	assert.doesNotMatch(sessionCatalog, /Failed to load Session catalog or backup/);
 	// SessionScanner JSONL 解析失败双写日志
 	assert.match(sessionScanner, /"Skipped unparseable JSONL line", \{ filePath \}\)/);
-	// 视觉桥配置写盘：只记 provider/hasApiKey，不记 key 值
-	assert.match(visionConfig, /"Vision config saved", \{\s*provider:/);
-	assert.match(visionConfig, /hasApiKey: Boolean/);
 	// git init / web 服务回退留痕
 	assert.match(gitIpc, /"Repository initialized", \{ projectId, path: project\.path \}\)/);
 	assert.match(index, /"Web service disabled after apply failure"/);

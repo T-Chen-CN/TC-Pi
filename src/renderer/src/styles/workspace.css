@@ -746,11 +746,11 @@ html[data-theme="dark"] .scratch-pad-md mark {
   --git-renamed: var(--color-info);
   --git-conflict: var(--color-warning);
   --git-graph-lane-1: var(--color-info);
-  --git-graph-lane-2: var(--color-accent);
+  --git-graph-lane-2: var(--color-success);
   --git-graph-lane-3: var(--color-warning);
-  --git-graph-lane-4: var(--color-brand-purple);
+  --git-graph-lane-4: light-dark(#7c3aed, #a78bfa);
   --git-graph-lane-5: var(--color-danger);
-  --git-graph-lane-6: var(--color-brand-blue);
+  --git-graph-lane-6: light-dark(#0891b2, #22d3ee);
   display: flex;
   flex: 1;
   min-height: 0;

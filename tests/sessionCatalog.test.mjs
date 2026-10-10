@@ -1021,38 +1021,25 @@ test("removes an unstarted draft from the durable catalog", async () => {
 	}
 });
 
-test("keeps anonymous records in memory and excludes them from the durable catalog", async () => {
+test("normal saved histories persist and anonymous creation is no longer exposed", async () => {
 	const { SessionCatalog } = loadCatalog();
 	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-"));
 	const filePath = join(dir, "sessions.json");
 	try {
 		const catalog = new SessionCatalog(filePath);
 		await catalog.load();
-		const anonymous = catalog.createAnonymous({
-			projectId: "project-1",
-			title: "Anonymous Chat",
-			environment: "native",
-		});
-		assert.equal(anonymous.noSession, true);
-		assert.equal((await catalog.mergeScanned("project-1", [])).map((record) => record.id).includes(anonymous.id), true);
-		await assert.rejects(readFile(filePath, "utf8"), /ENOENT/);
-
-		await catalog.createDraft({
-			projectId: "project-1",
-			title: "Saved draft",
-			environment: "native",
-		});
+		assert.equal(typeof catalog.createAnonymous, "undefined");
+		const savedPath = await realSessionFile(dir, "history.jsonl");
+		const [saved] = await catalog.mergeScanned("project-1", [summary({ filePath: savedPath, name: "Saved history" })]);
+		assert.equal(saved.noSession, undefined);
 		const snapshot = JSON.parse(await readFile(filePath, "utf8"));
 		assert.equal(
-			snapshot.sessions.some((entry) => entry.id === anonymous.id),
-			false,
+			snapshot.sessions.some((entry) => entry.id === saved.id && !entry.noSession),
+			true,
 		);
-
 		const reloaded = new SessionCatalog(filePath);
 		await reloaded.load();
-		assert.equal(reloaded.get(anonymous.id), undefined);
-		assert.equal(catalog.removeTransient(anonymous.id), true);
-		assert.equal(catalog.get(anonymous.id), undefined);
+		assert.equal(reloaded.get(saved.id).title, "Saved history");
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
@@ -1503,9 +1490,9 @@ test("removeWithDescendants drops nested subagent catalog entries with the paren
 		const unrelated = records.find((record) => record.title === "Unrelated");
 		assert.ok(parent && child && grandchild && unrelated);
 
-		const anonymous = catalog.createAnonymous({
+		const independent = await catalog.createDraft({
 			projectId: "project-1",
-			title: "Anonymous Chat",
+			title: "Independent saved draft",
 			environment: "native",
 		});
 		const draft = await catalog.createDraft({
@@ -1528,7 +1515,7 @@ test("removeWithDescendants drops nested subagent catalog entries with the paren
 		assert.equal(catalog.get(child.id), undefined);
 		assert.equal(catalog.get(grandchild.id), undefined);
 		assert.ok(catalog.get(restoredUnrelated.id), "unrelated file-backed session must stay");
-		assert.ok(catalog.get(anonymous.id), "anonymous sessions must survive parent archive");
+		assert.ok(catalog.get(independent.id), "independent sessions must survive parent archive");
 		assert.ok(catalog.get(draft.id), "drafts must survive parent archive");
 		assert.ok(
 			catalog.listEntries().some((entry) => entry.title === "Other project"),

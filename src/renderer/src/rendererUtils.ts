@@ -1,6 +1,5 @@
 import type { Project, SessionSummary, SessionEnvironment, AgentTab } from "../../shared/types";
 import { isSameSessionPath } from "./agentListDisplay";
-import { parseSessionFilterState, serializeSessionFilterState, type SessionFilterPill } from "./sessionFilterPills";
 
 // 输入卡本身的最小高度：输入区 + 模式/模型底栏。footer 的 8px 底 padding 由内容撑开。
 export const COMPOSER_DEFAULT_HEIGHT = 160;
@@ -128,24 +127,6 @@ export function formatCodexSubagentName(session: SessionSummary) {
 /** pi 原生子会话名称：优先使用会话名，回退到 "子会话" */
 export function formatPiSubagentName(session: SessionSummary) {
 	return session.name || "Pi Subagent";
-}
-
-/** 从 localStorage 恢复会话来源过滤配置（v2 格式，含旧版迁移，见 sessionFilterPills） */
-export function loadSessionSourceFilter(): Record<string, Set<SessionFilterPill> | null> {
-	try {
-		return parseSessionFilterState(localStorage.getItem("pideck-session-source-filter"));
-	} catch {
-		return {};
-	}
-}
-
-/** 将会话来源过滤持久化到 localStorage（与侧栏过滤菜单共用同一份配置） */
-export function saveSessionSourceFilter(filter: Record<string, Set<SessionFilterPill> | null>) {
-	try {
-		localStorage.setItem("pideck-session-source-filter", serializeSessionFilterState(filter));
-	} catch {
-		// 静默失败
-	}
 }
 
 export function inferSessionEnvironment(filePath?: string): SessionEnvironment {

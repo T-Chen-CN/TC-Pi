@@ -1,52 +1,24 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
-/**
- * 并行问询 hook 源码契约测试（src/renderer/src/hooks/useAskPanel.ts）。
- *
- * 为什么用源码断言而不是直接执行 hook：useAskPanel 是 React hook，依赖 jotai store
- * 与 preload desktopApi，完整执行需要大量 stub；本测试聚焦「能力契约」——
- * 上下文继承如何注入、追问是否复用匿名会话、关闭是否清空 origin，
- * 通过编译后模块的代码形状断言防回归（与 sessionComposer.test.mjs 同款方式）。
- */
+/** Source contracts complement behavior tests in askPanelHistory.test.mjs. */
 function compile(filePath) {
-	const source = readFileSync(filePath, "utf8");
-	const output = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-			esModuleInterop: true,
-			jsx: ts.JsxEmit.ReactJSX,
+	const stub = { useAtom: (value) => [value, () => undefined], useAtomValue: (value) => value, useStore: () => ({ get: () => undefined, set: () => undefined }) };
+	return loadTsCommonJs(filePath, {
+		stubs: {
+			react: { useCallback: (fn) => fn },
+			jotai: stub,
+			"../atoms/ask-panel-atoms": {},
+			"../atoms/app-ui-atoms": {},
+			"../atoms/session-atoms": {},
+			"../atoms/session-selectors": {},
+			"../desktopApi": { desktopApi: { sessions: {} } },
+			"../i18n": { t: (key) => key },
+			"../utils/notice": { showNotice: () => undefined },
 		},
-		fileName: filePath,
-	}).outputText;
-	const module = { exports: {} };
-	const localRequire = (specifier) => stubsFor(specifier);
-	vm.runInNewContext(
-		output,
-		{
-			module,
-			exports: module.exports,
-			require: localRequire,
-			crypto: { randomUUID: () => "request-id" },
-			console,
-			Set,
-		},
-		{ filename: filePath },
-	);
-	return module.exports;
-}
-
-/** 按模块名提供最小 stub：hook 只 import 不直接调用外部实现，源码形状断言不依赖其行为 */
-function stubsFor(specifier) {
-	const stub = { useAtom: (v) => [v, () => undefined], useAtomValue: (v) => v, useCallback: (fn) => fn, useStore: () => ({ get: () => undefined, set: () => undefined }) };
-	if (specifier.includes("react")) return { useCallback: stub.useCallback };
-	if (specifier.includes("jotai")) return stub;
-	if (specifier.includes("desktopApi")) return { sessions: { createAnonymous: async () => ({ session: { id: "s" } }), sendPrompt: async () => ({ accepted: true }), stopRuntime: async () => undefined } };
-	return {};
+	});
 }
 
 const askPanelSource = () => readFileSync("src/renderer/src/hooks/useAskPanel.ts", "utf8");
@@ -68,7 +40,7 @@ test("sendAsk passes context and originSessionId to the panel", () => {
 	assert.match(source, /if \(options\?\.originSessionId\) setOriginSessionId/);
 });
 
-test("follow-up reuses the existing anonymous session without creating a new one", () => {
+test("follow-up reuses the existing saved session without creating a new one", () => {
 	const source = askPanelSource();
 	// sendFollowUp 直接 dispatchPrompt(sessionId)，不再走 ensureSession/setCreating
 	assert.match(source, /const sendFollowUp = useCallback/);
@@ -76,7 +48,7 @@ test("follow-up reuses the existing anonymous session without creating a new one
 	assert.match(source, /return dispatchPrompt\(sessionId, trimmed\);/);
 });
 
-test("close clears origin session id along with the anonymous session", () => {
+test("close clears origin session id along with the saved session", () => {
 	const source = askPanelSource();
 	assert.match(source, /setSessionId\(null\);\n\s*setOriginSessionId\(null\);/);
 });

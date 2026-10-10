@@ -11,7 +11,6 @@ import { readRendererStyles } from "./helpers/rendererStyles.mjs";
 const styles = readRendererStyles();
 const titleScrollText = readFileSync("src/renderer/src/components/sidebar/TitleScrollText.tsx", "utf8");
 const sessionTree = readFileSync("src/renderer/src/components/sidebar/SessionTree.tsx", "utf8");
-const activeSessionsTree = readFileSync("src/renderer/src/components/sidebar/ActiveSessionsTree.tsx", "utf8");
 const dshSearchResults = readFileSync("src/renderer/src/components/sidebar/DshSearchResults.tsx", "utf8");
 const projectTree = readFileSync("src/renderer/src/components/sidebar/ProjectTree.tsx", "utf8");
 const agentListDisplay = readFileSync("src/renderer/src/agentListDisplay.ts", "utf8");
@@ -51,8 +50,6 @@ test("sidebar child titles use the shared width clamp and hover-scroll component
 	assert.match(sessionTree, /import \{ TitleScrollText \} from "\.\/TitleScrollText"/);
 	assert.match(sessionTree, /<TitleScrollText\s+text=\{displayTitle\}\s+className="font-medium"\s+\/>/);
 	assert.match(sessionTree, /标题被截断时 hover 滚动展示全文/);
-	assert.match(activeSessionsTree, /import \{ TitleScrollText \} from "\.\/TitleScrollText"/);
-	assert.match(activeSessionsTree, /<TitleScrollText text=\{displayTitle\} className="font-medium" \/>/);
 	assert.match(dshSearchResults, /import \{ TitleScrollText \} from "\.\/TitleScrollText"/);
 	assert.match(dshSearchResults, /text=\{record\.title\}/);
 	assert.doesNotMatch(titleScrollText, /title=\{overflowing \? text : undefined\}/);
@@ -64,7 +61,7 @@ test("sidebar child titles use the shared width clamp and hover-scroll component
 
 test("all sidebar session rows allow hover scrolling while tab strategy stays scoped", () => {
 	// 选中背景仍由行 class 保留；TitleScrollText 不应因聚焦/选中而禁用，便于查看完整标题。
-	for (const source of [sessionTree, activeSessionsTree, dshSearchResults]) {
+	for (const source of [sessionTree, dshSearchResults]) {
 		assert.doesNotMatch(source, /<TitleScrollText\b[^>]*\bdisabled\b/);
 	}
 	// 顶部 Tab 保留独立的激活态禁用和 500ms 防抖策略。
@@ -107,8 +104,10 @@ test("sidebar omits the redundant projects heading and tabs shrink to their titl
 	const sidebarContent = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
 
 	assert.doesNotMatch(sidebarContent, /FolderTree/);
-	// 项目标签不再作为独立分组标题，而是收拢到 Chats/项目分段 beUI Tab 的 trigger 文案
-	assert.match(sidebarContent, /<TabsTrigger[\s\S]{0,500}value="projects"[\s\S]{0,500}\{t\("app\.sidebarProjects"\)\}/);
+	// 四入口工作区导航替代旧分段；文件管理保留单一挂载点。
+	assert.match(sidebarContent, /<WorkspaceNavigation\s/);
+	assert.match(sidebarContent, /\{props\.workspaceFiles\}/);
+	assert.doesNotMatch(sidebarContent, /<TabsTrigger\s/);
 	// 固定 Tab 与普通 Tab 同宽策略：不再用 w-20 固定宽度（Pin 图标挤占标题空间）
 	// 宽度上限改为外观设置可调（sessionTabMaxWidth）：会话 Tab 与工作台文件/Diff Tab 同栏同源，
 	// 统一读根节点注入的 CSS 变量 --session-tab-max-w；带前置徽章（Pin/DSH/plan chip）的 Tab

@@ -320,15 +320,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	// 生图供应商/模型来自独立 imagegen.json，与会话 LLM 模型无关。
 	const activeImageGenProviderId = imageGenConfig.activeProviderId;
 	const activeImageGenModelId = imageGenConfig.activeModel;
-	const mode: ComposerAgentMode =
-		record?.backend === "imagegen" || hasImageGenHistory
-			? "imagegen"
-			: deriveComposerAgentMode({
-					backend: isDshBackend ? "dsh" : "pi",
-					localMode: localMode,
-					planModeActive: runtime?.state?.planModeActive === true,
-					goalPhase: runtime?.state?.goal?.phase,
-				});
+	const mode: ComposerAgentMode = deriveComposerAgentMode({ backend: "pi", localMode, planModeActive: runtime?.state?.planModeActive === true, goalPhase: runtime?.state?.goal?.phase });
 	// DSH 部署默认模型选择（settings.yaml agent-default-model）：草稿/未激活会话
 	// 的底栏与选择器用它展示默认模型/思考档位（host 会话创建前没有 runtime state）。
 	// settings.yaml 未配 reasoningEffort 时，回退到默认模型自身的 defaultEffort
@@ -1087,148 +1079,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	// 并行发送（拆分菜单「并行发送」）：把当前草稿文本送进独立 Ask 会话后台处理，不打断当前会话。
 	// useAskPanel 内部用全局 atom 管会话/胶囊状态，会话各处共享同一实例，重复调用安全。
 	const askPanel = useAskPanel();
-	// 结果按「消息」语义上屏（与 useSessionSend 乐观提交同一约定：写时间线缓存、source=runtime）：
-	// 提示词作为 user 消息立即上屏；随后追加一条 assistant「生图占位」消息（meta.imageGen=generating），
-	// 生成期间由 FinalAnswer 渲染 beUI ImageGeneration 点阵动画，完成后原地更新为 complete（图片清晰过渡），
-	// 失败原地更新为 error。不调用 send、不进附件栏（无运行中 Agent 也能用）。
-	const persistImageGenSelection = useCallback(
-		(providerId: string, modelId: string) => {
-			const next = {
-				...imageGenConfig,
-				activeProviderId: providerId,
-				activeModel: modelId,
-			};
-			setImageGenConfig(next);
-			void desktopApi.imagegen.saveConfig(next).catch(() => undefined);
-		},
-		[imageGenConfig, setImageGenConfig],
-	);
-
-	const generateImage = useCallback(async () => {
-		const prompt = draft.trim();
-		if (!prompt || generatingImage) return;
-		const provider = findImageGenProvider(imageGenConfig, activeImageGenProviderId);
-		const modelId = provider?.models.includes(activeImageGenModelId) ? activeImageGenModelId : "";
-		if (!provider?.id || !modelId || !provider.baseUrl.trim() || !provider.apiKey.trim()) {
-			showNotice(t("imagegen.error.notConfigured"), 5000);
-			return;
-		}
-		// 参考图前置门禁：供应商未声明带图输入时直接提示，不发无效请求（主进程也会拦截兑底）
-		if (attachments.length > 0 && (provider.referenceMode ?? "none") === "none") {
-			showNotice(t("imagegen.error.referenceUnsupported"), 5000);
-			return;
-		}
-		// 仅「启动即匿名」的会话提示（noSession=true，经匿名开聊创建，pi 以 --no-session 启动）：
-		// 生图不落盘、重启即失。普通新建 draft 会话 filePath 同样为空（生图不启动 agent），
-		// 但用户视角它是正式会话，不弹匿名提示打扰（2026 反馈）。
-		if (record?.noSession === true) {
-			showNotice(t("imagegen.transientHint"), 6000);
-		}
-		setGeneratingImage(true);
-
-		// 把本地生图消息追加进时间线缓存（整体替换 messages 数组，source=runtime 沿用乐观提交约定）。
-		const appendTimelineMessage = (message: ChatMessage) => {
-			const previous = store.get(sessionMessagesCacheAtom)?.[sessionId]?.messages ?? [];
-			setCacheMessages({ sessionId, messages: [...previous, message], source: "runtime" });
-		};
-		// 按 id 原地更新已上屏消息（生图占位 → complete/error 复用同一条，避免时间线多出一条）。
-		const updateTimelineMessage = (id: string, patch: (m: ChatMessage) => ChatMessage) => {
-			const previous = store.get(sessionMessagesCacheAtom)?.[sessionId]?.messages ?? [];
-			setCacheMessages({
-				sessionId,
-				messages: previous.map((m) => (m.id === id ? patch(m) : m)),
-				source: "runtime",
-			});
-		};
-
-		appendTimelineMessage({
-			id: crypto.randomUUID(),
-			agentId: "",
-			role: "user",
-			text: prompt,
-			timestamp: Date.now(),
-			// 参考图随 user 消息上屏：发送后附件栏清空，图片要留在时间线气泡里回显
-			images: attachments.length > 0 ? attachments : undefined,
-		});
-		const imageMessageId = crypto.randomUUID();
-		appendTimelineMessage({
-			id: imageMessageId,
-			agentId: "",
-			role: "assistant",
-			text: "",
-			stopReason: "stop",
-			timestamp: Date.now(),
-			meta: {
-				imageGen: { status: "generating", prompt, size: imageGenSize } satisfies ImageGenMeta,
-			},
-		});
-		setDraft("");
-		// 乐观清空附件栏：参考图已随 user 消息上屏回显，输入框不再占用
-		// （与普通消息发送同惯例 useSessionSend.clearSnapshot）；
-		// 生成失败时下方失败分支会把附件前插恢复，支持改词重试。
-		if (attachments.length > 0) {
-			setAttachmentsAtom({ sessionId, value: [] });
-		}
-
-		try {
-			const result = await desktopApi.imagegen.generate({
-				provider: provider.id,
-				model: modelId,
-				prompt,
-				size: imageGenSize,
-				watermark: imageGenWatermark,
-				outputFormat: imageGenOutputFormat,
-				// 参考图：附件栏图片作为参考图传给主进程；是否可用由供应商 referenceMode 决定
-				referenceImages: attachments.length > 0 ? attachments : undefined,
-				// 生图记录落盘：主进程成功后把 user+assistant 消息写入当前会话的 pi 文件
-				sessionId,
-			});
-			if (result.ok) {
-				// 参考图发送时已乐观清空，此处只原地更新结果消息
-				updateTimelineMessage(imageMessageId, (m) => ({
-					...m,
-					images: [result.image],
-					meta: {
-						imageGen: { status: "complete", prompt, size: imageGenSize } satisfies ImageGenMeta,
-					},
-				}));
-				showNotice(t("imagegen.done"), 4000);
-			} else {
-				// 失败恢复附件：参考图放回输入框便于改词重试；前插不覆盖期间新粘贴的图
-				if (attachments.length > 0) {
-					setAttachmentsAtom({ sessionId, value: (current) => [...attachments, ...current] });
-				}
-				updateTimelineMessage(imageMessageId, (m) => ({
-					...m,
-					meta: {
-						imageGen: {
-							status: "error",
-							prompt,
-							size: imageGenSize,
-							errorDetail: mapImageGenError(result.error, result.detail),
-						} satisfies ImageGenMeta,
-					},
-				}));
-			}
-		} catch {
-			// 网络/超时类失败同样恢复附件，便于原地重试
-			if (attachments.length > 0) {
-				setAttachmentsAtom({ sessionId, value: (current) => [...attachments, ...current] });
-			}
-			updateTimelineMessage(imageMessageId, (m) => ({
-				...m,
-				meta: {
-					imageGen: {
-						status: "error",
-						prompt,
-						errorDetail: t("imagegen.error.network"),
-					} satisfies ImageGenMeta,
-				},
-			}));
-		} finally {
-			setGeneratingImage(false);
-		}
-	}, [activeImageGenModelId, activeImageGenProviderId, attachments, draft, generatingImage, imageGenConfig, imageGenOutputFormat, imageGenSize, imageGenWatermark, record?.noSession, sessionId, setAttachmentsAtom, setCacheMessages, setDraft, store]);
+	const persistImageGenSelection = (_providerId: string, _modelId: string): void => {};
 
 	// 统一发送入口：先晋升预览 Tab 再投递（幂等，非预览无副作用）。
 	// 发送按钮 / 追问按钮 / Enter 键 / 无 Agent 时的 /compact 直发都会走这里，
@@ -1236,10 +1087,6 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	// 生图模式：所有发送入口统一转生图（不晋升预览 Tab、不发消息），避免各入口分支不一致。
 	const promoteAndSend = useCallback(
 		async (behavior?: "steer" | "followUp", overrideText?: string) => {
-			if (mode === "imagegen") {
-				void generateImage();
-				return;
-			}
 			// 粘贴文件折叠：把 chip 里的文件引用/内容并进草稿再发送。
 			// 新写入一律在 userData（inProject=false）：折叠原样文本内联，pi 读不到 userData；
 			// 遗留项目内 chip（inProject=true）仍走 @"path" 引用——pi 展开读取。
@@ -1265,7 +1112,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 			options.onPromoteSession?.(sessionId);
 			return send(behavior, overrideText);
 		},
-		[draft, mode, generateImage, options.onPromoteSession, pasteFiles, send, sessionId, setDraft, setPasteFiles],
+		[draft, mode, options.onPromoteSession, pasteFiles, send, sessionId, setDraft, setPasteFiles],
 	);
 
 	const selectSuggestion = useCallback(
@@ -2201,24 +2048,3 @@ export function useSessionComposerController(options: UseSessionComposerControll
 }
 
 export type SessionComposerController = ReturnType<typeof useSessionComposerController>;
-
-/** 生图错误码 → 用户可见文案。http/鉴权类错误尽量附上厂商 detail（已脱敏）。 */
-function mapImageGenError(error: string, detail?: string): string {
-	const extra = detail?.trim() ?? "";
-	switch (error) {
-		case "notConfigured":
-			return t("imagegen.error.notConfigured");
-		case "invalidKey":
-			return extra ? t("imagegen.error.invalidKeyDetail", { detail: extra }) : t("imagegen.error.invalidKey");
-		case "badBaseUrl":
-			return extra ? t("imagegen.error.badBaseUrlDetail", { detail: extra }) : t("imagegen.error.badBaseUrl");
-		case "empty":
-			return t("imagegen.error.empty");
-		case "http":
-			return extra ? t("imagegen.error.http", { detail: extra }) : t("imagegen.status.error");
-		case "responseTooLarge":
-			return t("imagegen.error.responseTooLarge");
-		default:
-			return t("imagegen.error.network");
-	}
-}

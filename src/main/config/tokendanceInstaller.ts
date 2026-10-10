@@ -1,24 +1,11 @@
-/**
- * TokenDance 一键安装：把供应商信息 + 目录模型写入 pi / DSH 配置。
- *
- * 设计动机（对应用户可见的「确认后写入配置文件」流程）：
- * - 不依赖任何展示层注入：模型写入 models.json（pi 侧）/ llm-pi-ai providers（DSH 侧）
- *   后，由 pi/DSH 运行时自行解析，配置页模型列表、会话模型选择、用量查询全部走
- *   既有链路，无需特判。
- * - 幂等：重复安装以同一份目录覆盖模型（用户改过模型列表？不覆盖——只做 upsert，
- *   保留已有 provider 时用户手工调整的字段；models 目录更新时合并）。
- * - Key 落点跟随迁移服务惯例（mergePiProvider）：内联写 models.json provider.apiKey，
- *   与 ModelsTab 编辑器一致（此前写 auth.json 造成迁移后 key 显示为空的 bug）。
- * - DSH 侧不写 X-App-URL 请求头：TokenDance 通过 OAuth 创建的 Key 已带 app_url 归因，
- *   且 DSH settings schema 白名单字段可能拒绝 headers，落点保持最小。
- */
+/** Writes the TokenDance catalog and optional credentials to pi models.json. */
 import { TOKENDANCE_APP_URL, TOKENDANCE_APP_URL_HEADER, TOKENDANCE_BASE_URL, TOKENDANCE_PROVIDER } from "../../shared/tokendance";
 // 落盘前统一排序：目录/缓存旧数据可能仍是平台返回顺序，写入 models.json 必须与下拉列表一致。
 import { sortModelRows } from "../../shared/modelOrder";
 import type { AvailableModel } from "../../shared/types";
-import { credentialRefFor, dshModelsFromPi, mergePiProvider, type DshProviderSnapshot, type PiProviderSnapshot } from "./providerMigration";
+import { mergePiProvider, type PiProviderSnapshot } from "./providerMigration";
 import type { PiModelItem } from "./ConfigManager";
-import type { ProviderMigrationDeps } from "./providerMigrationService";
+import type { ConfigManager } from "./ConfigManager";
 import type { TokendanceCatalogStore } from "./tokendanceCatalog";
 import type { PiAiCatalogEntry } from "../pi/piAiBuiltinCatalog";
 
@@ -37,7 +24,7 @@ export type TokendanceInstallResult = {
 	modelCount: number;
 	/** pi models.json 是否已写入（含 Key upsert）。 */
 	piSaved: boolean;
-	/** DSH 侧是否也写入（host 未就绪时经磁盘合并，仍返回 true）。 */
+	/** Legacy result field: always false in this distribution. */
 	dshSaved: boolean;
 	/** DSH 写入是否走了 host 官方 API（false = 磁盘直写 settings.yaml/.credentials.yaml）。 */
 	dshWroteViaHost?: boolean;
@@ -46,17 +33,14 @@ export type TokendanceInstallResult = {
 	error?: string;
 };
 
-export type TokendanceInstallDeps = ProviderMigrationDeps & {
+export type TokendanceInstallDeps = {
+	configManager: ConfigManager;
 	tokendanceCatalog: TokendanceCatalogStore;
 	/** 能力字段补全（可选）：未提供时只写目录实报字段。 */
 	catalogLookup?: TokendanceCatalogLookup;
 };
 
-/**
- * 执行安装：目录 → pi models.json（merge upsert）+ DSH llm-pi-ai（host 就绪走
- * settings API，否则磁盘直写）。任一写盘失败即返回 ok=false（错误信息原样上抛，
- * 由 IPC 边界转结构化结果，不泄露 Key）。
- */
+/** Refreshes the catalog and merges it into the retained pi provider configuration. */
 export async function installTokendanceProvider(deps: TokendanceInstallDeps, options: { apiKey?: string } = {}): Promise<TokendanceInstallResult> {
 	// 安装前强制刷新目录：旧缓存可能含已废弃的行（如 2026-09 曾写入 context_length=0
 	// 的模型导致 pi 拒绝整个 provider）；刷新失败（断网/超时）降级用旧缓存，不让目录消失。
@@ -122,43 +106,5 @@ export async function installTokendanceProvider(deps: TokendanceInstallDeps, opt
 		};
 	}
 
-	// DSH 侧：不写 headers（Key 已带归因；避免 schema 拒绝未知字段），其余字段对齐
-	// dsh-web llm-pi-ai 惯例（displayName/baseURL/api/apiKeyEnv/models）。
-	// 容错：DSH 未安装/未启动/直写失败都不阻断 pi 侧写入——用户可能只用 pi 后端，
-	// DSH 侧失败仅体现在 dshSaved=false（渲染层提示“已写入 Pi 配置；DSH 未同步”）。
-	const dshSnapshot: DshProviderSnapshot = {
-		name: TOKENDANCE_PROVIDER,
-		namespace: "llm-pi-ai",
-		profile: {
-			displayName: "TokenDance",
-			baseURL: TOKENDANCE_BASE_URL,
-			api: "openai-completions",
-			apiKeyEnv: credentialRefFor(undefined, TOKENDANCE_PROVIDER),
-			models: dshModelsFromPi(piModels),
-		},
-		apiKey,
-	};
-	try {
-		// writeDshSnapshot 由 providerMigrationService 提供并复用（host 就绪走官方 API，
-		// 否则直写 settings.yaml/.credentials.yaml）。
-		const { writeDshSnapshot } = await import("./providerMigrationService");
-		const wroteViaHost = await writeDshSnapshot(deps, dshSnapshot);
-		return {
-			ok: true,
-			modelCount: piModels.length,
-			piSaved: true,
-			dshSaved: true,
-			dshWroteViaHost: wroteViaHost,
-		};
-	} catch (error) {
-		// 跨 realm（测试 vm 加载）时 instanceof Error 不可靠，用结构提取 message
-		const dshError = error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string" ? (error as { message: string }).message : String(error);
-		return {
-			ok: true,
-			modelCount: piModels.length,
-			piSaved: true,
-			dshSaved: false,
-			dshError,
-		};
-	}
+	return { ok: true, modelCount: piModels.length, piSaved: true, dshSaved: false };
 }

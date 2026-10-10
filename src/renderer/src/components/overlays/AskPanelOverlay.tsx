@@ -23,12 +23,12 @@ const DRAG_THRESHOLD_PX = 4;
  * - 发送后会话区域右上方出现一枚可拖动的胶囊：状态点（创建中/运行中/已完成）
  *   + 最新响应的纯文本摘要；点击胶囊展开/收起详情浮层（复用 SessionMessageTimeline
  *   流式渲染 markdown 结果）。
- * - 详情浮层头部 X = 最小化（仅收起详情）；胶囊上的 X = 关闭（停止匿名 runtime 并回收）。
+ * - 详情浮层头部 X = 最小化（仅收起详情）；胶囊上的 X = 关闭（停止问询进程，保留历史）。
  */
 export function AskPanelOverlay() {
 	const panel = useAskPanel();
 	const [expanded, setExpanded] = useState(false);
-	// 追问输入框内容（详情浮层底部，复用同一条匿名会话继续对话）
+	// 追问输入框内容（详情浮层底部，复用同一条问询会话继续对话）
 	const [followUpText, setFollowUpText] = useState("");
 	const setInsertComposer = useSetAtom(setSessionDraftAtom);
 	// 拖拽位置：null 表示未拖动（使用默认定位，会话区域右上方）；拖动后切换为自由定位
@@ -155,7 +155,7 @@ export function AskPanelOverlay() {
 		showNotice(t("askPanel.insertToComposerDone"), 3000);
 	};
 
-	// 追问提交：复用同一条匿名会话（sendFollowUp 不经 ensureSession/setCreating）
+	// 追问提交：复用同一条问询会话（sendFollowUp 不经 ensureSession/setCreating）
 	const submitFollowUp = () => {
 		const text = followUpText.trim();
 		if (!text) return;
@@ -289,7 +289,7 @@ export function AskPanelOverlay() {
 							</div>
 						)}
 					</div>
-					{/* 追问输入：复用同一条匿名会话继续对话；禁用条件 = 无会话 / 正在创建 */}
+					{/* 追问输入：复用同一条问询会话继续对话；禁用条件 = 无会话 / 正在创建 */}
 					<form
 						className="flex shrink-0 items-center gap-1.5 border-t px-3 py-2"
 						onSubmit={(event) => {

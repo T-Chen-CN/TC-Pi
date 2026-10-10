@@ -33,8 +33,8 @@ test("project row text yields to the hover action buttons at any width", () => {
 	// 所有宽度统一让位，不能只依赖窄侧栏断点，否则中等宽度下按钮会叠在长项目名上。
 	assert.match(src, /conversation-body min-w-0 flex-1 transition-\[padding-right\] group-hover:pr-\[88px\] group-focus-within:pr-\[88px\]/);
 	// 过滤历史记录按钮 hover 常驻（不再只在筛选激活时出现），筛选激活时高亮
-	assert.match(src, /openSourceFilter\(project\.id, event\.clientX, event\.clientY\)/);
-	assert.match(src, /sourceFilter !== null\s*\?\s*"text-primary"/);
+	assert.doesNotMatch(src, /openSourceFilter/);
+	assert.doesNotMatch(src, /sourceFilter !== null/);
 	// 旧的 64px（两按钮时代）与 116px/窄侧栏断点不得回退
 	assert.doesNotMatch(src, /group-hover:pr-16/);
 	assert.doesNotMatch(src, /pr-29/);

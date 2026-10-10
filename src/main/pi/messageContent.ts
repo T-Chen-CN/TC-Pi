@@ -1,4 +1,4 @@
-import { stripFeishuDocActionHint, stripHostInstruction } from "../feishu/docActions";
+import { stripFeishuDocActionHint, stripHostInstruction } from "../compatibility/hostInstructions";
 
 function stripCpaCompletionMarker(text: string): string {
 	// CPA uses this final-line sentinel for transport completion; it is not user-visible content.

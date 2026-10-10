@@ -1,10 +1,10 @@
-import React, { useRef } from "react";
+import React, { useRef, type ReactNode } from "react";
+import type { WorkspaceNavigationPort } from "./WorkspaceNavigation";
 import { useSetAtom } from "jotai";
 import { PanelLeft } from "lucide-react";
 import { SidebarContent, type SidebarActions } from "./SidebarContent";
-import type { AppInfo, AppThemeMode, SessionSortModeId, WorktreeEntry } from "../../../../shared/types";
+import type { AppInfo, AppThemeMode, WorktreeEntry } from "../../../../shared/types";
 import { useSidebarController } from "../../hooks/useSidebarController";
-import type { SidebarNavTab } from "../../utils/sidebarNavTab";
 import { BrandLockup } from "../app/AppParts";
 import { AboutPopover } from "../app/AboutPopover";
 import { settingsOpenAtom } from "../../atoms";
@@ -13,6 +13,8 @@ import { Button } from "../ui-shadcn/button";
 import { t } from "../../i18n";
 
 interface AppSidebarProps {
+	navigation: WorkspaceNavigationPort;
+	workspaceFiles: ReactNode;
 	simple?: boolean;
 	actions: SidebarActions;
 	currentProjectId: string | undefined;
@@ -36,12 +38,8 @@ interface AppSidebarProps {
 	toggleListCollapsed: () => void;
 	/** settings.json 中已保存的展开项目 id，权威来源 */
 	settingsExpandedProjectIds?: readonly string[];
-	/** settings.json 中已保存的侧栏分段（Chats/项目），权威来源 */
-	settingsNavTab?: SidebarNavTab;
 	/** settings.json 中已保存的稳定 SessionRecord 置顶 id。 */
 	settingsPinnedSessionIds?: readonly string[];
-	/** settings.json 中的会话排序模式（settings.sessionSortMode）。 */
-	settingsSessionSortMode?: SessionSortModeId;
 	/** 首次 settings.get 已完成，controller 可安全处理旧 key 迁移。 */
 	settingsLoaded: boolean;
 	/** 展开集合完成权威 hydration 后，允许 App 按它懒加载会话。 */
@@ -51,29 +49,18 @@ interface AppSidebarProps {
 export function AppSidebar(props: AppSidebarProps) {
 	const setSettingsOpen = useSetAtom(settingsOpenAtom); // 快速连续点击展开/折叠会触发多次 IPC；按顺序写入可避免旧请求最后完成后覆盖新集合。
 	const expandedProjectsSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-	const navTabSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 	const pinnedSessionIdsSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-	const sessionSortModeSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 	const controller = useSidebarController({
 		getRpcLogging: props.actions.rpc.getLogging,
 		openRpcLogViewer: props.actions.rpc.openViewer,
 		settingsExpandedProjectIds: props.settingsExpandedProjectIds,
-		settingsNavTab: props.settingsNavTab,
 		settingsPinnedSessionIds: props.settingsPinnedSessionIds,
-		settingsSessionSortMode: props.settingsSessionSortMode,
 		settingsLoaded: props.settingsLoaded,
 		onExpandedProjectsReady: props.onExpandedProjectsReady,
 		persistExpandedProjectIds: (projectIds) => {
 			expandedProjectsSaveQueueRef.current = expandedProjectsSaveQueueRef.current
 				.catch(() => undefined)
 				.then(() => desktopApi.settings.update({ sidebarExpandedProjectIds: projectIds }))
-				.catch(() => undefined);
-		},
-		persistNavTab: (tab) => {
-			// 与展开集合同款串行队列：快速切换标签时避免旧请求最后完成覆盖新值
-			navTabSaveQueueRef.current = navTabSaveQueueRef.current
-				.catch(() => undefined)
-				.then(() => desktopApi.settings.update({ sidebarNavTab: tab }))
 				.catch(() => undefined);
 		},
 		persistPinnedSessionIds: (sessionIds) => {
@@ -83,18 +70,13 @@ export function AppSidebar(props: AppSidebarProps) {
 				.then(() => desktopApi.settings.update({ pinnedSessionIds: sessionIds }))
 				.catch(() => undefined);
 		},
-		persistSessionSortMode: (mode) => {
-			// 排序模式与置顶同款串行队列：快速切换选项时避免旧请求覆盖新值。
-			sessionSortModeSaveQueueRef.current = sessionSortModeSaveQueueRef.current
-				.catch(() => undefined)
-				.then(() => desktopApi.settings.update({ sessionSortMode: mode }))
-				.catch(() => undefined);
-		},
 	});
 
 	return (
 		<>
 			<SidebarContent
+				navigation={props.navigation}
+				workspaceFiles={props.workspaceFiles}
 				simple={props.simple}
 				controller={controller}
 				actions={props.actions}

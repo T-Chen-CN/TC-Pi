@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 import { ipcMain } from "electron";
 import { ipcChannels } from "../../shared/ipc";
 import type { AutomationChangedEvent, AutomationCronPreview, AutomationRun, AutomationSettings, AutomationSnapshot, AutomationTask, CreateAutomationTaskInput, UpdateAutomationSettingsInput, UpdateAutomationTaskInput } from "../../shared/types";
@@ -37,6 +38,7 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): () => void {
 			throw new Error("Invalid automation task input");
 		}
 		try {
+			requireSupportedBackend(input.backend);
 			const task = await automationStore.createTask(input);
 			void appLogger.info("automation", "Created task", { taskId: task.id, name: task.name });
 			// Evaluate scheduler immediately so any due task is scheduled
@@ -58,6 +60,7 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): () => void {
 			throw new Error("Invalid automation task patch");
 		}
 		try {
+			requireSupportedBackend(patch.backend);
 			const task = await automationStore.updateTask(taskId.trim(), patch);
 			void appLogger.info("automation", "Updated task", { taskId: task.id, name: task.name });
 			void automationScheduler.tick();

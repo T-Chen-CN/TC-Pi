@@ -336,23 +336,6 @@ test("installTemplate 保留用户对内置技能的禁用标记（重启覆盖�
 	});
 });
 
-test("installImageGenTemplate copies the bundled image-gen skill into the global skills dir", async () => {
-	await withTemporaryHome(async (home) => {
-		const { SkillManager } = loadSkillManagerModule();
-		const manager = new SkillManager(home);
-		const result = await manager.installImageGenTemplate();
-		assert.equal(result.success, true);
-		const target = join(home, ".pi", "agent", "skills", "image-gen", "SKILL.md");
-		const written = readFileSync(target, "utf8");
-		assert.match(written, /name: image-gen/);
-		assert.match(written, /images\/generations/);
-		// 幂等覆盖：重复安装不报错、内容一致
-		const again = await manager.installImageGenTemplate();
-		assert.equal(again.success, true);
-		assert.equal(readFileSync(target, "utf8"), written);
-	});
-});
-
 test("external skill directory import supports both managed global destinations", async () => {
 	await withTemporaryHome(async (home) => {
 		const source = join(home, "external", "source-skill");

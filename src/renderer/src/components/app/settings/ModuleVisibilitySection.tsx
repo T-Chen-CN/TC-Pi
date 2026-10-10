@@ -4,7 +4,6 @@ import type { AppSettings } from "../../../../../shared/types";
 import { HIDEABLE_MODULE_IDS, isModuleHidden, toggleHiddenModule, type HideableModuleId } from "../../../../../shared/hiddenModules";
 import { t, type TranslationKey } from "../../../i18n";
 import { imageGenConfigAtom, sessionRecordsAtom, sessionRuntimeByIdAtom } from "../../../atoms";
-import { useFeishuBridge } from "../../../hooks/useFeishuBridge";
 import { Badge } from "../../ui-shadcn/badge";
 import { SettingsSection } from "./SettingsStorageTab";
 import { DirtyMarker, SettingRow } from "./SettingRows";
@@ -15,8 +14,6 @@ type ModuleVisibilitySectionProps = {
 	draft: AppSettings;
 	updateDraft: (patch: Partial<AppSettings>) => void;
 	isDirty: (field: keyof AppSettings) => boolean;
-	/** 视觉桥配置里的 enabled（独立文件 pi-deck-vision.json，不在 AppSettings 里）；未加载时为 undefined。 */
-	visionEnabled: boolean | undefined;
 };
 
 /** 各模块行的标题 key：设置 tab 直接复用侧栏标题（命令面板同源），dsh 用配置管理分页的名字。 */
@@ -65,31 +62,15 @@ const MODULE_DESC_KEYS: Record<HideableModuleId, TranslationKey> = {
  * 用量统计 / 进程监控只是展示页，没有活动状态。
  */
 export const ModuleVisibilitySection = memo(function ModuleVisibilitySection(props: ModuleVisibilitySectionProps) {
-	const { draft, updateDraft, isDirty, visionEnabled } = props;
+	const { draft, updateDraft, isDirty } = props;
 	const hiddenModules = draft.hiddenModules ?? [];
-	const feishu = useFeishuBridge();
-	const imageGenConfig = useAtomValue(imageGenConfigAtom);
-	const sessionRecords = useAtomValue(sessionRecordsAtom);
-	const runtimeById = useAtomValue(sessionRuntimeByIdAtom);
-	// 会话目录里带 DSH 后端且进程未关闭的会话数：closed/detached 的不算「还在跑」
-	const dshActive = useMemo(() => Object.values(sessionRecords).some((record) => record.backend === "dsh" && runtimeById[record.id] !== undefined && runtimeById[record.id]?.status !== "closed" && runtimeById[record.id]?.status !== "detached"), [sessionRecords, runtimeById]);
 
 	const activeBadge = (moduleId: HideableModuleId): TranslationKey | null => {
 		switch (moduleId) {
-			case "im":
-				return feishu.status.status === "connected" ? "settings.modules.statusConnected" : null;
-			case "dsh":
-				return dshActive ? "settings.modules.statusRunning" : null;
-			case "pet":
-				return draft.petEnabled ? "settings.modules.statusEnabled" : null;
 			case "web":
 				return draft.webServiceEnabled ? "settings.modules.statusEnabled" : null;
 			case "git":
 				return draft.enableGitManagement ? "settings.modules.statusEnabled" : null;
-			case "vision":
-				return visionEnabled ? "settings.modules.statusEnabled" : null;
-			case "imagegen":
-				return imageGenConfig.providers.length > 0 ? "settings.modules.statusConfigured" : null;
 			case "usage":
 			case "process":
 			case "acp":
@@ -97,6 +78,7 @@ export const ModuleVisibilitySection = memo(function ModuleVisibilitySection(pro
 			case "composerModes":
 				return null;
 		}
+		return null;
 	};
 
 	return (

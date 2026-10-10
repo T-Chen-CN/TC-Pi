@@ -30,3 +30,16 @@ export interface MiniOverlayState {
 	 */
 	locale: MiniOverlayLocale;
 }
+
+/** Historical preload contract; floating windows are disabled in this distribution. */
+export interface FloatingBallState {
+	visible: boolean;
+	alwaysOnTop: boolean;
+	snapToEdge: boolean;
+	expandTarget: "mini" | "compact";
+	showRunningBadge: boolean;
+	activeCount: number;
+	runningCount: number;
+	recentTitles: string[];
+	locale: "zh-CN" | "zh-TW" | "en-US";
+}

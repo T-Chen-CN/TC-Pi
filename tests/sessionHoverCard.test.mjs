@@ -40,11 +40,11 @@ test("SessionTree wraps session rows with SessionHoverCard", () => {
 	assert.match(source, /disabled=\{Boolean\(props\.controller\.menu\)\}/);
 });
 
-test("ActiveSessionsTree wraps active session rows with SessionHoverCard", () => {
-	const source = readFileSync("src/renderer/src/components/sidebar/ActiveSessionsTree.tsx", "utf8");
+test("workspace session rows retain the hover details after removing the activity page", () => {
+	const source = readFileSync("src/renderer/src/components/sidebar/WorkspaceSessionList.tsx", "utf8");
 	assert.match(source, /import \{ SessionHoverCard \} from "\.\/SessionHoverCard"/);
 	assert.match(source, /<SessionHoverCard\b/);
-	assert.match(source, /projectName=\{project\?\.name\}/);
+	assert.match(source, /projectName=\{displayProjectDirectoryName\(props\.project\)\}/);
 	assert.match(source, /disabled=\{Boolean\(controller\.menu\)\}/);
 });
 

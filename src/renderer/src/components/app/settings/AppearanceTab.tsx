@@ -27,8 +27,6 @@ type AppearanceTabProps = {
 	/** 是否启用了分区字号（任一区域字号非空） */
 	perAreaFontSize: boolean;
 	setPerAreaFontSize: (checked: boolean) => void;
-	/** 视觉桥是否已启用（独立配置文件，由壳层草稿提供）：功能模块开关的活动状态标注用 */
-	visionEnabled: boolean | undefined;
 };
 
 /** 下拉选项：disabled 可选（SelectItem 透传） */
@@ -517,7 +515,7 @@ export const AppearanceTab = memo(function AppearanceTab(props: AppearanceTabPro
 			</SettingsSection>
 
 			{/* 功能模块：按需收起不用的模块 UI 入口（issue #248） */}
-			<ModuleVisibilitySection draft={draft} updateDraft={updateDraft} isDirty={isDirty} visionEnabled={props.visionEnabled} />
+			<ModuleVisibilitySection draft={draft} updateDraft={updateDraft} isDirty={isDirty} />
 			{/* 输入框功能显示：与功能模块同域（按需收起入口），紧跟其后成组 */}
 			<ComposerFeaturesSection draft={draft} updateDraft={updateDraft} isDirty={isDirty} />
 		</>

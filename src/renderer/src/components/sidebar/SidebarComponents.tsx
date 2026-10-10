@@ -48,15 +48,13 @@ import { cn } from "../../lib/utils";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
 import { Button } from "../ui-shadcn/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui-shadcn/table";
-import type { SessionSummary, Project, AgentTab, ArchivedDshSession, ArchivedPiSession, SessionSortModeId } from "../../../../shared/types";
-import { SESSION_SORT_MODES, resolveSessionSortMode } from "../../sessionSortModes";
+import type { SessionSummary, Project, AgentTab, ArchivedDshSession, ArchivedPiSession } from "../../../../shared/types";
 import { worktreeSlugify } from "../../../../shared/worktreeSlug";
 import { SessionSourceBadge, SessionBackendMark, DshSourceBadge, ImageGenSourceBadge } from "../session/SessionSourceBadge";
 import { Checkbox } from "../ui-shadcn/checkbox";
 import { Input } from "../ui-shadcn/input";
 import { Label } from "../../components/ui-shadcn/label";
 import { BridgeGuiSlot, useBridgeSessionId } from "../bridge/BridgeSlot";
-import { SESSION_FILTER_PILLS, filterSessionsByPills, pillsPresentIn, type SessionFilterPill } from "../../sessionFilterPills";
 import { archivedDshWorkspaceLabel, archivedPiWorkspaceLabel, filterArchivedDshByFamily, filterArchivedPiByFamily, managerArchivedDshLabel, managerArchivedRowKey, mergeManagerArchived, sessionManagerRowKey, sessionWorkspaceLabel, worktreeFamilyProjects, type ManagerArchivedRow } from "../../sessionManagerModel";
 
 /**
@@ -99,9 +97,6 @@ export function SessionManagerModal(props: {
 }) {
 	// 弹窗项目上下文 = 整个 worktree 家族（根 + 全部子工作区），与侧栏工作区树语义一致。
 	const family = useMemo(() => worktreeFamilyProjects(props.projects, props.projectId), [props.projects, props.projectId]);
-	// 过滤 pill 集合：来源（pi/codex/claude/opencode）+ DSH 后端。
-	// DSH 会话 source 恒为 "pi"，归属判定必须按 backend 优先（见 sessionFilterPills）。
-	const [activePills, setActivePills] = useState<Set<SessionFilterPill>>(new Set(SESSION_FILTER_PILLS));
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [selectAll, setSelectAll] = useState(false);
 	// 已归档视图：true 时展示归档会话并提供恢复；数据打开弹窗时按需拉取。
@@ -113,29 +108,12 @@ export function SessionManagerModal(props: {
 	// 已归档行待删除确认：单行/批量均收敛到这里（数组）；确认后调主进程删除并刷新归档列表。
 	const [pendingDeleteArchived, setPendingDeleteArchived] = useState<ManagerArchivedRow[] | null>(null);
 
-	// 按 pill 过滤（一个会话只归属一个 pill，DSH 不与 Pi 重复计数）
-	const filteredSessions = useMemo(() => filterSessionsByPills(props.sessions, activePills), [props.sessions, activePills]);
-
-	const togglePill = (pill: SessionFilterPill) => {
-		setActivePills((prev) => {
-			const next = new Set(prev);
-			if (next.has(pill)) {
-				next.delete(pill);
-			} else {
-				next.add(pill);
-			}
-			return next;
-		});
-		setSelected(new Set());
-		setSelectAll(false);
-	};
-
 	// 全选/取消全选（只在当前过滤后的范围内；行身份用稳定记录 id，DSH 无 filePath 不冲突）
 	const handleToggleAll = () => {
 		if (selectAll) {
 			setSelected(new Set());
 		} else {
-			setSelected(new Set(filteredSessions.map((s) => s.id)));
+			setSelected(new Set(props.sessions.map((s) => s.id)));
 		}
 		setSelectAll(!selectAll);
 	};
@@ -148,7 +126,7 @@ export function SessionManagerModal(props: {
 			} else {
 				next.add(sessionId);
 			}
-			setSelectAll(next.size === filteredSessions.length);
+			setSelectAll(next.size === props.sessions.length);
 			return next;
 		});
 	};
@@ -206,7 +184,7 @@ export function SessionManagerModal(props: {
 					<DialogTitle>{t("menu.manageSessions")}</DialogTitle>
 					<div className="flex items-center gap-2">
 						<small className="text-muted-foreground">
-							{filteredSessions.length} / {props.sessions.length} sessions
+							{props.sessions.length} / {props.sessions.length} sessions
 						</small>
 						<DialogClose asChild>
 							<Button variant="ghost" size="icon" aria-label={t("common.close")} title={t("common.close")}>
@@ -224,20 +202,6 @@ export function SessionManagerModal(props: {
 										<Checkbox checked={selectAll} onCheckedChange={handleToggleAll} className="m-0 size-[15px] cursor-pointer accent-[var(--color-accent)]" />
 										{t("common.selectAll")}
 									</Label>
-									<div className="flex items-center gap-1">
-										{/* 只渲染当前会话实际存在的类别（Chat 区通常只有 pi/生图，不摆空导入 pill） */}
-										{pillsPresentIn(props.sessions).map((pill) => (
-											<Button
-												key={pill}
-												variant="outline"
-												size="sm"
-												className={`h-auto rounded-full border border-border-subtle bg-transparent px-3 py-1 text-caption font-medium text-text-tertiary transition-all duration-fast hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]${activePills.has(pill) ? " border-[var(--color-accent)] bg-bg-active font-semibold text-[var(--color-accent)]" : ""}`}
-												onClick={() => togglePill(pill)}
-											>
-												{t(pill === "dsh" ? "sessionBackend.dsh" : pill === "imagegen" ? "sessionBackend.imagegen" : `sessionSource.${pill}`)}
-											</Button>
-										))}
-									</div>
 								</>
 							)}
 							{showArchived && (
@@ -397,7 +361,7 @@ export function SessionManagerModal(props: {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredSessions.map((session) => {
+									{props.sessions.map((session) => {
 										const isChecked = selected.has(session.id);
 										return (
 											<TableRow key={sessionManagerRowKey(session)} className="group bg-bg-panel" data-state={isChecked ? "selected" : undefined}>
@@ -520,56 +484,10 @@ function MenuShell(props: { x: number; y: number; onClose: () => void; className
 	);
 }
 
-export function SessionSourceFilterMenu(props: { menu: { projectId: string; x: number; y: number }; filter: ReadonlySet<SessionFilterPill> | null; onToggleSource: (source: SessionFilterPill) => void; onClear: () => void; onClose: () => void }) {
-	// 过滤类别 = 来源 + DSH 后端（DSH 会话 source 恒为 pi，必须按 backend 独立归类，
-	// 否则「只选 Pi」会继续显示 DSH 会话，用户无法单独过滤）。
-	const sources = SESSION_FILTER_PILLS;
-	// 品牌名与图标并列展示：纯图标列用户分不清哪个徽标对应哪个来源（用户反馈）。
-	// 模块级求值与 SessionSourceBadge 的 SOURCE_LABELS 同一惯例。
-	const pillLabels: Record<SessionFilterPill, string> = {
-		pi: t("sessionSource.pi"),
-		codex: t("sessionSource.codex"),
-		claude: t("sessionSource.claude"),
-		qoder: t("sessionSource.qoder"),
-		opencode: t("sessionSource.opencode"),
-		zcode: t("sessionSource.zcode"),
-		workbuddy: t("sessionSource.workbuddy"),
-		cursor: t("sessionSource.cursor"),
-		kimi: t("sessionSource.kimi"),
-		kimiwork: t("sessionSource.kimiwork"),
-		minimax: t("sessionSource.minimax"),
-		dsh: t("sessionBackend.dsh"),
-		imagegen: t("sessionBackend.imagegen"),
-	};
-	// 过滤菜单需要连续勾选，onSelect preventDefault 保持菜单打开
-	return (
-		<MenuShell x={props.menu.x} y={props.menu.y} onClose={props.onClose} className="min-w-44">
-			<DropdownMenuLabel>{t("menu.filterSessions")}</DropdownMenuLabel>
-			<DropdownMenuCheckboxItem
-				checked={props.filter === null}
-				onSelect={(event) => event.preventDefault()}
-				onCheckedChange={(checked) => {
-					if (checked) props.onClear();
-				}}
-			>
-				{t("menu.filterSourceAll")}
-			</DropdownMenuCheckboxItem>
-			<DropdownMenuSeparator />
-			{sources.map((pill) => (
-				<DropdownMenuCheckboxItem key={pill} checked={props.filter !== null && props.filter.has(pill)} onSelect={(event) => event.preventDefault()} onCheckedChange={() => props.onToggleSource(pill)}>
-					{pill === "dsh" ? <DshSourceBadge /> : pill === "imagegen" ? <ImageGenSourceBadge /> : <SessionSourceBadge source={pill} />}
-					<span className="text-body">{pillLabels[pill]}</span>
-				</DropdownMenuCheckboxItem>
-			))}
-		</MenuShell>
-	);
-}
-
 export function ProjectContextMenu(props: {
 	menu: { x: number; y: number; project: Project };
 	onClose: () => void;
 	onNewSession: () => void;
-	onNewAnonymousSession: () => void;
 	onRevealProject: () => void;
 	onOpenWithEditor: () => void;
 	onImportCodexSessions: () => void;
@@ -589,7 +507,6 @@ export function ProjectContextMenu(props: {
 	onManageProjectResources: () => void;
 	onManageAutomations: () => void;
 	onManageSessions: () => void;
-	onFilterSessions: () => void;
 	onToggleWorktree: () => void;
 	onRefreshProject: () => void;
 	onCopyProjectPath: () => void;
@@ -599,9 +516,6 @@ export function ProjectContextMenu(props: {
 	/** 置顶/取消置顶：仅普通顶级项目展示（Chat 恒置顶、worktree 子项目固定跟随父项目）。 */
 	isPinned?: boolean;
 	onTogglePin?: () => void;
-	/** 会话排序模式（全局设置，项目菜单作统一入口）；未传时隐藏子菜单。 */
-	sessionSortMode?: SessionSortModeId;
-	onSetSessionSortMode?: (mode: SessionSortModeId) => void;
 	/** worktree 子项目删除必须走 Git worktree 清理流程，不能只移除目录记录。 */
 	onRemoveWorktree?: () => void;
 	/** 聊天项目目录设置（仅内置 Chat 项目展示；调整会话存储目录，主进程校验不与已注册项目重叠）。 */
@@ -615,10 +529,6 @@ export function ProjectContextMenu(props: {
 			<DropdownMenuItem onSelect={props.onNewSession}>
 				<SquarePen className="size-3.5" aria-hidden="true" />
 				{t("app.newNormalSession")}
-			</DropdownMenuItem>
-			<DropdownMenuItem onSelect={props.onNewAnonymousSession}>
-				<UserPlus className="size-3.5" aria-hidden="true" />
-				{t("app.newAnonymousSession")}
 			</DropdownMenuItem>
 			<DropdownMenuSeparator />
 			{/* 打开/定位：使用频率最高的入口置顶（定位、换编辑器、复制路径） */}
@@ -674,28 +584,6 @@ export function ProjectContextMenu(props: {
 					<Boxes className="size-3.5" aria-hidden="true" />
 					{t("menu.projectResources")}
 				</DropdownMenuItem>
-			)}
-			<DropdownMenuItem onSelect={props.onFilterSessions}>
-				<Filter className="size-3.5" aria-hidden="true" />
-				{t("menu.filterSessions")}
-			</DropdownMenuItem>
-			{/* 会话排序（全局）：与过滤同组；选项由策略目录驱动，扩展时只改 sessionSortModes */}
-			{props.onSetSessionSortMode && (
-				<DropdownMenuSub>
-					<DropdownMenuSubTrigger>
-						<ArrowUpDown className="size-3.5" aria-hidden="true" />
-						{t("menu.sessionSortMode")}
-					</DropdownMenuSubTrigger>
-					<DropdownMenuSubContent>
-						<DropdownMenuRadioGroup value={props.sessionSortMode} onValueChange={(value) => props.onSetSessionSortMode?.(resolveSessionSortMode(value))}>
-							{SESSION_SORT_MODES.map((option) => (
-								<DropdownMenuRadioItem key={option.id} value={option.id}>
-									{t(option.labelKey)}
-								</DropdownMenuRadioItem>
-							))}
-						</DropdownMenuRadioGroup>
-					</DropdownMenuSubContent>
-				</DropdownMenuSub>
 			)}
 			<DropdownMenuItem onSelect={props.onRefreshProject}>
 				<RefreshCw className="size-3.5" aria-hidden="true" />

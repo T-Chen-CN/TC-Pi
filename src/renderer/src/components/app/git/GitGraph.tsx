@@ -4,9 +4,13 @@ import { GitBranch, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { ConfirmDialog } from "../AppParts";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../../ui-shadcn/dropdown-menu";
 import { showNotice } from "../../../utils/notice";
-import type { CommitDetail, CommitEntry, GitChangedFile } from "../../../../../shared/types";
+import type { CommitDetail, CommitEntry, GitChangedFile, GitResourceGroups, GitResourceGroupType } from "../../../../../shared/types";
+import { GitWorkingTreeRow } from "./GitWorkingTreeRow";
+import { GitCommitSummary } from "./GitCommitSummary";
+import { isHeadCommit, withWorkingTree, workingTreeSummary, WORKING_TREE_HASH } from "./gitGraphModel";
+import { useGitGraphUpdates } from "../../../hooks/useGitGraphUpdates";
 import { t, type TranslationKey } from "../../../i18n";
-import { compareStatusLetter, FileIcon, fileNameOnly, statusTone, Twistie } from "./GitResourceTree";
+import { compareStatusLetter, FileIcon, fileNameOnly, statusTone } from "./GitResourceTree";
 import { GitCompactFilter, PaneHeader } from "./GitPanelControls";
 import { Button } from "../../ui-shadcn/button";
 
@@ -21,6 +25,14 @@ export type GitGraphProps = {
 	onOpenCommitFileDiff: (commit: CommitEntry, file: GitChangedFile) => void | Promise<void>;
 	branches: string[];
 	currentBranch: string | null;
+	repoScopeKey: string;
+	groups?: GitResourceGroups;
+	getStatus: (projectId: string) => Promise<GitResourceGroups>;
+	onRefreshWorkspace: () => void;
+	onOpenWorkspaceFileDiff: (group: GitResourceGroupType, path: string) => void | Promise<void>;
+	watchRefs?: (projectId: string) => Promise<string>;
+	unwatchRefs?: (watchId: string) => Promise<void>;
+	onRefsChanged?: (listener: (watchId: string) => void) => () => void;
 	open: boolean;
 	height: number;
 	onToggle: () => void;
@@ -59,7 +71,7 @@ type GraphRow = {
 type GraphPath = { d: string; color: number };
 
 const GRAPH_LANE_WIDTH = 14;
-const GRAPH_ROW_HEIGHT = 28;
+const GRAPH_ROW_HEIGHT = 52;
 const GRAPH_CURVE_RADIUS = 6;
 const GRAPH_NODE_RADIUS = 4.5;
 const MAX_VISIBLE_GRAPH_LANES = 8;
@@ -177,29 +189,24 @@ function GraphLanes({ row, current }: { row: GraphRow; current: boolean }) {
 
 	const width = GRAPH_LANE_WIDTH * (Math.min(MAX_VISIBLE_GRAPH_LANES, Math.max(input.length, output.length, 1)) + 1);
 	return (
-		<span className="block h-7 shrink-0 overflow-hidden" style={{ width }}>
+		<span className="block h-[52px] shrink-0 overflow-hidden" style={{ width: "var(--git-graph-width, 28px)" }}>
 			<svg className="block max-w-none [&_path]:[vector-effect:non-scaling-stroke] [&_circle]:[vector-effect:non-scaling-stroke]" width={width} height={GRAPH_ROW_HEIGHT} viewBox={`0 0 ${width} ${GRAPH_ROW_HEIGHT}`} aria-hidden="true">
 				{paths.map((path, index) => (
-					<path key={`${path.d}-${index}`} d={path.d} fill="none" stroke={GRAPH_COLORS[path.color % GRAPH_COLORS.length]} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+					<path key={`${path.d}-${index}`} d={path.d} fill="none" stroke={GRAPH_COLORS[path.color % GRAPH_COLORS.length]} strokeWidth="1.6" strokeDasharray={commit.hash === WORKING_TREE_HASH ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" />
 				))}
 				{commit.parents.length > 1 && <circle cx={laneX(nodeIndex)} cy={GRAPH_ROW_HEIGHT / 2} r={GRAPH_NODE_RADIUS + 2} fill="var(--git-panel-bg)" stroke={GRAPH_COLORS[nodeColor % GRAPH_COLORS.length]} strokeWidth="1.6" />}
-				<circle cx={laneX(nodeIndex)} cy={GRAPH_ROW_HEIGHT / 2} r={current ? GRAPH_NODE_RADIUS + 0.5 : GRAPH_NODE_RADIUS} fill={GRAPH_COLORS[nodeColor % GRAPH_COLORS.length]} stroke="var(--git-panel-bg)" strokeWidth="2" />
+				<circle
+					cx={laneX(nodeIndex)}
+					cy={GRAPH_ROW_HEIGHT / 2}
+					r={current ? GRAPH_NODE_RADIUS + 0.5 : GRAPH_NODE_RADIUS}
+					fill={commit.hash === WORKING_TREE_HASH ? "var(--git-panel-bg)" : GRAPH_COLORS[nodeColor % GRAPH_COLORS.length]}
+					stroke={commit.hash === WORKING_TREE_HASH ? GRAPH_COLORS[nodeColor % GRAPH_COLORS.length] : "var(--git-panel-bg)"}
+					strokeWidth="2"
+				/>
 				{current && <circle cx={laneX(nodeIndex)} cy={GRAPH_ROW_HEIGHT / 2} r="2" fill="var(--git-panel-bg)" />}
 			</svg>
 		</span>
 	);
-}
-
-function primaryRef(refNames: string[]): { label: string; kind: "branch" | "tag" } | null {
-	const refs = refNames
-		.flatMap((item) => item.split(","))
-		.map((item) => item.trim())
-		.filter(Boolean);
-	const current = refs.find((item) => item.startsWith("HEAD -> "));
-	if (current) return { label: current.replace("HEAD -> ", ""), kind: "branch" };
-	const tag = refs.find((item) => item.startsWith("tag: "));
-	if (tag) return { label: tag.replace("tag: ", ""), kind: "tag" };
-	return null;
 }
 
 function absoluteTime(ms: number): string {
@@ -216,7 +223,7 @@ function absoluteTime(ms: number): string {
 function GraphContinuation({ row }: { row: GraphRow }) {
 	const width = GRAPH_LANE_WIDTH * (Math.min(MAX_VISIBLE_GRAPH_LANES, Math.max(row.output.length, 1)) + 1);
 	return (
-		<span className="block h-[26px] shrink-0 overflow-hidden" style={{ width }} aria-hidden="true">
+		<span className="block h-[26px] shrink-0 overflow-hidden" style={{ width: "var(--git-graph-width, 28px)" }} aria-hidden="true">
 			<svg className="block max-w-none [&_path]:[vector-effect:non-scaling-stroke] [&_circle]:[vector-effect:non-scaling-stroke]" width={width} height="26" viewBox={`0 0 ${width} 26`}>
 				{row.output.slice(0, MAX_VISIBLE_GRAPH_LANES).map((node, index) => (
 					<path key={`${node.id}-${index}`} d={`M ${laneX(index)} 0 V 26`} fill="none" stroke={GRAPH_COLORS[node.color % GRAPH_COLORS.length]} strokeWidth="1.6" strokeLinecap="round" />
@@ -599,7 +606,23 @@ export function SourceControlGraph(props: GitGraphProps) {
 	useEffect(() => {
 		void load();
 	}, [load]);
-	const graphRows = useMemo(() => buildGraphRows(commits), [commits]);
+	const { groups, statusError, refreshWorkingTree } = useGitGraphUpdates({
+		projectId: props.projectId,
+		repoScopeKey: props.repoScopeKey,
+		open: props.open,
+		groups: props.groups,
+		getStatus: props.getStatus,
+		refreshWorkspace: props.onRefreshWorkspace,
+		refreshHistory: () => void load(),
+		watchRefs: props.watchRefs,
+		unwatchRefs: props.unwatchRefs,
+		onRefsChanged: props.onRefsChanged,
+	});
+	const visibleHead = commits.find(isHeadCommit);
+	const currentRefVisible = visibleHead?.refNames.flatMap((entry) => entry.split(",")).some((entry) => entry.trim() === `HEAD -> ${ref}`);
+	const showWorkingTree = Boolean(groups && workingTreeSummary(groups).count > 0 && (!ref || currentRefVisible || (!commits.length && ref === props.currentBranch)));
+	const graphRows = useMemo(() => buildGraphRows(withWorkingTree(commits, showWorkingTree)), [commits, showWorkingTree]);
+	const graphWidth = GRAPH_LANE_WIDTH * (Math.min(MAX_VISIBLE_GRAPH_LANES, Math.max(1, ...graphRows.map((row) => Math.max(row.input.length, row.output.length, row.nodeIndex + 1)))) + 1);
 
 	const toggleCommit = useCallback(
 		(hash: string) => {
@@ -661,7 +684,7 @@ export function SourceControlGraph(props: GitGraphProps) {
 		<section
 			id={`git-pane-${props.paneIdPrefix}-graph`}
 			className={`flex min-h-0 flex-[0_0_auto] flex-col overflow-hidden border-b border-[var(--git-panel-border)] bg-[var(--git-panel-bg)] last:border-b-0${props.open ? " h-[calc(var(--git-pane-height)+32px)]" : " h-[32px]"}`}
-			style={{ "--git-pane-height": `${props.height}px` } as CSSProperties}
+			style={{ "--git-pane-height": `${props.height}px`, "--git-graph-width": `${graphWidth}px` } as CSSProperties}
 		>
 			<PaneHeader id={`${props.paneIdPrefix}-graph`} title={t("git.sourceControlGraph")} count={totalCount} open={props.open} onToggle={props.onToggle}>
 				{props.historyRepoOptions && props.historyRepoOptions.length > 1 && props.onSelectHistoryRepo && <GitCompactFilter value={props.historyRepoPath ?? ""} ariaLabel={t("git.switchRepository")} options={props.historyRepoOptions} onChange={props.onSelectHistoryRepo} className="max-w-[8.5rem]" />}
@@ -677,7 +700,18 @@ export function SourceControlGraph(props: GitGraphProps) {
 					]}
 					onChange={(value) => setRef(value)}
 				/>
-				<Button type="button" variant="ghost" size="icon-sm" className="size-7" title={t("common.refresh")} aria-label={t("common.refresh")} onClick={() => void load()}>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					className="size-7"
+					title={t("common.refresh")}
+					aria-label={t("common.refresh")}
+					onClick={() => {
+						refreshWorkingTree();
+						void load();
+					}}
+				>
 					<RefreshCw size={14} />
 				</Button>
 			</PaneHeader>
@@ -689,27 +723,28 @@ export function SourceControlGraph(props: GitGraphProps) {
 						</div>
 					)}
 					{error && <div className="git-status-msg error">{error}</div>}
-					{!loading && !error && !commits.length && (
+					{statusError && <div className="git-status-msg error">{statusError}</div>}
+					{!loading && !error && !commits.length && !showWorkingTree && (
 						/* 空仓库/无匹配提交：居中图标 + 文案的完成态，替代顶部一行小灰字（面板主体留白时缺少视觉锚点） */
 						<div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-center">
 							<GitBranch aria-hidden="true" size={26} strokeWidth={1.5} className="text-text-tertiary" />
 							<div className="text-control font-medium text-[var(--git-desc-fg)]">{t("git.noCommits")}</div>
 						</div>
 					)}
-					{commits.length > 0 && (
+					{graphRows.length > 0 && (
 						<div className="min-h-0 flex-1 overflow-auto overscroll-contain [scrollbar-gutter:stable]" role="list" onScroll={dismissHover}>
 							{graphRows.map((row) => {
 								const commit = row.commit;
+								if (commit.hash === WORKING_TREE_HASH && groups) return <GitWorkingTreeRow key={WORKING_TREE_HASH} groups={groups} lane={<GraphLanes row={row} current={false} />} continuation={<GraphContinuation row={row} />} onOpenDiff={props.onOpenWorkspaceFileDiff} />;
 								const detailState = detailStates[commit.hash];
 								const commitFiles = detailState?.detail?.files ?? [];
 								const expanded = expandedHashes.has(commit.hash);
-								const ref = primaryRef(commit.refNames);
-								const isCurrent = commit.refNames.some((item) => item.includes("HEAD ->"));
+								const isCurrent = isHeadCommit(commit);
 								return (
 									<div key={commit.hash} className="" role="listitem">
 										<button
 											type="button"
-											className={`git-history-row grid h-7 w-full cursor-pointer appearance-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-0 bg-transparent p-0 pr-2.5 pl-0.5 text-sm leading-7 text-left text-inherit focus-visible:shadow-[inset_var(--focus-ring)] focus-visible:outline-none${isCurrent ? " current" : ""}${expanded ? " expanded" : ""}`}
+											className={`git-history-row grid h-[52px] w-full cursor-pointer appearance-none grid-cols-[auto_minmax(0,1fr)] items-center gap-2 border-0 bg-transparent p-0 pr-2.5 pl-0.5 text-left text-inherit focus-visible:shadow-[inset_var(--focus-ring)] focus-visible:outline-none${isCurrent ? " current" : ""}${expanded ? " expanded" : ""}`}
 											aria-expanded={expanded}
 											aria-describedby={hover?.commit.hash === commit.hash ? "git-commit-hover" : undefined}
 											onClick={() => {
@@ -729,14 +764,7 @@ export function SourceControlGraph(props: GitGraphProps) {
 											onMouseLeave={handleRowMouseLeave}
 										>
 											<GraphLanes row={row} current={isCurrent} />
-											<span className="flex min-w-0 items-baseline gap-2.5 overflow-hidden">
-												<span className="flex min-w-0 flex-[1_1_auto] items-center overflow-hidden whitespace-nowrap text-[var(--git-panel-fg)]">
-													<Twistie open={expanded} />
-													{commit.message}
-												</span>
-												<span className="min-w-[48px] flex-[0_1_78px] truncate text-xs text-[var(--git-desc-fg)]">{commit.authorName}</span>
-											</span>
-											{ref && <span className={`max-w-[108px] truncate rounded-full border border-current px-[7px] text-xs font-medium leading-[18px]${ref.kind === "branch" ? " text-[var(--git-modified)]" : " text-[var(--git-conflict)]"}`}>{ref.label}</span>}
+											<GitCommitSummary commit={commit} branches={props.branches} expanded={expanded} time={relativeTime(commit.authorDate)} />
 										</button>
 										{expanded && (
 											<div className="min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-fast">
@@ -769,14 +797,14 @@ export function SourceControlGraph(props: GitGraphProps) {
 								);
 							})}
 							{/* "加载更多"按钮放在列表底部；当返回的提交数等于当前请求数时，可能还有更多可加载 */}
-							{commits.length === loadCount && commits.length > 0 && (
+							{commits.length < totalCount && loadCount < 500 && (
 								<Button
 									type="button"
 									variant="ghost"
 									size="sm"
 									className="w-full border border-dashed border-border-subtle py-2 text-xs text-text-secondary transition-colors duration-fast hover:bg-bg-hover hover:text-text-primary"
 									onClick={() => {
-										setLoadCount((prev) => prev + 30);
+										setLoadCount((prev) => Math.min(500, prev + 30));
 									}}
 								>
 									{t("git.loadMore")}

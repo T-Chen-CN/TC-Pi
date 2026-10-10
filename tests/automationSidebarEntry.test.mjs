@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-// 用户反馈：定时任务入口藏在左下角 Dock 不明显，应放在「新建会话 / 搜索会话」下方。
+// 工作区布局：定时任务保留在文件树下面的次级入口、搜索之后。
 const sidebar = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
 
-test("automation entry renders under new/search session actions, not the dock", () => {
+test("automation entry stays visible below file navigation and search, before the dock", () => {
 	assert.match(sidebar, /import \{ AutomationDockButton \} from "\.\.\/automation\/AutomationDockButton";/);
-	const newSessionIndex = sidebar.indexOf('aria-label={t("app.newSession")}');
+	const navigationIndex = sidebar.indexOf("<WorkspaceNavigation");
+	const filesIndex = sidebar.indexOf("{props.workspaceFiles}");
 	const searchIndex = sidebar.indexOf('aria-label={t("app.searchSessions")}');
 	const automationIndex = sidebar.indexOf("<AutomationDockButton />");
-	const tabsIndex = sidebar.indexOf("<Tabs");
-	assert.ok(newSessionIndex > -1, "new session action missing");
-	assert.ok(searchIndex > newSessionIndex, "search should follow new session");
-	assert.ok(automationIndex > searchIndex, "automation entry should sit below new/search session");
-	assert.ok(automationIndex < tabsIndex, "automation entry should stay in the top action block");
+	const dockIndex = sidebar.indexOf("<Dock size={32}");
+	assert.ok(navigationIndex > -1 && filesIndex > navigationIndex, "workspace navigation must precede the file explorer");
+	assert.ok(searchIndex > filesIndex, "secondary search must stay below the file explorer");
+	assert.ok(automationIndex > searchIndex && automationIndex < dockIndex, "automation remains a direct secondary entry");
 });
 
 test("dock no longer hosts the automation entry", () => {

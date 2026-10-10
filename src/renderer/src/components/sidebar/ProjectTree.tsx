@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronsDownUp, Ellipsis, Filter, Folder, FolderOpen, FolderPlus, Pin, Plus, RefreshCw } from "lucide-react";
+import { ChevronRight, ChevronsDownUp, Ellipsis, Folder, FolderOpen, FolderPlus, Pin, Plus, RefreshCw } from "lucide-react";
 import type { DragEvent } from "react";
 import { SidebarRemovalList, SidebarRemovalRow } from "./SidebarRemovalRow";
 import { useAtomValue } from "jotai";
@@ -6,7 +6,6 @@ import type { Project, WorktreeEntry } from "../../../../shared/types";
 import type { SidebarController } from "../../hooks/useSidebarController";
 import { t } from "../../i18n";
 import type { SidebarActions } from "./SidebarContent";
-import { ActiveSessionsTree } from "./ActiveSessionsTree";
 import { SessionTree } from "./SessionTree";
 import { WorktreeTree } from "./WorktreeTree";
 import { SessionActivityIndicator } from "../session/SessionActivityIndicator";
@@ -104,13 +103,12 @@ export function ProjectTree(props: {
 		const menuOpen = props.controller.menu?.kind === "project" && props.controller.menu.projectId === project.id;
 		const collapsed = props.controller.isProjectCollapsed(project.id);
 		const projectDirectoryName = displayProjectDirectoryName(project);
-		const sourceFilter = props.controller.sourceFilterFor(project.id);
 		const dragging = props.controller.drag.sourceProjectId === project.id;
 		const dragOver = props.controller.drag.overProjectId === project.id;
 		const dragPosition = dragOver ? props.controller.drag.overPosition : undefined;
 		const rootProjectSessions = props.controller.catalog.sessionsByProject[project.id] ?? [];
 		// 项目级「运行中」判定：任一 Agent 进程存活（starting/idle/running）即视为运行中。
-		// 与 ActiveSessionsTree 活动页同源，保证折叠时的项目 tag 与展开后的子行状态一致。
+		// 使用同一份 runtime 投影，保证折叠时的项目 tag 与展开后的子行状态一致。
 		const hasLiveAgent = props.controller.catalog.agents.some((agent) => agent.projectId === project.id && isLiveRuntimeStatus(agent.status));
 		const relatedProjectIds = new Set([project.id, ...props.controller.catalog.projects.filter((candidate) => candidate.worktreeParentId === project.id).map((candidate) => candidate.id)]);
 		const hasRunningAgent = [...relatedProjectIds].some((projectId) =>
@@ -200,15 +198,6 @@ export function ProjectTree(props: {
 					</button>
 					<div className={cn(dimmedActionsClass, "pr-1", menuOpen && "pointer-events-auto opacity-100")}>
 						{/* 过滤历史记录入口：hover 常驻（右键菜单同款功能），筛选生效时高亮提示 */}
-						<button
-							type="button"
-							className={cn("grid size-6 place-items-center rounded-md hover:bg-background/80", sourceFilter !== null ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-							title={t("menu.filterSessions")}
-							aria-label={t("menu.filterSessions")}
-							onClick={(event) => props.controller.openSourceFilter(project.id, event.clientX, event.clientY)}
-						>
-							<Filter size={12} />
-						</button>
 						{/* 新建会话入口外露为 + 号（hover 项目行可见），匿名会话保留在 ⋯ 菜单 */}
 						<Button
 							type="button"
@@ -274,7 +263,6 @@ export function ProjectTree(props: {
 	// Tab 已承担「聊天/项目」文案，下面不再重复标题父块；两个区只保留各自必需的操作入口。
 	const chatSection = chatProjects.map((project) => {
 		const collapsed = props.controller.isProjectCollapsed(project.id);
-		const sourceFilter = props.controller.sourceFilterFor(project.id);
 		const sessions = props.controller.catalog.sessionsByProject[project.id] ?? [];
 		// Chat 无独立的项目行，标题栏就是该项目的唯一身份入口，
 		// 因此待确认徽章必须挂在这里，否则 Chat 项目内的 ask 提问在侧栏完全不可见。
@@ -298,15 +286,6 @@ export function ProjectTree(props: {
 					</span>
 					<div className="flex items-center gap-0.5">
 						{/* 过滤历史记录：与工作区项目行 hover 按钮同款功能，聊天区标题栏常驻（用户反馈补齐） */}
-						<button
-							type="button"
-							className={cn("grid size-6 place-items-center rounded-md hover:bg-muted", sourceFilter !== null ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-							title={t("menu.filterSessions")}
-							aria-label={t("menu.filterSessions")}
-							onClick={(event) => props.controller.openSourceFilter(project.id, event.clientX, event.clientY)}
-						>
-							<Filter size={14} />
-						</button>
 						<Button type="button" variant="ghost" size="icon-xs" className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t("app.newNormalSession")} title={t("app.newNormalSession")} onClick={() => void props.actions.sessions.createDraft(project.id)}>
 							<Plus className="size-3.5" aria-hidden="true" />
 						</Button>
@@ -429,13 +408,10 @@ export function ProjectTree(props: {
 		</section>
 	);
 
-	if (props.simple)
-		return (
-			<>
-				{projectsSection}
-				{chatSection}
-				<ActiveSessionsTree controller={props.controller} actions={props.actions} currentSessionId={props.currentSessionId} recentOnly />
-			</>
-		);
-	return <>{props.controller.navTab === "active" ? <ActiveSessionsTree controller={props.controller} actions={props.actions} currentSessionId={props.currentSessionId} /> : props.controller.navTab === "chats" ? chatSection : projectsSection}</>;
+	return (
+		<>
+			{projectsSection}
+			{chatSection}
+		</>
+	);
 }

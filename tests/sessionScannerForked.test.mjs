@@ -50,11 +50,11 @@ function loadMessageContentModule() {
 		target: ts.ScriptTarget.ES2022,
 	};
 	const docActions = { exports: {} };
-	vm.runInNewContext(ts.transpileModule(readFileSync("src/main/feishu/docActions.ts", "utf8"), { compilerOptions }).outputText, docActions, { filename: "docActions.ts" });
+	vm.runInNewContext(ts.transpileModule(readFileSync("src/main/compatibility/hostInstructions.ts", "utf8"), { compilerOptions }).outputText, docActions, { filename: "docActions.ts" });
 	const messageContent = {
 		exports: {},
 		require: (id) => {
-			if (id === "../feishu/docActions") return docActions.exports;
+			if (id === "../compatibility/hostInstructions") return docActions.exports;
 			throw new Error(`Unexpected messageContent import: ${id}`);
 		},
 	};

@@ -23,7 +23,6 @@ import { WebSidebar, type WebSessionRowAction } from "./WebSidebar";
 import { WebHeader, type WebHeaderStatus } from "./WebHeader";
 import { WebTimeline } from "./WebTimeline";
 import { WebComposer } from "./WebComposer";
-import { WebDshToolsPanel } from "./WebDshToolsPanel";
 import { WebBranchBar } from "./WebBranchBar";
 import { sessionFromPath, sessionPath } from "./webSessionRoute";
 import { WebWorkspaceDrawer } from "./WebWorkspaceDrawer";
@@ -1024,7 +1023,7 @@ export function WebChatApp() {
 			{/* 第二批：会话内搜索（Ctrl+K）与技能/扩展面板 */}
 			<WebSearchDialog open={searchOpen} onOpenChange={setSearchOpen} messages={messages} onJump={scrollToMessage} />
 			<WebSkillsExtensionsDialog open={assetsOpen} onOpenChange={setAssetsOpen} />
-			{dshToolsOpen && activeSessionId && <WebDshToolsPanel sessionId={activeSessionId} onClose={() => setDshToolsOpen(false)} />}
+
 			{/* P3：工作区抽屉（Git 状态/diff + 文件浏览，projectId 来自活跃会话） */}
 			{workspaceOpen && activeSession && <WebWorkspaceDrawer projectId={activeSession.projectId} open={workspaceOpen} onClose={() => setWorkspaceOpen(false)} onOpenFile={openFilePreview} />}
 			{/* 第三批：文件/diff 全屏预览（消息文件链接 + 文件变更 strip chip） */}

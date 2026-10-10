@@ -110,25 +110,8 @@ export default defineConfig({
         // 持久 pwsh 已抽成独立包 dsh-tool-pwsh-persistent，不再打进 out/main。
         entry: {
           index: resolve(__dirname, "src/main/index.ts"),
-          hostEntry: resolve(__dirname, "src/main/dsh/hostEntry.ts"),
-          runnerConsolePreload: resolve(__dirname, "src/main/dsh/runnerConsolePreload.ts"),
-          pideckPluginBridge: resolve(__dirname, "src/main/dsh/pideckPluginBridge.ts"),
-          pideckCommandsBridge: resolve(__dirname, "src/main/dsh/pideckCommandsBridge.ts"),
-          // hostEntry 的 Loader 行按 join(__dirname, "pideckSessionBridge.js") 引用本文件；
-          // 只作为静态 import 时 rollup 会打成带 hash 的共享 chunk，Loader 行找不到文件
-          // （out/main 被清空重建后必然复现），必须保持独立入口产出稳定文件名。
-          pideckSessionBridge: resolve(__dirname, "src/main/dsh/pideckSessionBridge.ts"),
         },
         formats: ["cjs"],
-      },
-      rollupOptions: {
-        // @deepseek-ai/dsh 的子包（dsh-app-boot / dsh-llm / cordis 等）不在
-        // package.json 顶层 dependencies，externalizeDepsPlugin 只外置
-        // `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh/...`，不会匹配
-        // `@deepseek-ai/dsh-app-boot`。打进 out/main 后 import.meta.url
-        // 变成产物路径，createRequire(...)("../package.json") 会报
-        // Cannot find module '../package.json'（发送 DSH 消息即触发）。
-        external: [/^@deepseek-ai\//, "dsh-tool-pwsh-persistent", "dsh-bill"],
       },
     },
     define: {
@@ -200,9 +183,7 @@ export default defineConfig({
         // 多入口：主窗口 index.html + 桌面宠物悬浮窗 pet.html + Web 服务聊天页 web.html
         input: {
           index: resolve("src/renderer/index.html"),
-          pet: resolve("src/renderer/pet.html"),
           web: resolve("src/renderer/web.html"),
-          floater: resolve("src/renderer/floater.html"),
         },
         output: {
           // 将大体积的第三方依赖拆分为独立 chunk，减少首屏需要加载和解析的 JS 体积。

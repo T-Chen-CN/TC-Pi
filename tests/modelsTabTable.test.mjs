@@ -74,10 +74,8 @@ test("both provider entries share ProviderConnectionForm (no per-entry divergenc
 	assert.match(tabSource, /<ProviderConnectionForm/);
 	assert.match(dialogSource, /<ProviderConnectionForm/);
 	const endpointsSource = readFileSync("src/renderer/src/config/ProviderEndpointFields.tsx", "utf8");
-	const dshDialogSource = readFileSync("src/renderer/src/config/AddDshProviderDialog.tsx", "utf8");
 	// 连接字段由 Pi/DSH 共用子组件持有；Pi 的测试/兼容性仍留在原表单。
 	assert.match(formSource, /<ProviderEndpointFields\s/);
-	assert.match(dshDialogSource, /<ProviderEndpointFields\s/);
 	assert.match(endpointsSource, /config\.field\.baseUrl/);
 	assert.match(endpointsSource, /config\.field\.apiType/);
 	assert.match(endpointsSource, /config\.field\.apiKey/);

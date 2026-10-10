@@ -28,7 +28,7 @@ function imageDownloadExt(mimeType: string): string {
 export function ImageActionButtons(props: { image: ImageContent | null | undefined; className?: string; onRemove?: () => void }) {
 	const [copied, setCopied] = useState(false);
 	// ref 形态的按需取回通道：仅历史生图/落盘引用会走到，普通上传图片在内联分支短路
-	const readImageBlob = useCallback((ref: string) => window.piDesktop.imagegen.readImageBlob(ref), []);
+	const readImageBlob = useCallback((ref: string) => window.piDesktop.images.readBlob(ref), []);
 	/** 取回可复制/可下载的 data URL；内联与 ref 都取不到时返回 null（由调用方提示失败）。 */
 	const loadImageDataUrl = useCallback(async (): Promise<string | null> => {
 		const payload = await loadImageBase64(props.image, readImageBlob);

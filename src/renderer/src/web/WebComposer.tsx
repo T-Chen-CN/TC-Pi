@@ -24,7 +24,6 @@ import { compressImageToDataUrl, imagesFromPasteEvent } from "./webImageCompress
 import { WebModelSelector } from "./WebModelSheet";
 import { WebBackendSelector } from "./WebBackendSelector";
 import { WebThinkingSelector } from "./WebThinkingSelector";
-import { WebPromptPicker } from "./WebPromptPicker";
 
 /** 单会话图片上限（压缩后每张约 100–300KB，4 张足够多数场景且 body 可控）。 */
 const MAX_ATTACHED_IMAGES = 4;
@@ -160,7 +159,7 @@ export function WebComposer(props: {
 						<Button type="button" variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0 text-muted-foreground" disabled={props.disabled || busy || images.length >= MAX_ATTACHED_IMAGES} title={t("web.attachImage")} aria-label={t("web.attachImage")} onClick={() => fileInputRef.current?.click()}>
 							<ImagePlus className="size-4" aria-hidden="true" />
 						</Button>
-						<WebPromptPicker disabled={props.disabled} onPick={(content) => setDraft((prev) => (prev ? `${prev}\n\n${content}` : content))} />
+
 						{/* 计划模式切换（复用桌面「+」菜单里的模式项语义）：激活态高亮；一次性提交流，发送后自动回普通 */}
 						<Button type="button" variant={mode === "plan" ? "default" : "ghost"} size="sm" className="h-8 shrink-0 gap-1 px-2" aria-pressed={mode === "plan"} disabled={props.disabled} title={t("app.composerModePlanDesc")} onClick={() => setMode((prev) => (prev === "plan" ? "normal" : "plan"))}>
 							<ClipboardList className="size-4" aria-hidden="true" />

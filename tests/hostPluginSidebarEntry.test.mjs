@@ -14,10 +14,10 @@ test("host plugin dock entry renders under the automation entry in the sidebar a
 	assert.match(sidebar, /import \{ HostPluginDockButtons \} from "\.\.\/plugins\/HostPluginDockButtons";/);
 	const automationIndex = sidebar.indexOf("<AutomationDockButton />");
 	const pluginIndex = sidebar.indexOf("<HostPluginDockButtons />");
-	const tabsIndex = sidebar.indexOf("<Tabs");
+	const dockIndex = sidebar.indexOf("<Dock size={32}");
 	assert.ok(automationIndex > -1, "automation entry missing");
 	assert.ok(pluginIndex > automationIndex, "plugin entries should sit below the automation entry");
-	assert.ok(pluginIndex < tabsIndex, "plugin entries should stay in the top action block");
+	assert.ok(pluginIndex < dockIndex, "plugin entries should remain direct secondary actions before the dock");
 });
 
 test("dock rows only come from enabled plugins and share the panel atom open path", () => {

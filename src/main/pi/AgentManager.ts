@@ -5660,7 +5660,7 @@ export class AgentManager {
 			if (!win.isVisible()) win.show();
 			win.focus();
 			if (sessionId) {
-				win.webContents.send(ipcChannels.petFocusAgentTarget, { sessionId });
+				win.webContents.send(ipcChannels.appFocusTarget, { sessionId });
 			}
 		} catch (error) {
 			// 聚焦失败不影响主流程，静默处理

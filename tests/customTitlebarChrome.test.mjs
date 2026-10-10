@@ -169,7 +169,8 @@ test("drawer toggle stays on session tab bar right; no gap when drawer open", ()
 	// 抽屉打开后窗口控件叠在抽屉顶上，会话 Tab 不再预留 144px，开关贴在 Tab 栏右缘。
 	// drawer-open 必须同时要求未折叠：折叠后聊天区顶到窗口右缘，Tab 栏仍须让位，
 	// 否则抽屉开关会与关闭按钮重叠。
-	assert.match(shell, /drawer && !drawerCollapsed \? "drawer-open" : ""/);
+	assert.match(shell, /hasDrawer\s*&&\s*!drawerCollapsed\s*\?\s*"drawer-open"\s*:\s*""/);
+	assert.match(shell, /const\s+hasDrawer\s*=\s*Boolean\(drawer\)\s*\|\|\s*Boolean\(props\.overview\)/);
 	assert.match(foundation, /\.custom-titlebar-enabled \.session-tabs-bar \{[\s\S]*?margin-right:\s*var\(--window-controls-width\);/);
 	assert.match(foundation, /\.custom-titlebar-enabled \.shell-panel-drawer \.detail-drawer \{[\s\S]*?padding-top:\s*var\(--window-drag-height\);/);
 });

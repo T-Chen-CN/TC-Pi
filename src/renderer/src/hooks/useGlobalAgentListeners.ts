@@ -41,7 +41,7 @@ export function useGlobalAgentListeners(callbacks: GlobalAgentListenerCallbacks 
 				})
 				.catch(() => undefined);
 		});
-		const offFocusTarget = desktopApi.pet.onFocusTarget((target) => {
+		const offFocusTarget = desktopApi.app.onFocusTarget((target) => {
 			callbacksRef.current.onFocusTarget?.(target);
 		});
 		const offSettings = desktopApi.settings.onApplyWindow((settings) => {

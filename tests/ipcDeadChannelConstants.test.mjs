@@ -42,7 +42,7 @@ function collectSourceChunks() {
 
 test("shared/ipc 通道常量全部有消费方（防新增死通道）", () => {
 	const entries = [...source.matchAll(/^\s*([a-zA-Z0-9_]+): "([a-zA-Z:._-]+)"/gm)].map((m) => [m[1], m[2]]);
-	assert.ok(entries.length > 600, `通道常量数异常偏小：${entries.length}（正则或文件结构变了？）`);
+	assert.ok(entries.length > 300, `通道常量数异常偏小：${entries.length}（正则或文件结构变了？）`);
 	const haystack = collectSourceChunks();
 	const dead = entries.filter(([name, value]) => !haystack.includes(`.${name}`) && !haystack.includes(value));
 	assert.deepEqual(

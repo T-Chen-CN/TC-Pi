@@ -1,4 +1,5 @@
 export const ipcChannels = {
+	imagesReadBlob: "images:read-blob",
 	projectsList: "projects:list",
 	projectsAdd: "projects:add",
 	// 文件夹右键菜单直达：按路径添加项目（渲染层确认后调用；projectsAdd 走系统目录选择框）
@@ -109,7 +110,6 @@ export const ipcChannels = {
 	/** 引导页/新会话展示用：按当前 pi 配置解析「创建会话时会套用的默认模型/思考档位」。 */
 	sessionsResolveLaunchDefaults: "sessions:resolve-launch-defaults",
 	/** Starts an in-memory `--no-session` conversation. */
-	sessionsCreateAnonymous: "sessions:create-anonymous",
 	sessionsCatalogUpdate: "sessions:catalog-update",
 	sessionsCatalogDelete: "sessions:catalog-delete",
 	/** 归档会话：文件移入 .pideck-archive/ 并从目录移除 */
@@ -388,11 +388,7 @@ export const ipcChannels = {
 	promptsToggle: "prompts:toggle",
 	promptsToggleInProject: "prompts:toggle-in-project",
 	promptStoreSearch: "prompt-store:search",
-	promptStoreGet: "prompt-store:get",
 	promptStoreImport: "prompt-store:import",
-	yaoPromptsList: "yao-prompts:list",
-	yaoPromptsDetail: "yao-prompts:detail",
-	yaoPromptsImport: "yao-prompts:import",
 	skillStoreSearch: "skill-store:search",
 	skillStoreImport: "skill-store:import",
 	// SkillHub（api.skillhub.cn）
@@ -407,7 +403,6 @@ export const ipcChannels = {
 	extensionsRestoreBuiltIn: "extensions:restore-built-in",
 	extensionsUpdate: "extensions:update",
 	extensionsUpdateOne: "extensions:update-one",
-	extensionsCatalog: "extensions:catalog",
 	/** 内置扩展热更新：查询内置/覆盖层版本状态（不联网） */
 	extensionsBuiltInUpdateStatus: "extensions:builtin-update-status",
 	/** 内置扩展热更新：检查 AtomGit/GitHub 远端清单是否有更新（联网，逐文件 sha256 比对） */
@@ -741,8 +736,6 @@ export const ipcChannels = {
 	configTestUsageProbe: "config:test-usage-probe",
 	/** 安装内置「用量查询自定义」技能模板到 ~/.pi/agent/skills/usage-probe */
 	configInstallUsageSkill: "config:install-usage-skill",
-	/** 安装内置「图片生成」技能模板到 ~/.pi/agent/skills/image-gen */
-	configInstallImageGenSkill: "config:install-image-gen-skill",
 	/** 安装内置「MCP 配置助手」技能模板到 ~/.pi/agent/skills/mcp-setup */
 	configInstallMcpSetupSkill: "config:install-mcp-setup-skill",
 	// ===== 配置备份（config-backup） =====
@@ -798,72 +791,13 @@ export const ipcChannels = {
 	terminalExit: "terminal:exit",
 	terminalShells: "terminal:shells",
 	terminalFonts: "terminal:fonts",
-
-	// ===== 飞书桥接 =====
-	feishuConnect: "feishu:connect",
-	/** 临时连接（不保存 bot 配置），用于首次添加 Bot 时先验证后保存 */
-	feishuConnectTemp: "feishu:connect-temp",
-	feishuDisconnect: "feishu:disconnect",
-	feishuStatus: "feishu:status",
-	feishuStatusRequest: "feishu:status-request",
-	feishuBotsList: "feishu:bots-list",
-	feishuBotAdd: "feishu:bot-add",
-	feishuBotRemove: "feishu:bot-remove",
-	feishuBotConfig: "feishu:bot-config",
-	feishuBotSecret: "feishu:bot-secret",
-	feishuTestConnection: "feishu:test-connection",
-	feishuBindingsList: "feishu:bindings-list",
-	feishuBindingRemove: "feishu:binding-remove",
-	feishuBindingUpdate: "feishu:binding-update",
-	feishuBindingsChanged: "feishu:bindings-changed",
-	feishuBotsChanged: "feishu:bots-changed",
-	feishuMessages: "feishu:messages",
-	feishuConnectByBot: "feishu:connect-by-bot",
-	/** 获取指定稳定 Session 绑定的飞书 Bot ID */
-	feishuSessionBotGet: "feishu:session-bot-get",
-	/** 设置指定稳定 Session 使用的飞书 Bot ID */
-	feishuSessionBotSet: "feishu:session-bot-set",
-	/** 飞书 /whoami 结果推回前端 */
-	feishuWhoamiResult: "feishu:whoami-result",
-
-	// ===== 桌面宠物（全局聚合单宠） =====
-	/** 主进程 → 宠物窗：推送聚合状态 */
-	petState: "pet:state",
-	/** 宠物窗/设置页 → 主进程：列出可用宠物包 */
-	petList: "pet:list",
-	/** 设置页 → 主进程：开关宠物 */
-	petSetEnabled: "pet:set-enabled",
-	/** 设置页 → 主进程：切换当前宠物 */
-	petSetId: "pet:set-id",
-	/** 宠物窗 → 主进程：拖拽移动窗口位置 */
-	petMoveWindow: "pet:move-window",
-	/** 宠物窗 → 主进程：拖拽相对位移（连续 screenX 差值，避免 DPI 坐标单位混用） */
-	petMoveBy: "pet:move-by",
 	/** 宠物窗 → 主进程：点击宠物跳转活跃 Agent */
 	petFocusAgent: "pet:focus-agent",
 	/** 主进程 → 主窗口：点击宠物后通知主窗切换到活跃 Agent tab */
-	petFocusAgentTarget: "pet:focus-agent-target",
+	appFocusTarget: "app:focus-target",
 	/** 主窗口 → 主进程：冷启动/页面加载期间点击通知的跳转目标可能因监听未就绪而丢失，
 	 *  renderer 挂载后主动拉取一次（一次性，取走即清空） */
-	petGetFocusTargetPending: "pet:get-focus-target-pending",
-	/** 主进程 → 宠物窗：推送当前选中宠物的 manifest（含 spritesheetUrl），切换宠物时热加载 */
-	petCurrentSprite: "pet:current-sprite",
-	/** 宠物窗 → 主进程：拉取当前选中宠物的 manifest（挂载时主动拉取，避免推送竞态丢失） */
-	petGetCurrent: "pet:get-current",
-	/** 主进程 → 宠物窗：推送通知气泡（出错/完成时宠物头顶弹窗） */
-	petNotify: "pet:notify",
-	/** 设置页 → 主进程 → 宠物窗：预览动画行（测试用） */
-	petPreviewMode: "pet:preview-mode",
-	/** 主进程 → 宠物窗：推送窗口能力探测结果（透明/穿透/自由定位） ★ 降级形态渲染 */
-	petCaps: "pet:caps",
-	/** 宠物窗 → 主进程：双击宠物触发逗弄（注入一次 jumping 后恢复真实态） */
-	petTease: "pet:tease",
-	/** 宠物窗 → 主进程：拖拽起止通知（开始时暂停巡游，避免松手后 tick 命中反向边界瞬移） */
-	petDragState: "pet:drag-state",
-	/** 宠物窗 → 主进程：React 已挂载且 IPC 监听器已注册，主进程可安全推送初始状态 */
-	petReady: "pet:ready",
-	/** 宠物窗 → 主进程：请求显示右键上下文菜单 */
-	petContextMenu: "pet:context-menu",
+	appGetPendingFocusTarget: "app:get-pending-focus-target",
 
 	// ===== 声音提醒 =====
 	/** 主进程 → 渲染层：推送声音提醒播放事件（完成/出错/等待输入） */
@@ -882,10 +816,6 @@ export const ipcChannels = {
 	scratchPadLoad: "scratch-pad:load",
 	scratchPadSave: "scratch-pad:save",
 	scratchPadExport: "scratch-pad:export",
-
-	// ── 调试工具 ──
-	/** 设置面板 → 主进程：发送测试通知（调试弹窗样式） */
-	petTestNotify: "pet:test-notify",
 
 	// ===== 系统文件选择器 =====
 	dialogPickFiles: "dialog:pick-files",
@@ -943,14 +873,6 @@ export const ipcChannels = {
 	usageStatsDetect: "usage-stats:detect",
 	usageStatsRefresh: "usage-stats:refresh",
 	usageStatsGet: "usage-stats:get",
-
-	// ===== 生图（ImageGen） =====
-	/** 生图：OpenAI 兼容 /images/generations，返回 base64 图片 */
-	imagegenGenerate: "imagegen:generate",
-	/** 读取独立生图配置（userData/imagegen.json，不进 pi models.json） */
-	imagegenGetConfig: "imagegen:get-config",
-	/** 保存独立生图配置（白名单校验后落盘） */
-	imagegenSaveConfig: "imagegen:save-config",
 	/**
 	 * 按需取回落盘生图图片的 base64（入参为 blob 引用名）。
 	 * 展示走 pideck-img:// 协议流式加载，这个通道只服务「复制 / 保存 / 重发带回参考图」。
@@ -1030,28 +952,7 @@ export const ipcChannels = {
 	quickTaskExit: "quick-task:exit",
 	shellMenuQuickTaskGetState: "shell-menu:quick-task-get-state",
 	shellMenuQuickTaskSetEnabled: "shell-menu:quick-task-set-enabled",
-	// ===== 悬浮球（floater）：主窗口隐藏后的常驻小圆点 =====
-	floatingBallGetState: "floating-ball:get-state",
-	floatingBallState: "floating-ball:state",
-	floatingBallEnter: "floating-ball:enter",
 	floatingBallExit: "floating-ball:exit",
-	floatingBallDragStart: "floating-ball:drag-start",
-	floatingBallDragMove: "floating-ball:drag-move",
-	floatingBallDragEnd: "floating-ball:drag-end",
-	floatingBallContextMenu: "floating-ball:context-menu",
-	floatingBallSetExpandTarget: "floating-ball:set-expand-target",
-	// ===== 极简浮窗（mini overlay）：悬浮球点击展开的状态总览+快捷输入窗 =====
-	miniOverlayState: "mini-overlay:state",
-	miniOverlayGetState: "mini-overlay:get-state",
-	miniOverlayJumpToSession: "mini-overlay:jump-to-session",
-	miniOverlayQuickPrompt: "mini-overlay:quick-prompt",
-	miniOverlayClose: "mini-overlay:close",
-	miniOverlayCollapse: "mini-overlay:collapse",
-	/** 小窗 → 任务模式：隐藏小窗与悬浮球，主窗口以 quick-task 紧凑形态打开。 */
-	miniOverlaySwitchToQuickTask: "mini-overlay:switch-to-quick-task",
-	/** 任务模式 → 小窗：退出 quick-task 恢复主窗口尺寸后隐藏，展开极简浮窗。 */
-	quickTaskSwitchToMiniOverlay: "quick-task:switch-to-mini-overlay",
-	floatingBallSetEnabled: "floating-ball:set-enabled",
 	/** 渲染层 → 主进程：启用/取消资源管理器右键菜单注册 */
 	shellMenuSetEnabled: "shell-menu:set-enabled",
 
@@ -1100,16 +1001,6 @@ export const ipcChannels = {
 	channelSwitchGetStatus: "channel-switch:get-status",
 	/** 主进程 → 渲染层：通道切换状态机快照推送（querying/available/downloading/ready/error）。 */
 	channelSwitchStateChanged: "channel-switch:state-changed",
-
-	// ===== CUA 审批门（Plan A：MCP 主进程内托管，审批直连 IPC） =====
-	/** 主进程 → 渲染层：推审批请求（action/sessionId/detail/timestampMs）。 */
-	cuaApprovalRequest: "cua:approval-request",
-	/** 渲染层 → 主进程：回传审批结果（allowed/reason）。 */
-	cuaApprovalResponse: "cua:approval-response",
-	/** 渲染层 → 主进程：拉取 CUA 全局/会话开关状态。 */
-	cuaGetState: "cua:get-state",
-	/** 渲染层 → 主进程：设置 CUA 全局/会话开关。 */
-	cuaSetState: "cua:set-state",
 
 	// ===== ACP 后端（agent CLI 工具登记表） =====
 	/** ACP 工具列表（settings.acpTools 只读快照）。 */

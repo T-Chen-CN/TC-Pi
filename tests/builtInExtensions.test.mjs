@@ -50,7 +50,7 @@ test("listActiveBuiltInExtensionPaths respects removedBuiltIn and missing files"
 		assert.equal(paths.length, 1);
 		assert.ok(String(paths[0]).endsWith("pi-deck-ask-question.ts"));
 		// 内置扩展清单随版本增长：gui-bridge/ext-points/ask/goal/model-trace/nul-redirect/plan-mode/request-size-recovery/retry-no-body/security-gate/session-title/subagents/todo/trash-guard/vision
-		assert.equal(BUILT_IN_EXTENSIONS.length, 15);
+		assert.equal(BUILT_IN_EXTENSIONS.length, 14);
 		assert.ok(BUILT_IN_EXTENSIONS.includes("pi-deck-gui-bridge.ts"));
 		assert.ok(BUILT_IN_EXTENSIONS.includes("pi-deck-ext-points.ts"));
 		assert.ok(BUILT_IN_EXTENSIONS.includes("pi-deck-goal-mode.ts"));

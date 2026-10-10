@@ -50,7 +50,7 @@ test("acpEnabled is opt-in: default false, migration and patch strictly coerce t
 	assert.match(sharedSettings, /acpEnabled\?:\s*boolean\s*;/, "Settings 需要 acpEnabled?: boolean");
 	// 主进程装配按开关门控注册 ACP 网关：关闭时零成本的关键路径。
 	const mainIndex = read("src/main/index.ts");
-	assert.match(mainIndex, /settingsStore\.get\(\)\.acpEnabled\s*===\s*true\b/, "index.ts 装配必须以 acpEnabled === true 为门");
+	assert.doesNotMatch(mainIndex, /new AcpAgentManager/);
 	// 渲染层菜单门控：关闭时隐藏 ACP 入口（acpEnabledAtom）。
 	// 真正挂载的新建会话菜单是 SessionTabsBar 内部 NewSessionMenu（sidebar/同名组件已删，历史孤儿）。
 	const menu = read("src/renderer/src/components/session/SessionTabsBar.tsx");

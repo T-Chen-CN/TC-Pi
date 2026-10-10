@@ -59,6 +59,8 @@ export interface AppShellProps {
 
 	sidebarContent: ReactNode;
 	chatPaneContent: ReactNode;
+	/** 总览占据中间和右侧，工作区内容保留挂载。 */
+	overview?: { content: ReactNode; sidebar: ReactNode };
 	drawerContent: (panel: WorkspaceDrawerPanel) => ReactNode;
 	/** 抽屉活动栏（files/git/browser 切换），由 App 注入；抽屉打开时常驻。 */
 	drawerRail?: ReactNode;
@@ -120,9 +122,9 @@ export function AppShell(props: AppShellProps) {
 		listCollapsed,
 		listWidth,
 		drawer,
-		drawerCollapsed,
+		drawerCollapsed: workspaceDrawerCollapsed,
 		drawerWidth,
-		drawerPinned,
+		drawerPinned: workspaceDrawerPinned,
 		useNativeTitleBar,
 		platform,
 		chatPaneRef,
@@ -152,6 +154,9 @@ export function AppShell(props: AppShellProps) {
 		closeWindow,
 		children,
 	} = props;
+	const hasDrawer = Boolean(drawer) || Boolean(props.overview);
+	const drawerCollapsed = props.overview ? false : workspaceDrawerCollapsed;
+	const drawerPinned = props.overview ? true : workspaceDrawerPinned;
 
 	const shellRef = useRef<HTMLDivElement | null>(null);
 	const listPanelRef = useRef<PanelImperativeHandle | null>(null);
@@ -177,10 +182,10 @@ export function AppShell(props: AppShellProps) {
 	const prevDrawerOpenRef = useRef(false);
 	const prevListOpenRef = useRef(false);
 	useEffect(() => {
-		const open = Boolean(drawer) && !drawerCollapsed;
+		const open = hasDrawer && !drawerCollapsed;
 		if (open && !prevDrawerOpenRef.current) setDrawerEntering(true);
 		prevDrawerOpenRef.current = open;
-	}, [drawer, drawerCollapsed]);
+	}, [hasDrawer, drawerCollapsed]);
 	useEffect(() => {
 		const open = !listCollapsed;
 		if (open && !prevListOpenRef.current) setListEntering(true);
@@ -206,7 +211,7 @@ export function AppShell(props: AppShellProps) {
 		const frame = requestAnimationFrame(() => {
 			try {
 				// drawer 为空时必须折叠（常驻挂载下避免空面板意外展开）
-				if (!drawer || drawerCollapsed) {
+				if (!hasDrawer || drawerCollapsed) {
 					if (!panel.isCollapsed()) panel.collapse();
 				} else if (panel.isCollapsed()) {
 					// expand() 无历史会落到 minSize(180)。清缓存后保存宽度是默认 320，
@@ -218,7 +223,7 @@ export function AppShell(props: AppShellProps) {
 			}
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [drawerCollapsed, drawer]);
+	}, [drawerCollapsed, hasDrawer]);
 
 	// ── 外部宽度变化 → 面板（跳过拖拽回写产生的等值同步，防反馈回路） ──
 	useEffect(() => {
@@ -229,7 +234,7 @@ export function AppShell(props: AppShellProps) {
 
 	useEffect(() => {
 		const panel = drawerPanelRef.current;
-		if (!panel || !drawer || drawerCollapsed) return;
+		if (!panel || !hasDrawer || drawerCollapsed) return;
 		const frame = requestAnimationFrame(() => {
 			try {
 				if (Math.abs(panel.getSize().inPixels - drawerWidth) > 1) panel.resize(drawerWidth);
@@ -238,7 +243,7 @@ export function AppShell(props: AppShellProps) {
 			}
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [drawerWidth, drawer, drawerCollapsed]);
+	}, [drawerWidth, hasDrawer, drawerCollapsed]);
 
 	// 水合或用户拖拽改变保存宽度后，先让定位变量跟随保存值；面板若受到约束，
 	// 下方 ResizeObserver 会再用实际 DOM 宽度校正。observer 只改 CSS，不触发每帧 React 重渲染。
@@ -250,8 +255,8 @@ export function AppShell(props: AppShellProps) {
 	useEffect(() => {
 		drawerLayoutWidthRef.current = drawerWidth;
 		const shell = shellRef.current;
-		if (shell) writeDrawerLayoutVariables(shell, drawerWidth, Boolean(drawer) && !drawerCollapsed);
-	}, [drawerWidth, drawer, drawerCollapsed]);
+		if (shell) writeDrawerLayoutVariables(shell, drawerWidth, hasDrawer && !drawerCollapsed);
+	}, [drawerWidth, hasDrawer, drawerCollapsed]);
 
 	// 面板受窗口约束、钉住状态或拖拽影响时，实际 DOM 宽度可能与保存偏好不同。
 	// 只把这个瞬时值写入 CSS 定位变量，绝不写回 listWidth/drawerWidth 缓存。
@@ -269,7 +274,7 @@ export function AppShell(props: AppShellProps) {
 					writeListLayoutVariables(shell, width, true);
 				}
 			}
-			if (drawerElement && drawer && !drawerCollapsed) {
+			if (drawerElement && hasDrawer && !drawerCollapsed) {
 				const width = Math.round(drawerElement.getBoundingClientRect().width);
 				if (width > 1) {
 					drawerLayoutWidthRef.current = width;
@@ -283,7 +288,7 @@ export function AppShell(props: AppShellProps) {
 		if (drawerElement) observer.observe(drawerElement);
 		syncActualWidths();
 		return () => observer.disconnect();
-	}, [drawer, drawerCollapsed, drawerPinned, listCollapsed]);
+	}, [hasDrawer, drawerCollapsed, drawerPinned, listCollapsed]);
 
 	// ── 布局落定 → 状态回写 ──
 	// onLayoutChanged 在一次布局变更“完成”时触发（拖拽释放、分隔条键盘调整、容器缩放）。
@@ -307,7 +312,7 @@ export function AppShell(props: AppShellProps) {
 		}
 
 		const drawerPanel = drawerPanelRef.current;
-		if (drawerPanel && drawer && !drawerCollapsed) {
+		if (drawerPanel && hasDrawer && !drawerCollapsed) {
 			const px = readPanelLayoutWidth(drawerPanelElementRef.current, drawerPanel);
 			const next = shouldCommitPanelPixels({
 				px,
@@ -351,13 +356,9 @@ export function AppShell(props: AppShellProps) {
 	}
 
 	if (props.compactContent) {
-		// 小窗的标题栏/导航归 MiniOverlaySurface；任务模式继续复用工作台窗口控制。
-		// 边界感不在这里画：透明窗口里的自绘描边/投影被窗口矩形裁掉且颜色过淡，
-		// 改由系统接管（DWM 投影 + Win11 圆角），与任务模式同款观感。
-		const isMiniOverlayMode = new URLSearchParams(window.location.search).get("mini-overlay") === "1";
 		return (
-			<div className={["wechat-shell quick-task-shell bg-bg-app [[data-bg-image=on]_&]:bg-transparent", isMiniOverlayMode ? "mini-overlay-shell overflow-hidden" : "", useNativeTitleBar ? "" : "custom-titlebar-enabled", !useNativeTitleBar && platform === "darwin" ? "mac-custom-titlebar" : ""].filter(Boolean).join(" ")}>
-				{!isMiniOverlayMode ? (
+			<div className={["wechat-shell quick-task-shell bg-bg-app [[data-bg-image=on]_&]:bg-transparent", "", useNativeTitleBar ? "" : "custom-titlebar-enabled", !useNativeTitleBar && platform === "darwin" ? "mac-custom-titlebar" : ""].filter(Boolean).join(" ")}>
+				{
 					<AppHeader
 						useNativeTitleBar={useNativeTitleBar}
 						platform={platform}
@@ -369,7 +370,7 @@ export function AppShell(props: AppShellProps) {
 						onWindowMaximizedChange={onWindowMaximizedChange}
 						closeWindow={closeWindow}
 					/>
-				) : null}
+				}
 				<main ref={chatPaneRef} className="flex min-h-0 flex-1 flex-col">
 					{props.compactContent}
 				</main>
@@ -385,7 +386,7 @@ export function AppShell(props: AppShellProps) {
 				props.navigationChrome
 					? "simple-shell bg-(--simple-shell-surface) [--simple-shell-surface:color-mix(in_srgb,var(--color-bg-sidebar)_25%,var(--color-bg-muted))] dark:[--simple-shell-surface:var(--color-bg-app)] [[data-bg-image=on]_&]:bg-transparent [[data-bg-image=on]_&]:[--simple-shell-surface:var(--color-bg-sidebar)] [&_.window-controls]:h-8 [&_.window-drag-layer]:h-8 [&_.window-drag-layer]:pointer-events-none [&_.session-tabs-bar]:mr-0 [&_.session-tabs-bar]:[-webkit-app-region:no-drag] [&.custom-titlebar-enabled_.simple-navigation-bar]:[-webkit-app-region:drag] [&.custom-titlebar-enabled_.simple-navigation-bar]:mr-[var(--window-controls-width)] [&.mac-custom-titlebar_.simple-navigation-bar]:pl-[calc(var(--traffic-lights-width)+8px)]"
 					: "bg-bg-app [[data-bg-image=on]_&]:bg-transparent",
-				drawer && !drawerCollapsed ? "drawer-open" : "",
+				hasDrawer && !drawerCollapsed ? "drawer-open" : "",
 				listCollapsed ? "list-collapsed" : "",
 				drawerCollapsed ? "drawer-collapsed" : "",
 				useNativeTitleBar ? "" : "custom-titlebar-enabled",
@@ -399,9 +400,9 @@ export function AppShell(props: AppShellProps) {
 					"--list-width": `${listCollapsed ? 0 : listLayoutWidthRef.current}px`,
 					"--list-expanded-width": `${listLayoutWidthRef.current}px`,
 					"--list-hover-width": `${Math.max(190, listLayoutWidthRef.current)}px`,
-					"--drawer-width": `${drawer && !drawerCollapsed ? drawerLayoutWidthRef.current : 0}px`,
-					"--drawer-col-w": `${drawer && !drawerCollapsed ? drawerLayoutWidthRef.current : 0}px`,
-					"--drawer-splitter-w": `${drawer && !drawerCollapsed ? 6 : 0}px`,
+					"--drawer-width": `${hasDrawer && !drawerCollapsed ? drawerLayoutWidthRef.current : 0}px`,
+					"--drawer-col-w": `${hasDrawer && !drawerCollapsed ? drawerLayoutWidthRef.current : 0}px`,
+					"--drawer-splitter-w": `${hasDrawer && !drawerCollapsed ? 6 : 0}px`,
 					// 右缘刻度定位轴（.outline-hover）的底部边界：终端坞打开时让出其高度，
 					// 避免刻度铺到终端上；关闭时保底 16px 边距。
 					"--outline-bottom": `${Math.max(terminalRowHeight, 0) + 16}px`,
@@ -456,7 +457,11 @@ export function AppShell(props: AppShellProps) {
 							} as CSSProperties
 						}
 					>
-						{chatPaneContent}
+						{/* 总览覆盖工作台而不隐藏其布局：面板库在零尺寸容器中无法恢复 collapse 状态。 */}
+						<div className={cn("contents", props.overview && "invisible")} aria-hidden={props.overview ? true : undefined} inert={Boolean(props.overview)}>
+							{chatPaneContent}
+						</div>
+						{props.overview && <div className="absolute inset-0 z-10 bg-bg-panel">{props.overview.content}</div>}
 					</main>
 				</ResizablePanel>
 
@@ -465,22 +470,25 @@ export function AppShell(props: AppShellProps) {
             内容由 WorkspaceDrawerHost 的空态兜底。
             disableDoubleClick：drawer defaultSize=0，双击分隔条会把抽屉缩到 0
             且无法再双击恢复（见 splitter-left 注释，2026-08 用户反馈）。 */}
-				<ResizableHandle className="splitter splitter-right" data-active={Boolean(drawer) && !drawerCollapsed} disableDoubleClick />
+				<ResizableHandle className="splitter splitter-right" data-active={hasDrawer && !drawerCollapsed} disableDoubleClick />
 				<ResizablePanel id="drawer" panelRef={drawerPanelRef} collapsible={!drawerPinned} collapsedSize={0} minSize={drawerPinned ? DRAWER_WIDTH_MIN_PINNED : DRAWER_WIDTH_MIN} maxSize={DRAWER_WIDTH_MAX} groupResizeBehavior="preserve-pixel-size" defaultSize={0} className="shell-panel-drawer">
 					<div
 						ref={drawerPanelElementRef}
-						className={cn("h-full min-w-0", drawerEntering && "drawer-content-enter")}
+						className={cn("relative h-full min-w-0", drawerEntering && "drawer-content-enter")}
 						onAnimationEnd={(event) => {
 							if (event.target === event.currentTarget) setDrawerEntering(false);
 						}}
 					>
-						<WorkspaceDrawerHost panel={drawer} collapsed={drawerCollapsed} pinned={drawerPinned} onCollapse={onDrawerCollapse} onClose={onDrawerClose} onRestore={onDrawerRestore} onTogglePin={onToggleDrawerPin} rail={drawerRail} renderPanel={(panel) => drawerContent(panel)} />
+						<div className={cn("contents", props.overview && "invisible")} aria-hidden={props.overview ? true : undefined} inert={Boolean(props.overview)}>
+							<WorkspaceDrawerHost panel={drawer} collapsed={workspaceDrawerCollapsed} pinned={workspaceDrawerPinned} onCollapse={onDrawerCollapse} onClose={onDrawerClose} onRestore={onDrawerRestore} onTogglePin={onToggleDrawerPin} rail={drawerRail} renderPanel={(panel) => drawerContent(panel)} />
+						</div>
+						{props.overview && <div className="absolute inset-0 z-10">{props.overview.sidebar}</div>}
 					</div>
 				</ResizablePanel>
 			</ResizablePanelGroup>
 			{/* 大纲浮层必须放在 Group 外：v4 只认 data-panel / data-separator 直系子节点，
           夹在 panel 之间会污染分隔条命中区计算（absolute 也不算例外）。 */}
-			{outlineContent}
+			{!props.overview && outlineContent}
 			{children}
 		</div>
 	);

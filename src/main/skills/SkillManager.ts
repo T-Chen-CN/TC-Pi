@@ -331,7 +331,7 @@ export class SkillManager {
 	 */
 	/**
 	 * 把打包内置的技能模板（resources/skills/<name>/SKILL.md）复制到用户全局技能目录。
-	 * 为什么抽公共实现：内置技能不止一个（usage-probe、image-gen 等），复制逻辑完全一致，
+	 * 为什么抽公共实现：内置技能不止一个（usage-probe、mcp-setup 等），复制逻辑完全一致，
 	 * 只有技能名不同——单一 helper 避免每个技能重复一段一样的文件复制代码。
 	 */
 	private async installTemplate(skillName: string): Promise<{ success: true; path: string } | { success: false; error: string }> {
@@ -360,10 +360,6 @@ export class SkillManager {
 
 	async installUsageProbeTemplate(): Promise<{ success: true; path: string } | { success: false; error: string }> {
 		return this.installTemplate("usage-probe");
-	}
-
-	async installImageGenTemplate(): Promise<{ success: true; path: string } | { success: false; error: string }> {
-		return this.installTemplate("image-gen");
 	}
 
 	/**

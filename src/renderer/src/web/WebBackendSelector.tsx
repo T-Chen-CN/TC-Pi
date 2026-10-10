@@ -19,11 +19,7 @@ import { WebBottomSheet } from "./WebBottomSheet";
 
 /** 后端选项元数据；label 里 Pi/DSH 是品牌名不本地化，生图走 i18n。 */
 function backendOptions(): { value: AgentBackend; label: string; desc: string }[] {
-	return [
-		{ value: "pi", label: "Pi", desc: t("web.backendPiDesc") },
-		{ value: "dsh", label: "DSH", desc: t("web.backendDshDesc") },
-		{ value: "imagegen", label: t("web.backendImagegen"), desc: t("web.backendImagegenDesc") },
-	];
+	return [{ value: "pi", label: "Pi", desc: t("web.backendPiDesc") }];
 }
 
 /** 后端行首图标：pi=终端（本地编码助手）、dsh=官方预设 logo、生图=图片。 */

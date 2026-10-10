@@ -89,7 +89,6 @@ test("workspace routes return 503 when git/files/prompts services are absent", a
 	for (const [path, code] of [
 		["/api/git/status?projectId=p1", "webError.gitUnavailable"],
 		["/api/files?projectId=p1", "webError.filesUnavailable"],
-		["/api/prompts", "webError.promptsUnavailable"],
 	]) {
 		const result = await call(routes, path);
 		assert.equal(result.status, 503);
@@ -213,30 +212,6 @@ test("file-content enforces sandbox, size bound, and binary refusal on a real di
 	assert.equal((await call(routes, `/api/file-content?projectId=p1&path=${encodeURIComponent("missing.txt")}`)).status, 404);
 	assert.equal((await call(routes, "/api/file-content?projectId=p1&path=")).status, 400);
 	assert.equal((await call(routes, "/api/file-content?projectId=nope&path=a.txt")).status, 404);
-});
-
-test("prompt listing strips host paths, clamps pageSize, and detail decodes slugs", async () => {
-	const { deps, calls } = stubDeps("C:/project");
-	const routes = new WebWorkspaceRoutes(deps);
-
-	const list = await call(routes, "/api/prompts?search=%E4%BB%A3%E7%A0%81&category=%E7%BC%96%E7%A8%8B&pageSize=999");
-	assert.equal(list.status, 200);
-	assert.equal(calls.prompts[0].search, "代码");
-	assert.equal(calls.prompts[0].category, "编程");
-	assert.equal(calls.prompts[0].pageSize, 50);
-	assert.equal(calls.prompts[0].page, 1);
-	for (const prompt of list.body.prompts) {
-		assert.equal("path" in prompt, false);
-	}
-
-	assert.equal((await call(routes, "/api/prompts/a%20b?category=x")).status, 200);
-	assert.equal(calls.detail[0].slug, "a b");
-	const detail = await call(routes, "/api/prompts/a%20b?category=x");
-	assert.equal(detail.body.detail.title, "T:a b");
-	assert.equal("path" in detail.body.detail, false);
-
-	assert.equal((await call(routes, "/api/prompts/s1")).status, 400);
-	assert.equal((await call(routes, "/api/prompts/missing?category=x")).status, 404);
 });
 
 test("unknown api paths fall through to the caller (returns false)", async () => {
