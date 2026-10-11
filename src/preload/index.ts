@@ -1013,23 +1013,22 @@ const api = {
 				ok: boolean;
 				modelCount: number;
 				piSaved: boolean;
-				dshSaved: boolean;
-				dshWroteViaHost?: boolean;
+
 				error?: string;
 			}>,
 		/** 测试 provider 连接（隔离探针）：临时 agent 目录 + PI_CODING_AGENT_DIR 跑真实 pi，测当前表单值且不落盘；proxyMode 控制探针进程代理（同 fetchModels 语义，pi 侧走 PI 代理配置） */
 		testProvider: (providerName: string, modelId: string, provider: unknown, apiKey: string, proxyMode?: "follow" | "pi" | "desktop" | "off") =>
 			ipcRenderer.invoke(ipcChannels.configTestProvider, { providerName, modelId, provider, apiKey, proxyMode }) as Promise<import("../shared/types/fetchedModel").PiModelProbeResult>,
-		/** 查询 provider 用量/余额（主进程按 provider 名 + backend 路由；backend=dsh 走 $DSH_HOME 链路） */
-		fetchUsage: (provider: string, backend?: "pi" | "dsh") => ipcRenderer.invoke(ipcChannels.configFetchUsage, { provider, backend }) as Promise<ProviderUsageResult>,
+		/** 查询 provider 用量/余额（主进程按 provider 名 + backend 路由） */
+		fetchUsage: (provider: string, backend?: "pi") => ipcRenderer.invoke(ipcChannels.configFetchUsage, { provider, backend }) as Promise<ProviderUsageResult>,
 		/** 安装内置「用量查询自定义」技能模板到 ~/.pi/agent/skills/usage-probe */
 		installUsageSkill: () => ipcRenderer.invoke(ipcChannels.configInstallUsageSkill) as Promise<{ success: boolean; path?: string; error?: string }>,
-		/** 读取该 provider 的用量查询配置 + 内置模板自动识别（探针配置弹窗数据源；backend=dsh 走 DSH 链路） */
-		getUsageProbes: (provider: string, backend?: "pi" | "dsh") => ipcRenderer.invoke(ipcChannels.configGetUsageProbes, { provider, backend }) as Promise<UsageProbeSettingsResult>,
+		/** 读取该 provider 的用量查询配置 + 内置模板自动识别（探针配置弹窗数据源） */
+		getUsageProbes: (provider: string, backend?: "pi") => ipcRenderer.invoke(ipcChannels.configGetUsageProbes, { provider, backend }) as Promise<UsageProbeSettingsResult>,
 		/** 按 provider 合并保存用量查询配置（主进程校验后落盘，保留其它 providers 与旧 probes） */
 		saveUsageProbes: (payload: UsageProbeSaveInput) => ipcRenderer.invoke(ipcChannels.configSaveUsageProbes, payload) as Promise<UsageProbeSaveResult>,
 		/** 批量读取各 provider 用量查询状态（徽章开关 / 启动预热选源；只回开关/模板/间隔，不含密钥） */
-		listUsageProbeStates: (payload: { providers?: string[]; backend?: "pi" | "dsh" } = {}) => ipcRenderer.invoke(ipcChannels.configListUsageProbeStates, payload) as Promise<UsageProbeStatesResult>,
+		listUsageProbeStates: (payload: { providers?: string[]; backend?: "pi" } = {}) => ipcRenderer.invoke(ipcChannels.configListUsageProbeStates, payload) as Promise<UsageProbeStatesResult>,
 		/** 单条模板测试（模板 id + 覆盖字段；provider 端点与密钥由主进程解析，不回传渲染层） */
 		testUsageProbe: (payload: UsageProbeTestInput) => ipcRenderer.invoke(ipcChannels.configTestUsageProbe, payload) as Promise<ProviderUsageResult>,
 		/** 安装内置「MCP 配置助手」技能模板到 ~/.pi/agent/skills/mcp-setup */

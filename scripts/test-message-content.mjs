@@ -1,16 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const ts = require("typescript");
-const source = readFileSync(new URL("../src/main/pi/messageContent.ts", import.meta.url), "utf8");
-const functionSource = source.replace(/import \{ stripFeishuDocActionHint \} from "\.\.\/feishu\/docActions";\n\n/, "").replace(/export function extractMessageText/, "function extractMessageText");
-const compiled = ts.transpileModule(functionSource, {
-	compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-}).outputText;
-const stripFeishuDocActionHint = (text) => text;
-const extractMessageText = new Function("stripFeishuDocActionHint", `${compiled}\nreturn extractMessageText;`)(stripFeishuDocActionHint);
+import { loadTsCommonJs } from "../tests/helpers/loadTsCommonJs.mjs";
+const { extractMessageText } = loadTsCommonJs("src/main/pi/messageContent.ts");
 
 const fragmentedGlmContent = [
 	{ type: "text", text: "你好！" },

@@ -135,8 +135,7 @@ app.setPath(
 // 启动偏好共享一次读取（沙箱/单实例/宠物开关同源 settings.json）：三个快照值在
 // dev userData 覆盖之后一次读齐，替代原来三次独立的 readFileSync+JSON.parse。
 const bootPreferences = readBootPreferences();
-const petEnabledAtLaunch = false;
-applyLinuxDisplayBackendWorkaround(petEnabledAtLaunch);
+applyLinuxDisplayBackendWorkaround();
 
 // Chromium 沙箱开关必须在 app.ready 前生效。
 // 默认关闭：Windows 上部分安全软件/旧 GPU 驱动会在沙箱初始化时触发原生断点（0x80000003）。
@@ -266,7 +265,6 @@ import { registerVoiceTranscriptionIpc } from "./ipc/voiceTranscriptionIpc";
 import { registerWebRemoteAccessIpc } from "./ipc/webRemoteAccessIpc";
 import { QuitCleanupRegistry } from "./lifecycle/QuitCleanupRegistry";
 import { AppLogger } from "./logging/AppLogger";
-import { RpcLogLiveBroadcaster } from "./logging/RpcLogLiveBroadcaster";
 import { RpcLogger } from "./logging/RpcLogger";
 import { setAppLogger } from "./logging/sharedLogger";
 import { isMemoryProfileEnabled, startMemoryProfile, type MemoryProfileHandle } from "./memory/MemoryMonitor";
@@ -538,13 +536,6 @@ function emitSessionRuntimeEvent(agentId: string, sourceChannel: string, payload
 	}
 	sendSessionRuntimeEnvelope(event);
 	const tab = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Partial<AgentTab>) : undefined;
-	// A crashed anonymous process has no durable session to reopen. The regular
-	// Agent state event reaches the renderer first so diagnostics remain visible
-	// for the current tick, then detach removes the transient conversation.
-	if (tab?.noSession && tab.status === "closed") {
-		sessionRuntimeCoordinator.unbindTerminalAgent(agentId);
-		discardAnonymousSession({ ...runtimeBinding, agentId });
-	}
 	return true;
 }
 
@@ -559,24 +550,11 @@ function emitSessionRuntimeDetach(binding: SessionRuntimeBinding): void {
 	});
 }
 
-/**
- * Anonymous chats have no catalog file to rediscover. Once their runtime stops,
- * discard the in-memory record after broadcasting detach so every renderer can
- * remove its transient Session state.
- */
-function discardAnonymousSession(binding: SessionRuntimeBinding): void {
-	if (!sessionCatalog.get(binding.sessionId)?.noSession) return;
-	sessionCatalog.removeTransient(binding.sessionId);
-	emitSessionRuntimeDetach(binding);
-}
-
 async function stopSessionRuntime(target: SessionRuntimeTarget) {
-	const anonymous = sessionCatalog.get(target.sessionId)?.noSession === true;
 	const result = await sessionRuntimeCoordinator.stopRuntime(target);
 	if (result.ok) {
 		terminalManager.closeAgent(target.agentId);
-		if (anonymous) discardAnonymousSession(target);
-		else emitSessionRuntimeDetach(target);
+		emitSessionRuntimeDetach(target);
 	}
 	return result;
 }
@@ -1645,7 +1623,7 @@ function shouldUseDevRendererUrl() {
 }
 
 function shouldShowMainWindowImmediately() {
-	return isUsingLinuxXWaylandWorkaround(petEnabledAtLaunch);
+	return isUsingLinuxXWaylandWorkaround();
 }
 
 /** 启动尺寸预设 → 初始窗口尺寸；全屏/最大化也给合理兜底，避免显示器信息异常时缩成最小窗。 */
@@ -2146,7 +2124,7 @@ function registerIpc() {
 			const trustPath = project?.environment === "wsl" && process.platform === "win32" && settings.wslEnabled && settings.wslDistro ? toWslLinuxPath(projectRoot, { distro: settings.wslDistro }) : projectRoot;
 			return (await configManager.getProjectTrustDecision(trustPath)) === true;
 		},
-		// pi 环境引导：便携 Node 安装器的真实 IO（下载/解压与 DSH runtime 同源，
+		// pi 环境引导：便携 Node 安装器的真实 IO（流式下载、安全解压，
 		// 测试里注入替身；未装配时引导安装入口降级不可用）。
 		piRuntimeNodeInstaller: {
 			download: createNetDownloader((scope, message, detail) => {
@@ -2342,7 +2320,7 @@ function sendTelemetryHeartbeat() {
 				sessionsTotal: sessionCatalog.listEntries().length,
 				projectsTotal: projectStore.list().length,
 				agentsActive: agentManager.list().length,
-				feishuBotsTotal: 0,
+
 				automationTasksTotal: automationStore?.listTasks().length ?? 0,
 				systemLocale: app.getLocale(),
 				portable: Boolean(process.env.PORTABLE_EXECUTABLE_DIR),
@@ -2829,15 +2807,6 @@ app
 			diagnosticsMonitor?.recordTiming(name, startedAt, detail);
 		});
 		quitCleanup.register("diagnostics-monitor", () => diagnosticsMonitor?.stop());
-		// 实时 RPC 日志广播器（DSH 后端用）：镜像 pi AgentManager 的 80ms 节流批量推送语义，
-		// 窗口销毁后静默丢弃；观看登记由 rpcLogsSetWatching IPC 按面板挂载/卸载成对驱动。
-		const rpcLogLiveBroadcaster = new RpcLogLiveBroadcaster({
-			send: (channel, payload) => {
-				if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
-			},
-		});
-		// DSH 外部会话自动导入改到 projectStore.load 之后（见下方 scheduleDshForeignAutoImport）：
-		// 必须走只读磁盘扫描，不能依赖 host-ready——否则会与 dsh-web 抢同一份 DSH_HOME。
 		webServiceManager = new WebServiceManager({
 			// 令牌持久化回写：manager 内自动生成/轮换/手动修改后落盘，重启沿用同一令牌。
 			persistToken: (state) => {
@@ -2976,7 +2945,7 @@ app
 				terminalManager.closeAgent(target.agentId);
 				const result = await sessionRuntimeCoordinator.restartRuntime(target);
 				if (result.ok) {
-					if (!result.value.session.noSession) emitSessionRuntimeDetach(target);
+					emitSessionRuntimeDetach(target);
 					// 与桌面 IPC 同规约：新 runtime 的消息窗口在绑定前 flush 会被丢弃，
 					// 重启后必须重下发（id 已由会话级身份延续保持稳定，不触发整窗 remount）。
 					emitReplacementState(result.value.runtime, true);
@@ -3093,13 +3062,10 @@ app
 		quitCleanup.register("web-remote-access", () => remoteAccessManager?.dispose());
 		terminalManager = new TerminalSessionManager(
 			(agentId) => {
-				// 多后端：pi 与 DSH runtime 各持自己的 tab 表，终端工作目录必须经合成网关
-				// 按 agentId 解析。只查 pi agentManager 会让 DSH 会话的终端在创建时抛
-				// `Agent not found`，表现为「DSH 后端终端打不开」（渲染层静默吞掉该错误）。
+				// 终端工作目录由当前 Pi runtime 提供。
 				const tab = compositeAgentGateway?.list().find((candidate) => candidate.id === agentId);
 				if (tab) return tab.cwd;
-				// 网关未装配完成（启动极早期）时退回 pi 管理器；DSH agent 不在 pi 表里时
-				// 同样抛出与原来一致的 `Agent not found` 语义。
+				// 网关未装配完成时退回 Pi 管理器。
 				return agentManager.getCwd(agentId);
 			},
 			(channel, payload) => mainWindow?.webContents.send(channel, payload),

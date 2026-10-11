@@ -19,9 +19,12 @@ test("catalog message mutation IPC is wired in shared, main and preload", () => 
 	assert.match(preload, /prepareCatalogResend:/);
 });
 
-test("pi history mutation does not require a live agent; DSH keeps edit/delete/resend hidden", () => {
-	assert.match(injector, /const canEditOrDeleteMessages = !isDshBackend/);
-	assert.match(injector, /const canResend = !isDshBackend/);
-	assert.match(readFileSync("src/renderer/src/hooks/useSessionHistoryMutations.ts", "utf8"), /editCatalogMessage/);
+test("pi history mutation does not require a live agent; retired backends expose no mutation actions", () => {
+	assert.match(injector, /const canEditOrDeleteMessages\s*=\s*isSupportedBackend\(sessionRecord\?\.backend\)\s*&&\s*isSupportedBackend\(activeAgent\?\.backend\)/);
+	assert.match(injector, /const canResend\s*=\s*canEditOrDeleteMessages/);
+	assert.match(injector, /onForkMessage=\{canEditOrDeleteMessages\s*\?\s*services\.forkFromUserMessage\s*:\s*undefined\}/);
+	const mutations = readFileSync("src/renderer/src/hooks/useSessionHistoryMutations.ts", "utf8");
+	assert.match(mutations, /runForkMutation\("edit",\s*message,\s*newText\)/);
+	assert.match(mutations, /deleteCatalogMessage/);
 	assert.match(readFileSync("src/main/sessions/SessionRuntimeCoordinator.ts", "utf8"), /requireStoppedForFileMutation/);
 });

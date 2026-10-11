@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
-import { imageGenModuleHiddenAtom, composerModesHiddenAtom } from "../../atoms";
-import { AlertCircle, Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownLeft, Eye, EyeOff, FileText, GitBranch, ImageIcon, ListChecks, Loader2, Paperclip, Plus, RefreshCw, Sparkles, Star, Target, Terminal, Wrench, X } from "lucide-react";
+import { composerModesHiddenAtom } from "../../atoms";
+import { AlertCircle, Check, ChevronDown, ChevronLeft, CornerDownLeft, Eye, EyeOff, FileText, GitBranch, ImageIcon, ListChecks, Loader2, Paperclip, Plus, RefreshCw, Sparkles, Star, Target, Wrench, X } from "lucide-react";
 import { t, type TranslationKey } from "../../i18n";
 import type { PromptEnhanceView } from "../../hooks/usePromptEnhance";
 import { PromptEnhanceControls } from "./PromptEnhanceControls";
@@ -10,10 +10,10 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from ".
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "../ui-shadcn/dialog";
 import { cn } from "../../lib/utils";
 import { ModelThinkingChip } from "./ModelThinkingChip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
 import { ConfirmDialog } from "../app/AppParts";
 import { useComposerModeAvailability } from "../../hooks/useComposerModeAvailability";
-import type { ImageGenConfigFile } from "../../../../shared/imageGenConfig";
+
 import { ProviderUsageInline } from "../app/ProviderUsageInline";
 import { useProviderUsageBatchRefresh } from "../../hooks/useProviderUsage";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui-shadcn/select";
@@ -391,9 +391,7 @@ export function ComposerBottomBar(props: {
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					{/* 生图模式无 pi/DSH runtime：安全等级（pi 安全门）与 DSH 权限预设都对图片生成无意义，
-					   且 SecurityControl 按 backend 分发时没有 imagegen 分支会误显示成 pi 安全等级菜单；
-					   快捷消息同理（正文是给对话模型的指令），两个控制位一起屏蔽。 */}
+
 					{
 						<>
 							{props.securityControl}
@@ -402,14 +400,7 @@ export function ComposerBottomBar(props: {
 					}
 				</div>
 				<div className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4 @max-[620px]:justify-start @max-[620px]:overflow-x-auto @max-[620px]:pb-px @max-[480px]:order-3 @max-[480px]:basis-full @max-[480px]:flex-none${" overflow-hidden"}`}>
-					{/* 生图模式用独立供应商/模型下拉，不展示会话 LLM chip，避免两套配置混用。
-					    ACP 同理：模型/思考由 agent CLI 自持（session/config options 或各自 /model 命令），
-					    PiDeck 维护的 models.json 对 agent CLI 无意义，隐藏 chip 防止两套语义混用。 */}
 					{<ModelThinkingChip modelLabel={modelLabel} modelPendingTo={modelDisplay.pending && modelTo ? modelTo.modelName || modelTo.modelId : undefined} modelPendingTitle={modelPendingTitle} disabled={props.modelDisabled ?? props.disabled} onPickModel={props.onPickModel} thinkingControl={props.thinkingControl} />}
-					{/* DSH 压缩入口与 pi 统一：上下文圆环（右侧）常驻并带压缩按钮。
-					    2026-12 兼容期：dsh runtime state 已由主进程提供 contextPercent 兜底
-					    （request/context 的 contextWindow + 消息估算），圆环不再因缺数据隐藏，
-					    原独立 compact 按钮移除，避免双入口。 */}
 				</div>
 				<div className="composer-bottom-right ml-auto flex shrink-0 items-center gap-2">
 					{/* 分支只读 chip 升级为可切换下拉：当前分支即触发器，展开列表选目标分支后

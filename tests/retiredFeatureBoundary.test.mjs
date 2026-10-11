@@ -50,6 +50,19 @@ test("default E2E has no retired backend activation or Feishu UI tests", () => {
 	for (const name of ["dsh-models", "dsh-provider-add", "dsh-restart", "dsh-security-plan", "dsh-title-diag", "session-manager-dsh-archive", "feishu-link"]) assert.equal(existsSync(`e2e/${name}.spec.ts`), false, name);
 });
 
+test("current session menus do not offer copy/export for retired backend records", () => {
+	const app = readFileSync("src/renderer/src/App.tsx", "utf8");
+	assert.match(app, /canCopySession:\s*canRename\s*&&\s*isSupportedBackend\(record\.backend\)/);
+	assert.match(app, /canExportHtml:\s*canRename\s*&&\s*isSupportedBackend\(record\.backend\)/);
+	const sidebar = readFileSync("src/renderer/src/components/sidebar/SidebarComponents.tsx", "utf8");
+	assert.match(sidebar, /isSupportedBackend\(props\.menu\.session\.backend\)/);
+});
+
+test("removed runtime maintenance modules stay absent and automation uses shared prompt protocol", () => {
+	for (const file of ["src/main/logging/RpcLogLiveBroadcaster.ts", "scripts/dump-typert-endpoints.mjs", "scripts/pwsh-persistent-smoke.mjs", "scripts/local-package-build.mjs", "docs/pideck-cua-implementation-plan.md"]) assert.equal(existsSync(file), false, file);
+	assert.doesNotMatch(readFileSync("src/main/automation/AutomationRunCoordinator.ts", "utf8"), /from\s*["'][^"']*renderer\//);
+});
+
 test("provider startup warmup only requests the supported pi configuration", async () => {
 	const effects = [];
 	const backends = [];

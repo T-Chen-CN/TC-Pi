@@ -1,54 +1,27 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 
 function loadModule(mockProcess = {}) {
-	const source = readFileSync("src/main/linuxDisplayBackend.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
 	const appendedSwitches = [];
 	let disableHardwareAccelerationCalls = 0;
-	const sandbox = {
-		exports: {},
-		process: {
-			platform: "linux",
-			env: {},
-			argv: [],
-			...mockProcess,
-		},
-		require: (id) => {
-			if (id === "electron") {
-				return {
-					app: {
-						disableHardwareAcceleration: () => {
-							disableHardwareAccelerationCalls++;
-						},
-						commandLine: {
-							appendSwitch: (name, value) => appendedSwitches.push({ name, value }),
-						},
+	const load = createTsSandbox({
+		globals: { process: { platform: "linux", env: {}, argv: [], ...mockProcess } },
+		stubs: {
+			electron: {
+				app: {
+					disableHardwareAcceleration: () => {
+						disableHardwareAccelerationCalls++;
 					},
-				};
-			}
-			return require(id);
+					commandLine: { appendSwitch: (name, value) => appendedSwitches.push({ name, value }) },
+				},
+			},
 		},
-	};
-	vm.runInNewContext(outputText, sandbox, {
-		filename: "linuxDisplayBackend.ts",
 	});
-	return {
-		...sandbox.exports,
-		appendedSwitches,
-		getDisableHardwareAccelerationCalls: () => disableHardwareAccelerationCalls,
-	};
+	return { ...load("src/main/linuxDisplayBackend.ts"), appendedSwitches, getDisableHardwareAccelerationCalls: () => disableHardwareAccelerationCalls };
 }
 
-test("uses X11 ozone backend on Linux Wayland when the desktop pet is enabled", () => {
+test("uses X11 ozone backend on Linux Wayland when x11 is explicitly requested", () => {
 	const { getLinuxDisplayBackendSwitches } = loadModule();
 
 	assert.deepEqual(
@@ -60,9 +33,9 @@ test("uses X11 ozone backend on Linux Wayland when the desktop pet is enabled", 
 						XDG_SESSION_TYPE: "wayland",
 						WAYLAND_DISPLAY: "wayland-0",
 						DISPLAY: ":0",
+						PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 					},
 					argv: [],
-					petEnabled: true,
 				}),
 			),
 		),
@@ -73,10 +46,10 @@ test("uses X11 ozone backend on Linux Wayland when the desktop pet is enabled", 
 	);
 });
 
-test("does not force X11 by default when the desktop pet is disabled (#108)", () => {
+test("does not force X11 by default without an explicit backend (#108)", () => {
 	const { getLinuxDisplayBackendSwitches } = loadModule();
 
-	// 未传 petEnabled（默认未启用宠物）时，即使处于 Wayland + XWayland 环境
+	// 未传 backend override（默认未启用宠物）时，即使处于 Wayland + XWayland 环境
 	// 也不得强制 ozone-platform=x11，否则主窗口在部分 GNOME/Wayland 环境不可见。
 	assert.deepEqual(
 		JSON.parse(
@@ -105,7 +78,6 @@ test("does not force X11 by default when the desktop pet is disabled (#108)", ()
 						DISPLAY: ":0",
 					},
 					argv: [],
-					petEnabled: false,
 				}),
 			),
 		),
@@ -113,7 +85,7 @@ test("does not force X11 by default when the desktop pet is disabled (#108)", ()
 	);
 });
 
-test("forces X11 without the pet when the backend is explicitly set to x11", () => {
+test("forces X11  when the backend is explicitly set to x11", () => {
 	const { getLinuxDisplayBackendSwitches } = loadModule();
 
 	assert.deepEqual(
@@ -125,6 +97,7 @@ test("forces X11 without the pet when the backend is explicitly set to x11", () 
 						XDG_SESSION_TYPE: "wayland",
 						WAYLAND_DISPLAY: "wayland-0",
 						DISPLAY: ":0",
+						PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 						PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 					},
 					argv: [],
@@ -153,7 +126,6 @@ test("does not force X11 when user opts into native Wayland", () => {
 						PIDECK_LINUX_DISPLAY_BACKEND: "wayland",
 					},
 					argv: [],
-					petEnabled: true,
 				}),
 			),
 		),
@@ -173,9 +145,9 @@ test("does not override an explicit ozone platform argument", () => {
 						XDG_SESSION_TYPE: "wayland",
 						WAYLAND_DISPLAY: "wayland-0",
 						DISPLAY: ":0",
+						PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 					},
 					argv: ["pideck", "--ozone-platform=wayland"],
-					petEnabled: true,
 				}),
 			),
 		),
@@ -195,9 +167,9 @@ test("does not force X11 outside Linux", () => {
 						XDG_SESSION_TYPE: "wayland",
 						WAYLAND_DISPLAY: "wayland-0",
 						DISPLAY: ":0",
+						PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 					},
 					argv: [],
-					petEnabled: true,
 				}),
 			),
 		),
@@ -212,11 +184,12 @@ test("applies the X11 switch to Electron commandLine before app ready", () => {
 			XDG_SESSION_TYPE: "wayland",
 			WAYLAND_DISPLAY: "wayland-0",
 			DISPLAY: ":0",
+			PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 		},
 		argv: ["pideck"],
 	});
 
-	applyLinuxDisplayBackendWorkaround(true);
+	applyLinuxDisplayBackendWorkaround();
 
 	assert.deepEqual(appendedSwitches, [
 		{ name: "ozone-platform", value: "x11" },
@@ -231,11 +204,12 @@ test("does not override an explicit Chromium log level", () => {
 			XDG_SESSION_TYPE: "wayland",
 			WAYLAND_DISPLAY: "wayland-0",
 			DISPLAY: ":0",
+			PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 		},
 		argv: ["pideck", "--log-level=2"],
 	});
 
-	applyLinuxDisplayBackendWorkaround(true);
+	applyLinuxDisplayBackendWorkaround();
 
 	assert.deepEqual(appendedSwitches, [{ name: "ozone-platform", value: "x11" }]);
 });
@@ -247,11 +221,12 @@ test("disables hardware acceleration when forcing X11 on Linux Wayland", () => {
 			XDG_SESSION_TYPE: "wayland",
 			WAYLAND_DISPLAY: "wayland-0",
 			DISPLAY: ":0",
+			PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 		},
 		argv: ["pideck"],
 	});
 
-	applyLinuxDisplayBackendWorkaround(true);
+	applyLinuxDisplayBackendWorkaround();
 
 	assert.equal(getDisableHardwareAccelerationCalls(), 1);
 });
@@ -263,17 +238,18 @@ test("keeps hardware acceleration when Linux GPU disable is opted out", () => {
 			XDG_SESSION_TYPE: "wayland",
 			WAYLAND_DISPLAY: "wayland-0",
 			DISPLAY: ":0",
+			PIDECK_LINUX_DISPLAY_BACKEND: "x11",
 			PIDECK_LINUX_DISABLE_GPU: "0",
 		},
 		argv: ["pideck"],
 	});
 
-	applyLinuxDisplayBackendWorkaround(true);
+	applyLinuxDisplayBackendWorkaround();
 
 	assert.equal(getDisableHardwareAccelerationCalls(), 0);
 });
 
-test("applies nothing and keeps GPU acceleration when the pet is disabled (#108)", () => {
+test("applies nothing and keeps GPU acceleration without an explicit backend (#108)", () => {
 	const { applyLinuxDisplayBackendWorkaround, appendedSwitches, getDisableHardwareAccelerationCalls } = loadModule({
 		platform: "linux",
 		env: {
@@ -284,7 +260,7 @@ test("applies nothing and keeps GPU acceleration when the pet is disabled (#108)
 		argv: ["pideck"],
 	});
 
-	// 默认（未启用宠物）不得改动任何 Chromium 启动参数。
+	// 默认（未请求 x11）不得改动任何 Chromium 启动参数。
 	applyLinuxDisplayBackendWorkaround();
 
 	assert.deepEqual(appendedSwitches, []);

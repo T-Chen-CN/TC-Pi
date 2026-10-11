@@ -66,12 +66,6 @@ function sectionTabValue(section: ConfigSection, tab: ConfigTab): string {
 /** localStorage 键：Pi 管理页上次打开的 tab（重开弹窗时恢复位置，跨应用重启保留）。 */
 const CONFIG_LAST_TAB_KEY = "pideck-config-last-tab";
 
-/** localStorage 键：配置管理顶层后端分页（Pi/DSH）上次选择（重开弹窗时恢复）。 */
-const CONFIG_BACKEND_PANE_KEY = "pideck-config-backend-pane";
-function loadLastConfigBackendPane(): "dsh" | "pi" {
-	return "pi";
-}
-
 /** 全部合法 section / config 组子 tab，用于校验持久化值（避免版本更新后残留旧值导致无高亮）。 */
 const CONFIG_SECTIONS: readonly ConfigSection[] = ["config", "security", "skills", "prompts", "extensions", "mcp"];
 const CONFIG_TABS: readonly ConfigTab[] = ["models", "auth", "settings", "trust", "mcp", "raw"];
@@ -182,8 +176,6 @@ type ConfigModalProps = {
 	focusConfigTab?: ConfigTab;
 	/** 深链：models 页要定位展开的供应商名。 */
 	focusProvider?: string;
-	/** 深链：打开时落在的后端分页（DSH 配置 / Pi 管理）；缺省保持上次位置。 */
-	focusBackendPane?: "dsh" | "pi";
 };
 
 /**
@@ -226,8 +218,6 @@ export type ConfigPaneProps = {
 	focusConfigTab?: ConfigTab;
 	/** 深链：models 页要定位展开的供应商名。 */
 	focusProvider?: string;
-	/** 深链：打开时落在的后端分页（DSH 配置 / Pi 管理）；缺省保持上次位置。 */
-	focusBackendPane?: "dsh" | "pi";
 	/**
 	 * 头部按钮状态上报（saving 禁用保存 / hasDirty 黄点 / unsaved 关闭确认清单）。
 	 * 外壳把这些 UI 细节呈现在自己的标题栏，因此 ConfigPane 需要把内部状态同步给外壳。
@@ -244,7 +234,7 @@ export type ConfigPaneProps = {
  * 配置管理嵌入分区：供设置窗口内嵌渲染（共享同一窗口/标题栏，不再各自弹 Dialog）。
  * 不包错误边界——宿主 SettingsModal 的 ErrorBoundary 已兜底整个窗口。
  */
-export const ConfigPane = forwardRef<ConfigPaneHandle, ConfigPaneProps>(function ConfigPane({ onClose, onSaved, projectId, projectKind, projectName, projects, resourceOnly, focusConfigTab, focusProvider, focusBackendPane, onStateChange, onRequestClose }, ref) {
+export const ConfigPane = forwardRef<ConfigPaneHandle, ConfigPaneProps>(function ConfigPane({ onClose, onSaved, projectId, projectKind, projectName, projects, resourceOnly, focusConfigTab, focusProvider, onStateChange, onRequestClose }, ref) {
 	return (
 		<ConfigModalContent
 			open
@@ -257,7 +247,6 @@ export const ConfigPane = forwardRef<ConfigPaneHandle, ConfigPaneProps>(function
 			resourceOnly={resourceOnly}
 			focusConfigTab={focusConfigTab}
 			focusProvider={focusProvider}
-			focusBackendPane={focusBackendPane}
 			embedded
 			paneRef={ref}
 			onPaneStateChange={onStateChange}
@@ -350,7 +339,7 @@ type ConfigModalContentProps = ConfigModalProps & {
 };
 
 function ConfigModalContent(props: ConfigModalContentProps) {
-	const { open, onClose, onSaved, projectId, projectKind, projectName, projects = [], resourceOnly = false, embedded, focusConfigTab, focusProvider, focusBackendPane } = props;
+	const { open, onClose, onSaved, projectId, projectKind, projectName, projects = [], resourceOnly = false, embedded, focusConfigTab, focusProvider } = props;
 	/**
 	 * 资源作用域是派生值而非可切换 state：
 	 * - 主配置页固定 global（全局安装 + 用户 ~/.pi 自装 + PiDeck 内置）；项目级技能/扩展/提示词
@@ -391,13 +380,13 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	});
 	// 深链 provider：models 页展开该供应商卡片并滚动高亮（ModelsTab 消费）。
 	const [focusedProvider, setFocusedProvider] = useState<string | undefined>(focusProvider);
-	// 用量探针配置弹窗：由模型/认证/DSH 卡片触发（provider + backend 决定配置落盘位置）。
+	// 用量探针配置弹窗：由 Pi 模型/认证卡片触发。
 	const [usageProbeDialog, setUsageProbeDialog] = useState<{
 		provider: string;
-		backend: "pi" | "dsh";
+		backend: "pi";
 	} | null>(null);
-	// 打开弹窗的公共入口：pi 侧（模型/认证）provider 与 DSH route 分开（DSH 走 $DSH_HOME 链路）。
-	const openUsageProbeDialogFor = useCallback((provider: string, backend: "pi" | "dsh") => {
+	// 打开弹窗的公共入口：模型与认证页共用 Pi 供应商配置。
+	const openUsageProbeDialogFor = useCallback((provider: string, backend: "pi") => {
 		setUsageProbeDialog({ provider, backend });
 	}, []);
 	useEffect(() => {
@@ -416,29 +405,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		}
 		// focusProvider/focusConfigTab 变化即应用：设置窗口已开时点圆球跳转也要生效。
 	}, [open, focusConfigTab, focusProvider, resourceOnly]);
-	/** 配置管理顶层后端分页：以 Pi 为主（默认 Pi，且 Pi 标签在左），dsh 页在右。
-	 *  新建会话默认后端跟随设置项 defaultAgentBackend（默认 pi），与此处配置管理入口相互独立。
-	 *  弹窗每次打开都会重建 state，这里从 localStorage 恢复上次选定的后端分页。 */
-	const [backendPane, setBackendPane] = useState<"dsh" | "pi">("pi");
-	const dshPaneHidden = true;
-	useEffect(() => {
-		// 上次停在 DSH 页、或弹窗开着时在设置里隐藏了 DSH：回到 Pi 页，避免停在一个没有入口的页面。
-		// 只改本次弹窗的 state，不覆写 localStorage 记忆——恢复显示后仍回到用户上次的选择。
-		if (dshPaneHidden) setBackendPane("pi");
-	}, [dshPaneHidden]);
-	/** 切换后端分页并持久化：退出配置管理再进入时停留在上次选定的后端。 */
-	const selectBackendPane = useCallback((value: string) => {
-		const next = "pi";
-		setBackendPane(next);
-		// 用量查询弹窗是 per-provider 的：切换 Pi/DSH 页时关闭，
-		// 避免「从认证页点开、切到模型页后弹窗还挂着」的越界出现（用户反馈的闪现 bug）。
-		setUsageProbeDialog(null);
-		try {
-			localStorage.setItem(CONFIG_BACKEND_PANE_KEY, next);
-		} catch {
-			/* localStorage 不可用（隐私模式等）时静默失败，仅本次会话内不记忆 */
-		}
-	}, []);
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -461,14 +427,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	/** 关闭弹框时存在未保存修改 → 弹出保存确认（借鉴设置页关闭逻辑） */
 	const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 	const hasDirty = dirtyTabs.size > 0;
-	// DSH/Pi 顶层分页与 DSH 左侧导航的黄点来源：dsh:<nav> 归 DSH，其余归 Pi
-	const dshDirtyNavIds = useMemo(() => {
-		const ids = new Set<string>();
-		for (const key of dirtyTabs) if (key.startsWith("dsh:")) ids.add(key);
-		return ids;
-	}, [dirtyTabs]);
-	const hasDshDirty = dshDirtyNavIds.size > 0;
-	const hasPiDirty = dirtyTabs.size > 0 && !hasDshDirty;
 	/** 关闭确认摘要：列出全部脏 tab（不再只点第一条），供 AlertDialog 逐条展示。 */
 	const configUnsavedSummary = useMemo(() => summarizeConfigUnsavedChanges(dirtyTabs), [dirtyTabs]);
 	const configUnsavedMessage = useMemo(() => formatConfigUnsavedMessage(configUnsavedSummary, t), [configUnsavedSummary]);
@@ -493,20 +451,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		});
 	}, []);
 
-	/** DSH 页脏状态：保留聚合 "dsh" 给保存按钮，同时记下 dsh:<nav> 供侧栏黄点/关闭文案。 */
-	const handleDshDirtyChange = useCallback((dirty: boolean, keys: string[] = []) => {
-		setDirtyTabs((prev) => {
-			const next = new Set([...prev].filter((key) => key !== "dsh" && !key.startsWith("dsh:")));
-			if (dirty) {
-				next.add("dsh");
-				for (const key of keys) {
-					if (key.startsWith("dsh:")) next.add(key);
-				}
-			}
-			dirtyTabsRef.current = next;
-			return next;
-		});
-	}, []);
 	const [configDiagnostic, setConfigDiagnostic] = useState<ConfigFileDiagnostic | null>(null);
 	/* toast 已改用 sonner 实现 */
 
@@ -591,11 +535,11 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 
 	/**
 	 * Pi 配置脏状态由数据与基准的真实差异推导（models/auth/settings/trust/raw 这 5 个
-	 * 由本组件 state 承载的文件）。MCP/DSH/security/skills/prompts 仍由各自注册表维护，
+	 * 由本组件 state 承载的文件）。MCP/security/skills/prompts 仍由各自注册表维护，
 	 * 这里只增删对应的 config:* key，不动其它来源的脏标记。
 	 */
 	useEffect(() => {
-		// 以 ref 为源（markDirty/clearDirty/handleDshDirtyChange 都同步维护它），
+		// 以 ref 为源（markDirty/clearDirty 都同步维护它），
 		// 只增删这 5 个 config:* key，其它来源的脏标记原样保留。
 		const before = new Set(dirtyTabsRef.current);
 		const next = new Set(dirtyTabsRef.current);
@@ -628,12 +572,11 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	/** 用户隐藏的认证供应商列表（持久化到 AppSettings.hiddenAuthProviders）。 */
 	const [hiddenAuthProviders, setHiddenAuthProviders] = useState<string[]>([]);
 	/**
-	 * 供应商卡片自定义顺序（Pi 页与 DSH 页各存一份，持久化到 AppSettings）。
-	 * 与 hiddenProviders 同类：属于 UI 展示偏好，不写进 models.json / DSH 配置，
+	 * 供应商卡片自定义顺序（持久化到 AppSettings）。
+	 * 与 hiddenProviders 同类：属于 UI 展示偏好，不写进 models.json，
 	 * 因此无需担心被外部改写 pi 配置的工具覆盖。
 	 */
 	const [providerOrder, setProviderOrder] = useState<string[]>([]);
-	const [dshProviderOrder, setDshProviderOrder] = useState<string[]>([]);
 	/** 切换供应商隐藏状态：本地立即生效 + 持久化到 AppSettings（不影响 models.json 配置本身）。 */
 	const handleToggleHiddenProvider = useCallback((name: string) => {
 		setHiddenProviders((prev) => {
@@ -668,20 +611,10 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		setProviderOrder(next);
 		void api.settings.update({ providerOrder: next }).catch(() => undefined);
 	}, []);
-	/** DSH 模型页的供应商卡片重排（与 Pi 页分开存，两页的供应商集合不同）。 */
-	const handleReorderDshProviders = useCallback((next: string[]) => {
-		setDshProviderOrder(next);
-		void api.settings.update({ dshProviderOrder: next }).catch(() => undefined);
-	}, []);
-	/** 恢复默认顺序：清空自定义顺序（空数组）——两页与模型选择器立即回到配置本身的顺序。 */
+	/** 重置 Pi 供应商卡片顺序。 */
 	const handleResetProviderOrder = useCallback(() => {
 		setProviderOrder([]);
 		void api.settings.update({ providerOrder: [] }).catch(() => undefined);
-	}, []);
-	/** DSH 页的「恢复默认顺序」（与 Pi 页分开清，避免改一页把另一页也重置）。 */
-	const handleResetDshProviderOrder = useCallback(() => {
-		setDshProviderOrder([]);
-		void api.settings.update({ dshProviderOrder: [] }).catch(() => undefined);
 	}, []);
 	/**
 	 * 「模型」与「认证」页共享的排序作用域：两页的供应商集合可能不同（models.json 与 auth.json
@@ -700,7 +633,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 					setHiddenModels(settings.hiddenModels ?? []);
 					setHiddenAuthProviders(settings.hiddenAuthProviders ?? []);
 					setProviderOrder(settings.providerOrder ?? []);
-					setDshProviderOrder(settings.dshProviderOrder ?? []);
 				}
 			})
 			.catch(() => undefined);
@@ -1068,11 +1000,11 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 
 	// ── Models 操作 ──────────────────────────────────────
 
-	/** TokenDance 一键安装成功：刷新 Pi 模型数据 + DSH 配置页（主进程已直写两侧配置文件）。 */
+	/** TokenDance 一键安装成功：刷新 Pi 模型数据（主进程已写入配置文件）。 */
 	const handleTokendanceInstalled = useCallback(
 		(outcome: TokendanceInstallOutcome) => {
 			// 主进程已直接落盘 models.json：以磁盘为准整页重载（force 清空草稿保留集——
-			// 安装是明确的落盘动作，与保存/导入同语义）；DSH 侧若写入成功同步刷新配置页。
+			// 安装是明确的落盘动作，与保存/导入同语义）。
 			void loadConfig("models", { force: true }).catch(() => undefined);
 		},
 		[loadConfig],
@@ -1084,7 +1016,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	 */
 	const handleAddProvider = (draft: AddProviderDraft) => {
 		const providerName = draft.name.trim();
-		// 非法字符：提示规则，避免 DSH credentialRefFor 把含特殊字符的名字转成
+		// 非法字符：提示规则，避免供应商名在配置和凭据映射中变形，
 		// 非法环境变量名 → 密钥读不到（弹窗内已禁用确定，这里仅兜底）。
 		if (!isValidProviderName(providerName)) {
 			showNotice(t("config.providerNameRule"));
@@ -2371,8 +2303,8 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		}
 	};
 
-	/** 当前后端分页下的 tab 编码（DSH 页固定 "dsh"，Pi 页按 section:tab）。 */
-	const currentTabKey = backendPane === "dsh" ? "dsh" : sectionTabValue(section, tab);
+	/** 当前配置分页编码。 */
+	const currentTabKey = sectionTabValue(section, tab);
 
 	/**
 	 * 顶部统一保存按钮：模型页的新增/编辑供应商是一个页内子页面，
@@ -2383,7 +2315,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 		if (saving) return;
 		// 新增/编辑页的第一次点击只把页内草稿提交到 modelsData；
 		// React state 更新后下一轮 effect 会自动继续落盘，用户无需再点一次保存。
-		if (backendPane === "pi" && section === "config" && tab === "models" && (addingProvider || editingProvider)) {
+		if (section === "config" && tab === "models" && (addingProvider || editingProvider)) {
 			providerPageSavePendingRef.current = true;
 			providerPageSaveRef.current?.();
 			return;
@@ -2411,12 +2343,12 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 			saveCurrent: () => handleSaveCurrent(),
 			exportConfig: handleExport,
 			importConfig: handleImport,
-			// 外壳统一关闭确认时调用：把配置分区全部脏来源逐个保存（dsh:<nav> 归并 dsh），
+			// 外壳统一关闭确认时调用：把配置分区全部脏来源逐个保存，
 			// 与独立 ConfigModal「保存并关闭」走同一套 saveByKey 分发，任一失败返回 false 留在窗口。
 			saveAllDirty: async () => {
 				const roots = new Set<string>();
 				for (const key of dirtyTabs) {
-					roots.add(key.startsWith("dsh:") ? "dsh" : key);
+					roots.add(key);
 				}
 				for (const key of orderDirtyKeysForSave(roots)) {
 					const ok = await saveByKey(key);
@@ -2451,13 +2383,13 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 
 	/**
 	 * 关闭确认框选择保存并关闭：汇总**全部**脏来源逐个保存（不是只存当前 tab），
-	 * dsh:<nav> 归并到 dsh 一个保存入口；任一保存失败则留下重试（错误已展示在内容区）。
+	 * 任一保存失败则留下重试（错误已展示在内容区）。
 	 * 顺序由 orderDirtyKeysForSave 保证 settings 最后（它的重载会连带刷新 models/auth/raw）。
 	 */
 	const handleSaveAndClose = async () => {
 		const roots = new Set<string>();
 		for (const key of dirtyTabs) {
-			roots.add(key.startsWith("dsh:") ? "dsh" : key);
+			roots.add(key);
 		}
 		for (const key of orderDirtyKeysForSave(roots)) {
 			const ok = await saveByKey(key);
@@ -2501,498 +2433,490 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 
 	if (!open && !embedded) return null;
 
-	// 对话框主体（后端分页 + 各种确认弹窗）：独立 ConfigModal 与嵌入分区共用同一份，
+	// 对话框主体（配置分页 + 各种确认弹窗）：独立 ConfigModal 与嵌入分区共用同一份，
 	// 唯一的差别是外壳（Dialog/标题栏按钮）由谁提供——embedded 时宿主 SettingsModal 承担。
 	const modalBody = (
 		<>
-			{/* 顶层后端分页：Pi 配置管理（默认，在左）/ DSH 配置管理（在右） */}
-			<Tabs value={backendPane} onValueChange={selectBackendPane} className="flex min-h-0 min-w-0 flex-1 flex-col">
-				{/* forceMount + inactive hidden：Pi/DSH 两个后端页都保持挂载，切换后端不会丢草稿；
-				    与 config:mcp 同款做法，inactive 必须 hidden 避免叠在另一页上。 */}
-
-				<TabsContent value="pi" forceMount className="flex min-h-0 min-w-0 flex-1 data-[state=inactive]:hidden">
-					{/* 默认浅色主题整页同底（bg-background），避免顶栏白 / 下方多层灰的割裂感。
+			{/* 默认浅色主题整页同底（bg-background），避免顶栏白 / 下方多层灰的割裂感。
 			  左侧导航 = shadcn Vertical Tabs：TabsList 竖排（orientation=vertical），
 			  组标题是非 trigger 的普通 div；窄屏（<820px）回退为横向导航。 */}
-					<Tabs
-						orientation="vertical"
-						value={sectionTabValue(section, tab)}
-						onValueChange={(value) => {
-							const parsed = parseSectionTabValue(value);
-							setSection(parsed.section);
-							if (parsed.tab) setTab(parsed.tab);
-							// 用量查询弹窗随配置 tab 联动：切走（如 认证 → 模型）即关闭，
-							// 防止弹窗跨 tab 悬挂被误认为「自动弹出」。
-							setUsageProbeDialog(null);
-							// 记住位置：下次打开 Pi 管理页时回到同一 tab
-							try {
-								localStorage.setItem(CONFIG_LAST_TAB_KEY, value);
-							} catch {
-								/* localStorage 不可用（隐私模式等）时静默失败，仅本次会话内不记忆 */
-							}
-						}}
-						className="config-layout grid min-h-0 flex-1 gap-0 bg-transparent"
-					>
-						<TabsList
-							className="config-sidebar flex min-h-0 shrink-0 flex-col items-stretch gap-2.5 overflow-auto border-0 border-r border-border rounded-none bg-transparent p-2.5 data-[orientation=vertical]:w-[160px] max-[820px]:flex-row max-[820px]:gap-3 max-[820px]:overflow-x-auto max-[820px]:overflow-y-hidden max-[820px]:border-r-0 max-[820px]:border-b"
-							aria-label={t("config.title")}
-						>
-							{!resourceOnly && (
-								<div className="config-sidebar-group grid gap-0.5">
-									<span className="px-2 pb-1 text-micro font-semibold text-muted-foreground">{t("config.group.config")}</span>
-									{configNavItems.map((item) => (
-										<TabsTrigger key={item.id} value={`config:${item.id}`} className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-											<span className="config-nav-icon">{item.icon}</span>
-											{item.label}
-											{/* 未保存黄点：与 DSH 导航同款 */}
-											{dirtyTabs.has(`config:${item.id}`) || dirtyTabs.has(item.id) ? <span className="ml-auto size-1.5 rounded-full bg-amber-500" aria-hidden="true" /> : null}
-										</TabsTrigger>
-									))}
-								</div>
-							)}
-							<div className="config-sidebar-group grid gap-0.5">
-								<span className="px-2 pb-1 text-micro font-semibold text-muted-foreground">{t("config.group.agent")}</span>
-								{!resourceOnly && (
-									<TabsTrigger value="security" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-										<span className="config-nav-icon">
-											<Shield size={14} aria-hidden="true" />
-										</span>
-										{t("config.nav.security")}
-									</TabsTrigger>
-								)}
-								<TabsTrigger value="extensions" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-									<span className="config-nav-icon">
-										<Puzzle size={14} aria-hidden="true" />
-									</span>
-									{t("config.nav.extensions")}
+			<Tabs
+				orientation="vertical"
+				value={sectionTabValue(section, tab)}
+				onValueChange={(value) => {
+					const parsed = parseSectionTabValue(value);
+					setSection(parsed.section);
+					if (parsed.tab) setTab(parsed.tab);
+					// 用量查询弹窗随配置 tab 联动：切走（如 认证 → 模型）即关闭，
+					// 防止弹窗跨 tab 悬挂被误认为「自动弹出」。
+					setUsageProbeDialog(null);
+					// 记住位置：下次打开 Pi 管理页时回到同一 tab
+					try {
+						localStorage.setItem(CONFIG_LAST_TAB_KEY, value);
+					} catch {
+						/* localStorage 不可用（隐私模式等）时静默失败，仅本次会话内不记忆 */
+					}
+				}}
+				className="config-layout grid min-h-0 flex-1 gap-0 bg-transparent"
+			>
+				<TabsList
+					className="config-sidebar flex min-h-0 shrink-0 flex-col items-stretch gap-2.5 overflow-auto border-0 border-r border-border rounded-none bg-transparent p-2.5 data-[orientation=vertical]:w-[160px] max-[820px]:flex-row max-[820px]:gap-3 max-[820px]:overflow-x-auto max-[820px]:overflow-y-hidden max-[820px]:border-r-0 max-[820px]:border-b"
+					aria-label={t("config.title")}
+				>
+					{!resourceOnly && (
+						<div className="config-sidebar-group grid gap-0.5">
+							<span className="px-2 pb-1 text-micro font-semibold text-muted-foreground">{t("config.group.config")}</span>
+							{configNavItems.map((item) => (
+								<TabsTrigger key={item.id} value={`config:${item.id}`} className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+									<span className="config-nav-icon">{item.icon}</span>
+									{item.label}
+									{/* 未保存黄点与设置导航保持一致 */}
+									{dirtyTabs.has(`config:${item.id}`) || dirtyTabs.has(item.id) ? <span className="ml-auto size-1.5 rounded-full bg-amber-500" aria-hidden="true" /> : null}
 								</TabsTrigger>
-								{/* MCP 在配置管理弹窗里由「配置文件」组的 config:mcp 承担（全局作用域 + 导入扫描源）；
+							))}
+						</div>
+					)}
+					<div className="config-sidebar-group grid gap-0.5">
+						<span className="px-2 pb-1 text-micro font-semibold text-muted-foreground">{t("config.group.agent")}</span>
+						{!resourceOnly && (
+							<TabsTrigger value="security" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+								<span className="config-nav-icon">
+									<Shield size={14} aria-hidden="true" />
+								</span>
+								{t("config.nav.security")}
+							</TabsTrigger>
+						)}
+						<TabsTrigger value="extensions" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+							<span className="config-nav-icon">
+								<Puzzle size={14} aria-hidden="true" />
+							</span>
+							{t("config.nav.extensions")}
+						</TabsTrigger>
+						{/* MCP 在配置管理弹窗里由「配置文件」组的 config:mcp 承担（全局作用域 + 导入扫描源）；
 								    这里只在项目资源管理器（resourceOnly）提供项目作用域入口，避免同名双入口用户无法选择。 */}
-								{resourceOnly && (
-									<TabsTrigger value="mcp" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-										<span className="config-nav-icon">
-											<PlugZap size={14} aria-hidden="true" />
-										</span>
-										{t("config.nav.mcp")}
-									</TabsTrigger>
-								)}
-								<TabsTrigger value="skills" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-									<span className="config-nav-icon">
-										<Sparkles size={14} aria-hidden="true" />
-									</span>
-									{t("config.nav.skills")}
-								</TabsTrigger>
-								<TabsTrigger value="prompts" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-									<span className="config-nav-icon">
-										<FileText size={14} aria-hidden="true" />
-									</span>
-									{t("config.nav.prompts")}
-								</TabsTrigger>
-								{/* 桥贡献的独立配置页（落点 `config.page`）：标题取贡献自己的 slot.title，
+						{resourceOnly && (
+							<TabsTrigger value="mcp" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+								<span className="config-nav-icon">
+									<PlugZap size={14} aria-hidden="true" />
+								</span>
+								{t("config.nav.mcp")}
+							</TabsTrigger>
+						)}
+						<TabsTrigger value="skills" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+							<span className="config-nav-icon">
+								<Sparkles size={14} aria-hidden="true" />
+							</span>
+							{t("config.nav.skills")}
+						</TabsTrigger>
+						<TabsTrigger value="prompts" className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+							<span className="config-nav-icon">
+								<FileText size={14} aria-hidden="true" />
+							</span>
+							{t("config.nav.prompts")}
+						</TabsTrigger>
+						{/* 桥贡献的独立配置页（落点 `config.page`）：标题取贡献自己的 slot.title，
 								    缺省用 key；排序已在 useGuiContributions 里按 order + key 做好。 */}
-								{configPages.map((page) => (
-									<TabsTrigger key={page.targetId} value={guiPageSectionId(page.targetId)} className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
-										<span className="config-nav-icon">
-											<Blocks size={14} aria-hidden="true" />
-										</span>
-										{page.node.slot?.title ?? page.key}
-									</TabsTrigger>
-								))}
-							</div>
-						</TabsList>
-
-						{/* 桥贡献的独立配置页内容：一项一个 Tab，按完整落点 id 精确取项。 */}
 						{configPages.map((page) => (
-							<TabsContent key={page.targetId} value={guiPageSectionId(page.targetId)} className="config-main min-w-0">
-								{/* 与原生 tab 同构：TabsContent > .config-content（滚动容器）> 内容。
+							<TabsTrigger key={page.targetId} value={guiPageSectionId(page.targetId)} className="config-nav-btn h-8 justify-start gap-1.5 px-2.5 text-control font-medium">
+								<span className="config-nav-icon">
+									<Blocks size={14} aria-hidden="true" />
+								</span>
+								{page.node.slot?.title ?? page.key}
+							</TabsTrigger>
+						))}
+					</div>
+				</TabsList>
+
+				{/* 桥贡献的独立配置页内容：一项一个 Tab，按完整落点 id 精确取项。 */}
+				{configPages.map((page) => (
+					<TabsContent key={page.targetId} value={guiPageSectionId(page.targetId)} className="config-main min-w-0">
+						{/* 与原生 tab 同构：TabsContent > .config-content（滚动容器）> 内容。
 								    少了 .config-content 这层，页面内容既不滚、也会被 .config-main 裁掉；
 								    页面内的 sticky/absolute 还会挂到弹窗的滚动视口上（页脚悬到列表中间）。 */}
-								<div className="config-content">
-									<BridgeGuiSingleSlot sessionId={bridgeSessionId} slot="config.page" targetId={page.targetId} />
-								</div>
-							</TabsContent>
-						))}
-						<TabsContent value="config:models" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{configDiagnosticBlock}
-								{!loading && (
-									<>
-										{/* TokenDance：确认后一键写入配置（pi models.json + DSH 模型目录），不内置注入 */}
-										<TokenDancePanel configured={!!modelsData.providers[TOKENDANCE_PROVIDER]} onInstalled={handleTokendanceInstalled} />
-										<ModelsTab
-											data={modelsData}
-											expandedProvider={expandedProvider}
-											focusProvider={focusedProvider}
-											onOpenUsageProbeDialog={(provider) => openUsageProbeDialogFor(provider, "pi")}
-											addingProvider={addingProvider}
-											providerPageSaveRef={providerPageSaveRef}
-											hiddenProviders={hiddenProviders}
-											onToggleHiddenProvider={handleToggleHiddenProvider}
-											providerOrder={providerOrder}
-											providerOrderScope={providerOrderScope}
-											onReorderProviders={handleReorderProviders}
-											onResetProviders={handleResetProviderOrder}
-											hiddenModels={hiddenModels}
-											onToggleHiddenModel={handleToggleHiddenModel}
-											fetchingProvider={fetchingProvider}
-											fetchedModels={fetchedModels}
-											fetchModelsErrorByProvider={fetchModelsErrorByProvider}
-											testingProvider={testingProvider}
-											testResult={testResult}
-											testModelIdByProvider={testModelIdByProvider}
-											testProxyModeByProvider={testProxyModeByProvider}
-											saving={saving}
-											onToggleProvider={(name) => setExpandedProvider(expandedProvider === name ? null : name)}
-											onStartAddProvider={() => {
-												setAddingProvider(true);
-											}}
-											onCancelAddProvider={() => setAddingProvider(false)}
-											onConfirmAddProvider={handleAddProvider}
-											editingProvider={editingProvider}
-											onStartEditProvider={(name) => setEditingProvider(name)}
-											onCancelEditProvider={() => setEditingProvider(null)}
-											onConfirmEditProvider={handleEditProvider}
-											onDeleteProvider={handleDeleteProvider}
-											onDuplicateProvider={handleDuplicateProvider}
-											onDeleteProviders={handleDeleteProviders}
-											onApplyModelsTransfer={handleApplyModelsTransfer}
-											onAddModel={handleAddModel}
-											onUpdateModel={handleUpdateModel}
-											onUpdateModelThinkingLevel={handleUpdateModelThinkingLevel}
-											onUpdateModelUserAgent={handleUpdateModelUserAgent}
-											getModelUserAgentOverride={(providerName, index) => {
-												const provider = modelsData.providers[providerName];
-												const model = provider?.models[index];
-												return model ? getModelUserAgentOverride(provider.modelOverrides, model.id) : "";
-											}}
-											onUpdateModelThinkingLevelDefault={settingsLoaded ? handleUpdateModelThinkingLevelDefault : undefined}
-											getModelThinkingLevelDefault={settingsLoaded ? (providerName, index) => modelThinkingLevelOf(settingsData, providerName, modelsData.providers[providerName]?.models[index]?.id) ?? "" : undefined}
-											onDeleteModel={handleDeleteModel}
-											onDeleteModels={handleDeleteModels}
-											onResetModel={handleResetModelToAdaptive}
-											resettingModelKey={resettingModelKey}
-											onFetchModels={handleFetchModels}
-											onTestProvider={handleTestProvider}
-											onChangeTestModelId={(providerName, modelId) =>
-												setTestModelIdByProvider((current) => ({
-													...current,
-													[providerName]: modelId,
-												}))
-											}
-											onChangeTestProxyMode={(providerName, mode) =>
-												setTestProxyModeByProvider((current) => ({
-													...current,
-													[providerName]: mode,
-												}))
-											}
-											onClearTestResult={() => setTestResult(null)}
-											onSave={handleSaveModels}
-											onChangeProvider={(name, field, value) => {
-												const provider = modelsData.providers[name];
-												if (!provider) return;
-												setModelsData({
-													...modelsData,
-													providers: {
-														...modelsData.providers,
-														[name]: { ...provider, [field]: value },
-													},
-												});
-												markDirty("config:models");
-											}}
-										/>
-									</>
-								)}
-							</div>
-						</TabsContent>
+						<div className="config-content">
+							<BridgeGuiSingleSlot sessionId={bridgeSessionId} slot="config.page" targetId={page.targetId} />
+						</div>
+					</TabsContent>
+				))}
+				<TabsContent value="config:models" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{configDiagnosticBlock}
+						{!loading && (
+							<>
+								{/* TokenDance：确认后一键写入配置（pi models.json），不内置注入 */}
+								<TokenDancePanel configured={!!modelsData.providers[TOKENDANCE_PROVIDER]} onInstalled={handleTokendanceInstalled} />
+								<ModelsTab
+									data={modelsData}
+									expandedProvider={expandedProvider}
+									focusProvider={focusedProvider}
+									onOpenUsageProbeDialog={(provider) => openUsageProbeDialogFor(provider, "pi")}
+									addingProvider={addingProvider}
+									providerPageSaveRef={providerPageSaveRef}
+									hiddenProviders={hiddenProviders}
+									onToggleHiddenProvider={handleToggleHiddenProvider}
+									providerOrder={providerOrder}
+									providerOrderScope={providerOrderScope}
+									onReorderProviders={handleReorderProviders}
+									onResetProviders={handleResetProviderOrder}
+									hiddenModels={hiddenModels}
+									onToggleHiddenModel={handleToggleHiddenModel}
+									fetchingProvider={fetchingProvider}
+									fetchedModels={fetchedModels}
+									fetchModelsErrorByProvider={fetchModelsErrorByProvider}
+									testingProvider={testingProvider}
+									testResult={testResult}
+									testModelIdByProvider={testModelIdByProvider}
+									testProxyModeByProvider={testProxyModeByProvider}
+									saving={saving}
+									onToggleProvider={(name) => setExpandedProvider(expandedProvider === name ? null : name)}
+									onStartAddProvider={() => {
+										setAddingProvider(true);
+									}}
+									onCancelAddProvider={() => setAddingProvider(false)}
+									onConfirmAddProvider={handleAddProvider}
+									editingProvider={editingProvider}
+									onStartEditProvider={(name) => setEditingProvider(name)}
+									onCancelEditProvider={() => setEditingProvider(null)}
+									onConfirmEditProvider={handleEditProvider}
+									onDeleteProvider={handleDeleteProvider}
+									onDuplicateProvider={handleDuplicateProvider}
+									onDeleteProviders={handleDeleteProviders}
+									onApplyModelsTransfer={handleApplyModelsTransfer}
+									onAddModel={handleAddModel}
+									onUpdateModel={handleUpdateModel}
+									onUpdateModelThinkingLevel={handleUpdateModelThinkingLevel}
+									onUpdateModelUserAgent={handleUpdateModelUserAgent}
+									getModelUserAgentOverride={(providerName, index) => {
+										const provider = modelsData.providers[providerName];
+										const model = provider?.models[index];
+										return model ? getModelUserAgentOverride(provider.modelOverrides, model.id) : "";
+									}}
+									onUpdateModelThinkingLevelDefault={settingsLoaded ? handleUpdateModelThinkingLevelDefault : undefined}
+									getModelThinkingLevelDefault={settingsLoaded ? (providerName, index) => modelThinkingLevelOf(settingsData, providerName, modelsData.providers[providerName]?.models[index]?.id) ?? "" : undefined}
+									onDeleteModel={handleDeleteModel}
+									onDeleteModels={handleDeleteModels}
+									onResetModel={handleResetModelToAdaptive}
+									resettingModelKey={resettingModelKey}
+									onFetchModels={handleFetchModels}
+									onTestProvider={handleTestProvider}
+									onChangeTestModelId={(providerName, modelId) =>
+										setTestModelIdByProvider((current) => ({
+											...current,
+											[providerName]: modelId,
+										}))
+									}
+									onChangeTestProxyMode={(providerName, mode) =>
+										setTestProxyModeByProvider((current) => ({
+											...current,
+											[providerName]: mode,
+										}))
+									}
+									onClearTestResult={() => setTestResult(null)}
+									onSave={handleSaveModels}
+									onChangeProvider={(name, field, value) => {
+										const provider = modelsData.providers[name];
+										if (!provider) return;
+										setModelsData({
+											...modelsData,
+											providers: {
+												...modelsData.providers,
+												[name]: { ...provider, [field]: value },
+											},
+										});
+										markDirty("config:models");
+									}}
+								/>
+							</>
+						)}
+					</div>
+				</TabsContent>
 
-						<TabsContent value="config:auth" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{configDiagnosticBlock}
-								{!loading && (
-									<AuthTab
-										data={authData}
-										expandedAuth={expandedAuth}
-										addingAuth={addingAuth}
-										newAuthName={newAuthName}
-										saving={saving}
-										modelsData={modelsData}
-										hiddenAuthProviders={hiddenAuthProviders}
-										providerOrder={providerOrder}
-										providerOrderScope={providerOrderScope}
-										onReorderProviders={handleReorderProviders}
-										onResetProviders={handleResetProviderOrder}
-										onToggleHiddenAuthProvider={handleToggleHiddenAuthProvider}
-										onToggleAuth={(name) => setExpandedAuth(expandedAuth === name ? null : name)}
-										onStartAddAuth={() => {
-											setAddingAuth(true);
-											setNewAuthName("");
-										}}
-										onCancelAddAuth={() => setAddingAuth(false)}
-										onChangeNewAuthName={setNewAuthName}
-										onConfirmAddAuth={(name, key) => handleAddAuth(name, key)}
-										onDuplicateAuth={handleDuplicateAuth}
-										onDeleteAuths={handleDeleteAuths}
-										onDeleteAuth={handleDeleteAuth}
-										onUpdate={handleUpdateAuth}
-										onSave={handleSaveAuth}
-										onOpenUsageProbeDialog={(provider) => openUsageProbeDialogFor(provider, "pi")}
-									/>
-								)}
-							</div>
-						</TabsContent>
+				<TabsContent value="config:auth" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{configDiagnosticBlock}
+						{!loading && (
+							<AuthTab
+								data={authData}
+								expandedAuth={expandedAuth}
+								addingAuth={addingAuth}
+								newAuthName={newAuthName}
+								saving={saving}
+								modelsData={modelsData}
+								hiddenAuthProviders={hiddenAuthProviders}
+								providerOrder={providerOrder}
+								providerOrderScope={providerOrderScope}
+								onReorderProviders={handleReorderProviders}
+								onResetProviders={handleResetProviderOrder}
+								onToggleHiddenAuthProvider={handleToggleHiddenAuthProvider}
+								onToggleAuth={(name) => setExpandedAuth(expandedAuth === name ? null : name)}
+								onStartAddAuth={() => {
+									setAddingAuth(true);
+									setNewAuthName("");
+								}}
+								onCancelAddAuth={() => setAddingAuth(false)}
+								onChangeNewAuthName={setNewAuthName}
+								onConfirmAddAuth={(name, key) => handleAddAuth(name, key)}
+								onDuplicateAuth={handleDuplicateAuth}
+								onDeleteAuths={handleDeleteAuths}
+								onDeleteAuth={handleDeleteAuth}
+								onUpdate={handleUpdateAuth}
+								onSave={handleSaveAuth}
+								onOpenUsageProbeDialog={(provider) => openUsageProbeDialogFor(provider, "pi")}
+							/>
+						)}
+					</div>
+				</TabsContent>
 
-						<TabsContent value="config:settings" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{configDiagnosticBlock}
-								{!loading && (
-									<SettingsTab
-										data={settingsData}
-										saving={saving}
-										modelsData={modelsData}
-										authData={authData}
-										discoveredModels={discoveredModels}
-										onChange={(data) => {
-											setSettingsData(data);
-											markDirty("config:settings");
-										}}
-										onSave={handleSaveSettings}
-									/>
-								)}
-							</div>
-						</TabsContent>
+				<TabsContent value="config:settings" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{configDiagnosticBlock}
+						{!loading && (
+							<SettingsTab
+								data={settingsData}
+								saving={saving}
+								modelsData={modelsData}
+								authData={authData}
+								discoveredModels={discoveredModels}
+								onChange={(data) => {
+									setSettingsData(data);
+									markDirty("config:settings");
+								}}
+								onSave={handleSaveSettings}
+							/>
+						)}
+					</div>
+				</TabsContent>
 
-						<TabsContent value="skills" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{!loading &&
-									(editingGlobalSkill ? (
-										<div className="prompts-editor-backdrop" onClick={() => setEditingGlobalSkill(null)}>
-											<div className="prompts-editor-modal" onClick={(e) => e.stopPropagation()}>
-												<div className="file-diff-header">
-													<span className="file-diff-header-file">{editingGlobalSkill.name} · SKILL.md</span>
-													<div className="file-diff-header-actions">
-														<Button
-															variant="ghost"
-															size="icon"
-															aria-label={t("common.close")}
-															title={t("common.close")}
-															onClick={() => {
-																clearDirty("skills");
-																setEditingGlobalSkill(null);
-															}}
-														>
-															<X size={18} strokeWidth={2.2} aria-hidden="true" />
-														</Button>
-													</div>
-												</div>
-												{editGlobalLoading ? (
-													<div className="flex items-center justify-center gap-2 py-12 text-control text-text-tertiary">
-														<Loader2 size={14} className="animate-pideck-spin" aria-hidden="true" />
-														{t("common.loading")}
-													</div>
-												) : (
-													<div className="prompts-monaco-wrap">
-														<CodeMirrorEditor
-															value={editGlobalContent}
-															onChange={(value) => {
-																setEditGlobalContent(value);
-																markDirty("skills");
-															}}
-														/>
-													</div>
-												)}
-												{editGlobalSaved && <span className="file-diff-hint saved">{t("config.promptSavedHint")}</span>}
+				<TabsContent value="skills" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{!loading &&
+							(editingGlobalSkill ? (
+								<div className="prompts-editor-backdrop" onClick={() => setEditingGlobalSkill(null)}>
+									<div className="prompts-editor-modal" onClick={(e) => e.stopPropagation()}>
+										<div className="file-diff-header">
+											<span className="file-diff-header-file">{editingGlobalSkill.name} · SKILL.md</span>
+											<div className="file-diff-header-actions">
+												<Button
+													variant="ghost"
+													size="icon"
+													aria-label={t("common.close")}
+													title={t("common.close")}
+													onClick={() => {
+														clearDirty("skills");
+														setEditingGlobalSkill(null);
+													}}
+												>
+													<X size={18} strokeWidth={2.2} aria-hidden="true" />
+												</Button>
 											</div>
 										</div>
-									) : (
-										<SkillsTab
-											scope={resourceScope}
-											projectId={resourceScope === "project" ? effectiveProjectId : undefined}
-											sourceProjectId={projectId}
-											projects={projects}
-											fixedProjectId={resourceOnly ? effectiveProjectId : undefined}
-											scopeSelector={resourceScopeSelector}
-											projectOverrides={projectResourcesData.overrides}
-											discoverySkills={discoveryData.skills}
-											data={skillsData}
-											loading={loading}
-											creating={creatingSkill}
-											newName={newSkillName}
-											newDescription={newSkillDescription}
-											newLocationId={newSkillLocationId}
-											onRefresh={refreshSkills}
-											onOpenRoot={() => {
-												if (resourceScope === "project" && effectiveProjectId) {
-													const kind = newSkillLocationId === "project-agents" ? "project-agents" : "project-pi";
-													void api.projectResources.openDirectory(effectiveProjectId, kind).catch((err) => setError(err instanceof Error ? err.message : String(err)));
-													return;
-												}
-												void api.skills.openFolder().catch((err) => setError(err instanceof Error ? err.message : String(err)));
-											}}
-											onChangeNewName={setNewSkillName}
-											onChangeNewDescription={setNewSkillDescription}
-											onChangeNewLocation={setNewSkillLocationId}
-											onCreate={handleCreateSkill}
-											onToggle={handleToggleSkill}
-											onDelete={setDeleteSkillConfirm}
-											onEdit={handleEditGlobalSkill}
-											onRename={handleRenameGlobalSkill}
-										/>
-									))}
-							</div>
-						</TabsContent>
-
-						<TabsContent value="prompts" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{!loading && (
-									<PromptsTab
-										scope={resourceScope}
-										projectId={resourceScope === "project" ? effectiveProjectId : undefined}
-										scopeSelector={resourceScopeSelector}
-										projectOverrides={projectResourcesData.overrides}
-										discoveryPrompts={discoveryData.prompts}
-										data={promptsData}
-										loading={loading}
-										creating={creatingPrompt}
-										newName={newPromptName}
-										newDescription={newPromptDescription}
-										editingTemplate={editingPrompt}
-										editContent={editPromptContent}
-										editLoading={editPromptLoading}
-										editSaving={editPromptSaving}
-										onRefresh={refreshPrompts}
-										onOpenRoot={() => {
-											if (resourceScope === "project" && effectiveProjectId) {
-												void api.projectResources.openDirectory(effectiveProjectId, "prompts").catch((err) => setError(err instanceof Error ? err.message : String(err)));
-												return;
-											}
-											void api.prompts.openFolder().catch((err) => setError(err instanceof Error ? err.message : String(err)));
-										}}
-										onDelete={setDeletePromptConfirm}
-										onEdit={handleEditPrompt}
-										onRename={handleRenamePrompt}
-										onChangeNewName={setNewPromptName}
-										onChangeNewDescription={setNewPromptDescription}
-										onCreate={handleCreatePrompt}
-										onToggle={handleTogglePrompt}
-										onQuickSave={handleQuickSavePrompt}
-										onCancelEdit={handleCancelEditPrompt}
-										onChangeEditContent={(value) => {
-											setEditPromptContent(value);
-											markDirty("prompts");
-										}}
-										onSaveEdit={handleSaveEditPrompt}
-									/>
-								)}
-							</div>
-						</TabsContent>
-
-						<TabsContent value="extensions" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								<ExtensionsTab
+										{editGlobalLoading ? (
+											<div className="flex items-center justify-center gap-2 py-12 text-control text-text-tertiary">
+												<Loader2 size={14} className="animate-pideck-spin" aria-hidden="true" />
+												{t("common.loading")}
+											</div>
+										) : (
+											<div className="prompts-monaco-wrap">
+												<CodeMirrorEditor
+													value={editGlobalContent}
+													onChange={(value) => {
+														setEditGlobalContent(value);
+														markDirty("skills");
+													}}
+												/>
+											</div>
+										)}
+										{editGlobalSaved && <span className="file-diff-hint saved">{t("config.promptSavedHint")}</span>}
+									</div>
+								</div>
+							) : (
+								<SkillsTab
 									scope={resourceScope}
 									projectId={resourceScope === "project" ? effectiveProjectId : undefined}
-									projectOverrides={projectResourcesData.overrides}
-									discoveryExtensions={discoveryData.extensions}
+									sourceProjectId={projectId}
+									projects={projects}
+									fixedProjectId={resourceOnly ? effectiveProjectId : undefined}
 									scopeSelector={resourceScopeSelector}
-									data={extensionsData}
-									loading={extensionsLoading}
-									uninstallingSource={uninstallingExtensionSource}
-									onRefresh={() => refreshExtensions(true)}
-									// 开关后的刷新刻意走轻量路径：开关只改 enabled，主进程缓存里重投影即可，
-									// 不必付出一次全量扫描（pi list + npm view）——那会让开关行长时间处于 pending。
-									onRefreshAfterToggle={() => refreshExtensions(false)}
-									onToggle={handleToggleExtension}
-									onUninstall={handleRequestExtensionUninstall}
-									onShowInFolder={(extension) => void handleOpenExtensionLocation(extension)}
-								/>
-							</div>
-						</TabsContent>
-
-						{/* forceMount：面板自管草稿（工具动作 allow/ask/deny、目录边界等只在组件 state 里），
-						    切走再回来不能丢未保存编辑；inactive 必须 hidden，否则叠在别的 tab 上。 */}
-						<TabsContent value="security" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
-							<div className="config-content">
-								<SecuritySection ref={securitySectionRef} onDirtyChange={handleSecurityDirtyChange} />
-							</div>
-						</TabsContent>
-
-						{/* forceMount：MCP 页自管草稿，切走再回来不能丢未保存编辑；inactive 必须 hidden，否则叠在别的 tab 上。 */}
-						<TabsContent value="config:mcp" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
-							<div className="config-content flex min-h-0 flex-col">
-								{/* 全局作用域：activeProjectId 只作导入扫描的项目来源，配置仍写全局 mcp.json。 */}
-								<McpTab
-									ref={mcpTabRef}
-									activeProjectId={projectId}
-									onGoToExtensions={() => {
-										// 同区导航：扩展页与 MCP 页都属于配置区/项目资源区，保留当前作用域。
-										setSection("extensions");
+									projectOverrides={projectResourcesData.overrides}
+									discoverySkills={discoveryData.skills}
+									data={skillsData}
+									loading={loading}
+									creating={creatingSkill}
+									newName={newSkillName}
+									newDescription={newSkillDescription}
+									newLocationId={newSkillLocationId}
+									onRefresh={refreshSkills}
+									onOpenRoot={() => {
+										if (resourceScope === "project" && effectiveProjectId) {
+											const kind = newSkillLocationId === "project-agents" ? "project-agents" : "project-pi";
+											void api.projectResources.openDirectory(effectiveProjectId, kind).catch((err) => setError(err instanceof Error ? err.message : String(err)));
+											return;
+										}
+										void api.skills.openFolder().catch((err) => setError(err instanceof Error ? err.message : String(err)));
 									}}
-									onDirtyChange={handleMcpDirtyChange}
+									onChangeNewName={setNewSkillName}
+									onChangeNewDescription={setNewSkillDescription}
+									onChangeNewLocation={setNewSkillLocationId}
+									onCreate={handleCreateSkill}
+									onToggle={handleToggleSkill}
+									onDelete={setDeleteSkillConfirm}
+									onEdit={handleEditGlobalSkill}
+									onRename={handleRenameGlobalSkill}
 								/>
-							</div>
-						</TabsContent>
+							))}
+					</div>
+				</TabsContent>
 
-						{/* 只有项目资源管理器会走到这里（见左侧导航同名开关）；forceMount：面板自管草稿，
+				<TabsContent value="prompts" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{!loading && (
+							<PromptsTab
+								scope={resourceScope}
+								projectId={resourceScope === "project" ? effectiveProjectId : undefined}
+								scopeSelector={resourceScopeSelector}
+								projectOverrides={projectResourcesData.overrides}
+								discoveryPrompts={discoveryData.prompts}
+								data={promptsData}
+								loading={loading}
+								creating={creatingPrompt}
+								newName={newPromptName}
+								newDescription={newPromptDescription}
+								editingTemplate={editingPrompt}
+								editContent={editPromptContent}
+								editLoading={editPromptLoading}
+								editSaving={editPromptSaving}
+								onRefresh={refreshPrompts}
+								onOpenRoot={() => {
+									if (resourceScope === "project" && effectiveProjectId) {
+										void api.projectResources.openDirectory(effectiveProjectId, "prompts").catch((err) => setError(err instanceof Error ? err.message : String(err)));
+										return;
+									}
+									void api.prompts.openFolder().catch((err) => setError(err instanceof Error ? err.message : String(err)));
+								}}
+								onDelete={setDeletePromptConfirm}
+								onEdit={handleEditPrompt}
+								onRename={handleRenamePrompt}
+								onChangeNewName={setNewPromptName}
+								onChangeNewDescription={setNewPromptDescription}
+								onCreate={handleCreatePrompt}
+								onToggle={handleTogglePrompt}
+								onQuickSave={handleQuickSavePrompt}
+								onCancelEdit={handleCancelEditPrompt}
+								onChangeEditContent={(value) => {
+									setEditPromptContent(value);
+									markDirty("prompts");
+								}}
+								onSaveEdit={handleSaveEditPrompt}
+							/>
+						)}
+					</div>
+				</TabsContent>
+
+				<TabsContent value="extensions" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						<ExtensionsTab
+							scope={resourceScope}
+							projectId={resourceScope === "project" ? effectiveProjectId : undefined}
+							projectOverrides={projectResourcesData.overrides}
+							discoveryExtensions={discoveryData.extensions}
+							scopeSelector={resourceScopeSelector}
+							data={extensionsData}
+							loading={extensionsLoading}
+							uninstallingSource={uninstallingExtensionSource}
+							onRefresh={() => refreshExtensions(true)}
+							// 开关后的刷新刻意走轻量路径：开关只改 enabled，主进程缓存里重投影即可，
+							// 不必付出一次全量扫描（pi list + npm view）——那会让开关行长时间处于 pending。
+							onRefreshAfterToggle={() => refreshExtensions(false)}
+							onToggle={handleToggleExtension}
+							onUninstall={handleRequestExtensionUninstall}
+							onShowInFolder={(extension) => void handleOpenExtensionLocation(extension)}
+						/>
+					</div>
+				</TabsContent>
+
+				{/* forceMount：面板自管草稿（工具动作 allow/ask/deny、目录边界等只在组件 state 里），
+						    切走再回来不能丢未保存编辑；inactive 必须 hidden，否则叠在别的 tab 上。 */}
+				<TabsContent value="security" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
+					<div className="config-content">
+						<SecuritySection ref={securitySectionRef} onDirtyChange={handleSecurityDirtyChange} />
+					</div>
+				</TabsContent>
+
+				{/* forceMount：MCP 页自管草稿，切走再回来不能丢未保存编辑；inactive 必须 hidden，否则叠在别的 tab 上。 */}
+				<TabsContent value="config:mcp" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
+					<div className="config-content flex min-h-0 flex-col">
+						{/* 全局作用域：activeProjectId 只作导入扫描的项目来源，配置仍写全局 mcp.json。 */}
+						<McpTab
+							ref={mcpTabRef}
+							activeProjectId={projectId}
+							onGoToExtensions={() => {
+								// 同区导航：扩展页与 MCP 页都属于配置区/项目资源区，保留当前作用域。
+								setSection("extensions");
+							}}
+							onDirtyChange={handleMcpDirtyChange}
+						/>
+					</div>
+				</TabsContent>
+
+				{/* 只有项目资源管理器会走到这里（见左侧导航同名开关）；forceMount：面板自管草稿，
 						    切走再回来不能丢未保存编辑，inactive 必须 hidden，否则叠在别的 tab 上。 */}
-						{resourceOnly ? (
-							<TabsContent value="mcp" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
-								<div className="config-content flex min-h-0 flex-col">
-									<McpTab ref={resourceMcpTabRef} projectId={resourceOnly && projectKind !== "chat" ? effectiveProjectId : undefined} projectName={resourceOnly ? projectName : undefined} onGoToExtensions={() => setSection("extensions")} onDirtyChange={handleResourceMcpDirtyChange} />
-								</div>
-							</TabsContent>
-						) : null}
+				{resourceOnly ? (
+					<TabsContent value="mcp" forceMount className="config-main min-w-0 data-[state=inactive]:hidden">
+						<div className="config-content flex min-h-0 flex-col">
+							<McpTab ref={resourceMcpTabRef} projectId={resourceOnly && projectKind !== "chat" ? effectiveProjectId : undefined} projectName={resourceOnly ? projectName : undefined} onGoToExtensions={() => setSection("extensions")} onDirtyChange={handleResourceMcpDirtyChange} />
+						</div>
+					</TabsContent>
+				) : null}
 
-						<TabsContent value="config:trust" className="config-main min-w-0">
-							<div className="config-content">
-								{statusBlock}
-								{configDiagnosticBlock}
-								{!loading && (
-									<TrustTab
-										data={trustData}
-										saving={saving}
-										onChange={(data) => {
-											setTrustData(data);
-											markDirty("config:trust");
-										}}
-										onSave={handleSaveTrust}
-									/>
-								)}
-							</div>
-						</TabsContent>
+				<TabsContent value="config:trust" className="config-main min-w-0">
+					<div className="config-content">
+						{statusBlock}
+						{configDiagnosticBlock}
+						{!loading && (
+							<TrustTab
+								data={trustData}
+								saving={saving}
+								onChange={(data) => {
+									setTrustData(data);
+									markDirty("config:trust");
+								}}
+								onSave={handleSaveTrust}
+							/>
+						)}
+					</div>
+				</TabsContent>
 
-						<TabsContent value="config:raw" className="config-main min-w-0">
-							<div className="config-content flex min-h-0 flex-col">
-								{statusBlock}
-								{configDiagnosticBlock}
-								{!loading && (
-									<RawTab
-										fileName={rawFileName}
-										content={rawContent}
-										saving={saving}
-										configDir={piConfigDir ?? undefined}
-										onChangeFileName={handleRawFileChange}
-										onChangeContent={(value) => {
-											setRawContent(value);
-											markDirty("config:raw");
-										}}
-										onSave={handleSaveRaw}
-									/>
-								)}
-							</div>
-						</TabsContent>
-					</Tabs>
+				<TabsContent value="config:raw" className="config-main min-w-0">
+					<div className="config-content flex min-h-0 flex-col">
+						{statusBlock}
+						{configDiagnosticBlock}
+						{!loading && (
+							<RawTab
+								fileName={rawFileName}
+								content={rawContent}
+								saving={saving}
+								configDir={piConfigDir ?? undefined}
+								onChangeFileName={handleRawFileChange}
+								onChangeContent={(value) => {
+									setRawContent(value);
+									markDirty("config:raw");
+								}}
+								onSave={handleSaveRaw}
+							/>
+						)}
+					</div>
 				</TabsContent>
 			</Tabs>
 
-			{/* 用量查询配置弹窗：模型/认证/DSH 共用入口；provider + backend 决定配置落盘位置。
+			{/* 用量查询配置弹窗：模型/认证共用入口，按 Pi 供应商定位配置。
 			    必须放在所有 Tabs 之外：Radix Tabs 默认卸载非激活内容，若放回 config:models
-			    TabsContent 内，切到认证 tab / DSH 页时弹窗组件会随卸载消失（点击无反应的 bug）。 */}
+			    TabsContent 内，切到认证 tab时弹窗组件会随卸载消失（点击无反应的 bug）。 */}
 			<UsageProbeConfigDialog
 				open={usageProbeDialog != null}
 				onClose={() => setUsageProbeDialog(null)}
@@ -3090,7 +3014,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 							{hasDirty && <span className="size-2 rounded-full bg-amber-400" aria-hidden="true" />}
 							{saving ? t("common.saving") : t("common.save")}
 						</Button>
-						{backendPane === "pi" && section === "config" ? (
+						{section === "config" ? (
 							<>
 								<Button variant="outline" size="sm" onClick={handleExport}>
 									{t("common.export")}

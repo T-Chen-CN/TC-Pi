@@ -10,7 +10,7 @@ import { extractQuoteTokens, pruneUnreferencedQuotes, rehydrateDraftFromMessage 
 import { resolveHistoryMutationPath, shouldShowResendRollbackHint } from "../utils/sessionHistoryMutationPolicy";
 import { sessionHistoryUnavailableState } from "../utils/sessionHistoryAvailability";
 import type { NoticeKind } from "../utils/notice";
-import { messageEntryId } from "../utils/sessionCommands";
+
 import { useSessionMessageImageRemoval } from "./useSessionMessageImageRemoval";
 
 type ConfirmConfig = {
@@ -37,23 +37,18 @@ export interface SessionHistoryMutationsDeps {
 	setCurrentSessionIdRef: (sessionId: string) => void;
 	isAgentCurrentlyBusy: () => boolean;
 	resolveProjectId: (sessionId: string) => string | undefined;
-	/** 有会话文件才走 catalog JSONL；匿名会话没有文件，仍用 runtime 命令。 */
+	/** 有会话文件才走 catalog JSONL；未落盘会话没有文件，仍用 runtime 命令。 */
 	hasPersistedSessionFile: (sessionId: string) => boolean;
-	/** 会话是否为生图 draft（无 pi JSONL、直连生图 API，重发目标不是 pi 会话文件）。 */
-	isImageGenSession?: (sessionId: string) => boolean;
-	/** DSH 会话判定：fork 化重发/编辑只服务 pi 后端，DSH 维持 legacy 路径。 */
-	isDshSession?: (sessionId: string) => boolean;
+	/** 已删除后端的历史不允许再次发送或修改。 */
+	isUnsupportedBackend?: (sessionId: string) => boolean;
 	/** 目标消息是否是会话最后一条用户消息：决定 fork 后旧会话隐藏（替换）还是保留可见（分支）。 */
 	isLastUserMessage?: (sessionId: string, message: ChatMessage) => boolean;
-	/** 生图重发：把失败消息的提示词（+参考图）放回输入框供一键重试，代替对不存在的 pi 文件做截断。 */
-	restoreImageGenTurn?: (sessionId: string, text: string, images?: ImageContent[]) => void;
 }
 
 /**
  * pi 历史消息改写：编辑/重发走 fork 化重试（fork 到目标 entry → 子会话立即重发，旧分支
  * 完整保留在原文件，旧会话记录打 supersededBy 从列表隐藏）；删除仍走文件墓碑（无 runtime
- * 直接改 JSONL，有 runtime 先停再改）。DSH 不迁移（策略层返回 catalog legacy，且入口按
- * backend 隐藏）。匿名会话无文件：编辑/删除明确不支持，重发退化为重新提交。
+ * backend 隐藏）。未落盘会话无文件：编辑/删除明确不支持，重发退化为重新提交。
  */
 export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 	const setOverlay = useSetAtom(setSessionHistoryMutationOverlayAtom);
@@ -99,7 +94,6 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 			showOverlay(sessionId, "reloading");
 			setLoadState({ sessionId, state: { status: "loading" } });
 			const page = await api.sessions.readRecordMessagePage(sessionId, undefined, 100);
-			// 与 App 的重载同源：DSH host 被手动停止时读到的是「暂时读不了」的空页，
 			// force 写进去会把刚改过的会话显示成空白（编辑/删除/重发后立刻触发，最迷惑）。
 			const unavailable = sessionHistoryUnavailableState(page);
 			if (unavailable) {
@@ -175,8 +169,6 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 	/**
 	 * 解析 fork 锚点 entryId。
 	 * - pi：优先 meta.entryId，其次消息 id 的 "-history-" 后缀，最后 getForkMessages 文本回退匹配。
-	 * - DSH：消息 id 形如 "dsh:<seq>"，seq 即 fork 锚点（session.fork 的 atSeq），直接解析，
-	 *   不依赖文本匹配（重复/空文本消息也能 fork）。
 	 * target 由调用方传入（而非按 agentId 反查），避免「刚 activateRuntime 完、
 	 * 渲染层 agentId→sessionId 映射尚未落库」的竞态导致回退匹配拿不到 target。
 	 */
@@ -192,9 +184,6 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 				return fromId;
 			}
 		}
-		// DSH：直接按消息 id 解析 seq 锚点（乐观上屏的 randomUUID id 不命中，走下方文本回退）。
-		const dshMatch = /^dsh:(\d+)$/.exec(message.id);
-		if (dshMatch) return `seq:${dshMatch[1]}`;
 		if (!target) return undefined;
 		try {
 			const wrapped = requireSessionCommand(await api.sessions.getRuntimeForkMessages(target));
@@ -277,16 +266,20 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 			const latest = depsRef.current;
 			const sessionId = latest.currentSessionId;
 			if (!sessionId) return;
-			// 匿名/--no-session 没有 JSONL：pi 的 editMessage 要求 sessionPath，缺失即报
+			// 未落盘的首次发送 没有 JSONL：pi 的 editMessage 要求 sessionPath，缺失即报
 			// “Session not persisted”，旧逻辑调必然失败的 runtime 命令。这里改为明确告知不支持。
 			const path = resolveHistoryMutationPath({
 				kind: "edit",
 				live: latest.isSessionRuntimeLive(sessionId),
 				persisted: latest.hasPersistedSessionFile(sessionId),
-				isDshSession: latest.isDshSession?.(sessionId),
+				unsupportedBackend: latest.isUnsupportedBackend?.(sessionId),
 			});
-			if (path.path === "unsupported-anonymous") {
-				latest.showToast(t("message.anonymousEditUnsupported"), 4000);
+			if (path.path === "unsupported-backend") {
+				latest.showToast(t("app.legacyBackendReadOnly"), 4000);
+				return;
+			}
+			if (path.path === "unsupported-unpersisted") {
+				latest.showToast(t("message.unpersistedEditUnsupported"), 4000);
 				return;
 			}
 			// fork 化编辑（pi）：确认停掉运行中的 turn 后 fork 到该消息 + 立即以新文本重发
@@ -315,24 +308,6 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 				);
 				return;
 			}
-			// legacy 文件路径（DSH 兜底，策略上仅 DSH 会落到这里）：行为与迁移前一致
-			confirmStopIfRunning(
-				sessionId,
-				{
-					title: t("message.historyStopToEditTitle"),
-					message: latest.isAgentCurrentlyBusy() ? t("message.historyStopToEditBody") : t("message.historyStopToEditBodyIdle"),
-					confirmLabel: t("app.stop"),
-				},
-				async () => {
-					try {
-						await runFileMutation(sessionId, async () => {
-							requireSessionCommand(await api.sessions.editCatalogMessage(sessionId, message.id, newText, messageEntryId(message)));
-						});
-					} catch (error) {
-						failToast(t("message.editFailed"), error);
-					}
-				},
-			);
 		},
 		[confirmStopIfRunning, failToast, runFileMutation, runForkMutation],
 	);
@@ -342,18 +317,23 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 			const latest = depsRef.current;
 			const sessionId = latest.currentSessionId;
 			if (!sessionId) return;
-			// 匿名会话无文件可删：旧逻辑弹「删除后需要重新加载会话才能生效」的误导确认后调
+			// 未落盘会话无文件可删：旧逻辑弹「删除后需要重新加载会话才能生效」的误导确认后调
 			// deleteRuntimeMessage，必然报 “Session not persisted”。改为明确告知不支持。
 			const path = resolveHistoryMutationPath({
 				kind: "delete",
+				unsupportedBackend: latest.isUnsupportedBackend?.(sessionId),
 				live: latest.isSessionRuntimeLive(sessionId),
 				persisted: latest.hasPersistedSessionFile(sessionId),
 			});
-			if (path.path === "unsupported-anonymous") {
-				latest.showToast(t("message.anonymousDeleteUnsupported"), 4000);
+			if (path.path === "unsupported-backend") {
+				latest.showToast(t("app.legacyBackendReadOnly"), 4000);
 				return;
 			}
-			// kind 为 delete 时策略只会给出 unsupported-anonymous 或 catalog，这里收窄类型
+			if (path.path === "unsupported-unpersisted") {
+				latest.showToast(t("message.unpersistedDeleteUnsupported"), 4000);
+				return;
+			}
+			// kind 为 delete 时策略只会给出 unsupported-unpersisted 或 catalog，这里收窄类型
 			if (path.path !== "catalog") return;
 			// 文案与 stopIfRunning 同口径：按 runtime status 判定是否需先停。error/closed 终态进程
 			// 已死（主进程 getTarget 对终态有解绑副作用，返回 undefined 不 BUSY），直接删除即可；
@@ -389,33 +369,22 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 				kind: "resend",
 				live: latest.isSessionRuntimeLive(sessionId),
 				persisted: latest.hasPersistedSessionFile(sessionId),
-				isImageGenSession: latest.isImageGenSession?.(sessionId),
-				// DSH 兜底：正常 UI 已按 backend 隐藏重发入口，这里仅防御冷 DSH 误入
-				isDshSession: latest.isDshSession?.(sessionId),
+				unsupportedBackend: latest.isUnsupportedBackend?.(sessionId),
 			});
-			// 匿名重发：没有文件可截断旧轮次（prepareRuntimeResend 必然报 “Session not
+			// 未落盘消息重发：没有文件可截断旧轮次（prepareRuntimeResend 必然报 “Session not
 			// persisted”），直接把原消息文本重新提交（submitPromptSnapshot 会自动激活
 			// runtime）；旧轮次保留为历史，新轮次即新尝试。
-			if (path.path === "runtime-anonymous-resend") {
+			if (path.path === "unsupported-backend") {
+				latest.showToast(t("app.legacyBackendReadOnly"), 4000);
+				return;
+			}
+			if (path.path === "unpersisted-resend") {
 				resendingIdsRef.current.add(message.id);
 				setTimeout(() => resendingIdsRef.current.delete(message.id), 30_000);
 				void latest
 					.submitPromptSnapshot(sessionId, message.text ?? "", message.images)
 					.catch((error) => failToast(t("message.resendFailed"), error))
 					.finally(() => resendingIdsRef.current.delete(message.id));
-				return;
-			}
-			// 生图 draft：无 runtime、无 pi JSONL，重发目标不是「截断 pi 文件消息」，而是把失败的
-			// 提示词（+参考图）放回输入框供一键重产生（历史由 ImageSessionStore 兜底，不依赖 pi 文件）。
-			if (path.path === "imagegen-resend") {
-				if (!latest.restoreImageGenTurn) return;
-				resendingIdsRef.current.add(message.id);
-				setTimeout(() => resendingIdsRef.current.delete(message.id), 30_000);
-				try {
-					latest.restoreImageGenTurn(sessionId, message.text ?? "", message.images);
-				} finally {
-					resendingIdsRef.current.delete(message.id);
-				}
 				return;
 			}
 			// fork 化重发（pi）：确认停掉运行中的 turn 后 fork 到该消息 + 立即以原文重发。
@@ -443,40 +412,6 @@ export function useSessionHistoryMutations(deps: SessionHistoryMutationsDeps) {
 				);
 				return;
 			}
-			// legacy catalog 路径（DSH 兜底；UI 已对 DSH 隐藏重发入口，正常不会到达）：
-			// 保持迁移前的 prepare/truncate 流程。
-			const run = async () => {
-				resendingIdsRef.current.add(message.id);
-				setTimeout(() => resendingIdsRef.current.delete(message.id), 30_000);
-				try {
-					let snapshot: { text: string; images?: ImageContent[] } | undefined;
-					await runFileMutation(sessionId, async () => {
-						snapshot = requireSessionCommand(await api.sessions.prepareCatalogResend(sessionId, message.id, messageEntryId(message)));
-					});
-					if (!snapshot) return;
-					showOverlay(sessionId, "activating");
-					const delivered = await depsRef.current.submitPromptSnapshot(sessionId, snapshot.text, snapshot.images);
-					if (shouldShowResendRollbackHint(delivered)) {
-						// 发送失败前历史已截断：仅靠 submitPromptSnapshot 内部的 API 错误 toast，
-						// 用户看不出时间线为什么变短（「重发坏了」类反馈多源于此），补状态说明。
-						latest.showToast(t("message.resendSendFailedRolledBack"), undefined, "warning");
-					}
-				} catch (error) {
-					failToast(t("message.resendFailed"), error);
-				} finally {
-					resendingIdsRef.current.delete(message.id);
-					hideOverlay(sessionId);
-				}
-			};
-			confirmStopIfRunning(
-				sessionId,
-				{
-					title: t("message.historyStopToResendTitle"),
-					message: latest.isAgentCurrentlyBusy() ? t("message.historyStopToResendBody") : t("message.historyStopToResendBodyIdle"),
-					confirmLabel: t("app.stop"),
-				},
-				run,
-			);
 		},
 		[confirmStopIfRunning, failToast, hideOverlay, runFileMutation, runForkMutation, showOverlay],
 	);

@@ -23,12 +23,7 @@ export type TokendanceInstallResult = {
 	modelCount: number;
 	/** pi models.json 是否已写入（含 Key upsert）。 */
 	piSaved: boolean;
-	/** Legacy result field: always false in this distribution. */
-	dshSaved: boolean;
-	/** DSH 写入是否走了 host 官方 API（false = 磁盘直写 settings.yaml/.credentials.yaml）。 */
-	dshWroteViaHost?: boolean;
-	/** DSH 写入失败原因（不含 Key；仅诊断用，UI 不直接展示）。 */
-	dshError?: string;
+
 	error?: string;
 };
 
@@ -54,7 +49,7 @@ export async function installTokendanceProvider(deps: TokendanceInstallDeps, opt
 			ok: false,
 			modelCount: 0,
 			piSaved: false,
-			dshSaved: false,
+
 			error: "TokenDance catalog unavailable",
 		};
 	}
@@ -100,10 +95,10 @@ export async function installTokendanceProvider(deps: TokendanceInstallDeps, opt
 			ok: false,
 			modelCount: piModels.length,
 			piSaved: false,
-			dshSaved: false,
+
 			error: saveResult.error ?? "failed to save models.json",
 		};
 	}
 
-	return { ok: true, modelCount: piModels.length, piSaved: true, dshSaved: false };
+	return { ok: true, modelCount: piModels.length, piSaved: true };
 }

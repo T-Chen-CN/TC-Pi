@@ -1,3 +1,4 @@
+import { isSupportedBackend } from "../../../../shared/productFeatures";
 /**
  * 会话代理设置弹框（侧栏会话右键菜单 → 会话代理）
  *
@@ -71,7 +72,7 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 	}, []);
 
 	const save = async (mode: SessionProxyMode) => {
-		if (saving) return;
+		if (saving || !isSupportedBackend(record?.backend)) return;
 		setSaving(true);
 		try {
 			const updated = await desktopApi.sessions.updateRecord(props.sessionId, { proxy: { mode } });
@@ -79,7 +80,7 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 
 			// 代理写在 spawn env 上：进程不重建就不会重新读。因此保存后若该会话仍在运行，
 			// 直接在这里重启其进程，把「改设置 + 停止 + 启动」三步压成一步。
-			// 判定收敛在纯函数里（含 DSH 共享 host 不能按会话重启的规则），见 sessionCommands。
+			// 判定收敛在纯函数里，见 sessionCommands。
 			// 读的是 store 快照而非 React state，避免与本组件渲染时机耦合。
 			const runtime = store.get(sessionRuntimeBySessionIdAtomFamily(props.sessionId));
 			const target = toSessionRuntimeTarget(props.sessionId, runtime);
@@ -101,7 +102,7 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 				}
 				showNotice(t("sessionProxy.savedApplied"), 3000);
 			} else {
-				showNotice(strategy === "dsh-host-restart" ? t("sessionProxy.dshSavedNotice") : t("sessionProxy.savedNotice"), 3000);
+				showNotice(t("sessionProxy.savedNotice"), 3000);
 			}
 			props.onClose();
 		} catch (error) {
@@ -132,7 +133,7 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 						const selected = currentMode === option.id;
 						const Icon = option.icon;
 						return (
-							<Button key={option.id} type="button" variant="ghost" disabled={saving} onClick={() => void save(option.id)} className="flex h-auto min-h-11 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-muted/60">
+							<Button key={option.id} type="button" variant="ghost" disabled={saving || !isSupportedBackend(record?.backend)} onClick={() => void save(option.id)} className="flex h-auto min-h-11 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-muted/60">
 								<span className={`grid size-6 shrink-0 place-items-center rounded-md ${selected ? "bg-primary/12 text-primary" : "bg-muted text-muted-foreground"}`}>
 									<Icon size={14} aria-hidden="true" />
 								</span>

@@ -66,7 +66,7 @@ test("一键安装：pi models.json 写入 provider（baseUrl/归因头/模型�
 	assert.equal(result.ok, true);
 	assert.equal(result.modelCount, 2);
 	assert.equal(result.piSaved, true);
-	assert.equal(result.dshSaved, false);
+	assert.equal(Object.hasOwn(result, "dshSaved"), false);
 
 	const provider = configManager._dump()["tokendance"];
 	assert.equal(provider.baseUrl, "https://tokendance.space/gateway/v1");
@@ -129,8 +129,8 @@ test("旧后端不可用时仍只保存 pi", async () => {
 	const result = await installer.installTokendanceProvider({ configManager, dshHost, tokendanceCatalog: makeCatalog() }, {});
 	assert.equal(result.ok, true);
 	assert.equal(result.piSaved, true);
-	assert.equal(result.dshSaved, false);
-	assert.equal(result.dshError, undefined);
+	assert.equal(Object.hasOwn(result, "dshSaved"), false);
+	assert.equal(Object.hasOwn(result, "dshError"), false);
 	assert.equal(configManager._dump()["tokendance"].models.length, 2);
 });
 

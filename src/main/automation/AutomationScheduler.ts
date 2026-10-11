@@ -1,5 +1,6 @@
 import type { AutomationTask } from "../../shared/types";
-import { missedAutomationCronOccurrences, nextAutomationCronOccurrence } from "./automationCron";
+import { isSupportedBackend } from "../../shared/productFeatures";
+import { missedAutomationCronOccurrences } from "./automationCron";
 import { hasActiveAutomationRun } from "./automationPolicy";
 import type { AutomationStore } from "./AutomationStore";
 import { getAppLogger } from "../logging/sharedLogger";
@@ -52,7 +53,8 @@ export class AutomationScheduler {
 			const tasks = this.store.listTasks();
 			const runs = this.store.listRuns();
 			for (const task of tasks) {
-				if (!task.enabled || task.schedule.type !== "cron") continue;
+				// Retired tasks remain visible in history without recurring failed runs.
+				if (!isSupportedBackend(task.backend) || !task.enabled || task.schedule.type !== "cron") continue;
 				await this.evaluateTask(task, runs, now);
 			}
 		} catch (error) {

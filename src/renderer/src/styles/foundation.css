@@ -1991,30 +1991,6 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chat-title-row .anonymous-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-  margin-left: 2px;
-}
-.conversation-title .anonymous-indicator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  margin-left: 4px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-tertiary);
-}
 /* 标题后的压缩次数小徽标：只显示数字，带边框，与来源 Badge 视觉一致；
    hover 通过 title 提示“压缩了几次，仅显示压缩后的会话记录”。 */
 .project-group {

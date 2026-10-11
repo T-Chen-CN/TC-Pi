@@ -88,7 +88,7 @@ const surface = [
 	read("src/renderer/src/components/session/TimelineEventCards.tsx"),
 	read("src/renderer/src/components/session/MessageShareModal.tsx"),
 ].join("\n");
-const extensions = read("src/renderer/src/config/ExtensionsTab.tsx") + "\n" + read("src/renderer/src/config/extensionsRecommendedPackages.tsx");
+const extensions = read("src/renderer/src/config/ExtensionsTab.tsx");
 const configShared = read("src/renderer/src/config/ConfigShared.tsx");
 const providerHeaders = read("src/renderer/src/config/providerHeaders.ts");
 // UA 预设清单已从 providerHeaders.ts 迁到 userAgentPresets.ts（纯函数 + 分组元数据，可单测）；
@@ -110,9 +110,6 @@ test("remaining renderer product copy is available in Chinese and English", () =
 	assert.equal(i18n.t("timeline.loadMoreHistory", { count: 12 }), "加载更多历史消息 (12 条)");
 	assert.equal(i18n.t("settings.wsl.apiUnavailable"), "WSL API 未就绪，请重启应用后再试");
 	assert.match(i18n.t("settings.wsl.piNotInstalled"), /@earendil-works\/pi-coding-agent/);
-	assert.equal(i18n.t("config.skillStoreImportAs"), "导入为 Skill");
-	assert.equal(i18n.t("config.yaoNoMatches"), "未匹配到提示词");
-	assert.equal(i18n.t("config.skillHubCopyInstallCommand"), "复制安装命令");
 	assert.equal(i18n.t("app.queuedDeliveryUnknown"), "消息可能未送达");
 	assert.equal(i18n.t("mermaid.renderFailed"), "Mermaid 图表渲染失败");
 
@@ -129,9 +126,6 @@ test("remaining renderer product copy is available in Chinese and English", () =
 	assert.equal(i18n.t("timeline.loadMoreHistory", { count: 12 }), "Load more history messages (12)");
 	assert.equal(i18n.t("settings.wsl.apiUnavailable"), "The WSL API is not ready. Restart PiDeck and try again.");
 	assert.match(i18n.t("settings.wsl.piNotInstalled"), /@earendil-works\/pi-coding-agent/);
-	assert.equal(i18n.t("config.skillStoreImportAs"), "Import as Skill");
-	assert.equal(i18n.t("config.yaoNoMatches"), "No matching prompts");
-	assert.equal(i18n.t("config.skillHubCopyInstallCommand"), "Copy install command");
 	assert.equal(i18n.t("app.queuedDeliveryUnknown"), "The message may not have been delivered");
 	assert.equal(i18n.t("mermaid.renderFailed"), "Failed to render Mermaid diagram");
 });
@@ -151,7 +145,6 @@ test("reachable renderer surfaces use i18n without changing their UI structure",
 	assert.match(settings, /t\("settings\.saveAndClose"\)/);
 	assert.match(settingsStorage, /t\("settings\.storage\.clearConfirm"/);
 	assert.match(surface, /t\("activity\.executionSummary", \{ summary:/);
-	assert.match(extensions, /className="extensions-recommended-desc">[\s\S]*?t\(pkg\.descriptionKey\)/);
 	assert.match(configShared, /getApiTypeDescription\(option\)/);
 	assert.match(userAgentPresets, /labelKey: "config\.userAgentBrowser"/);
 	assert.match(queuedPrompt, /unknownDeliveryMessage = t\("app\.queuedDeliveryUnknown"\)/);

@@ -23,6 +23,7 @@ import { resolveActiveAskRequest } from "../../utils/askUi";
 import { formatRelativeTime } from "../../utils/relativeTime";
 import { ConfirmDialog } from "../ui-shadcn/ConfirmDialog";
 import type { ChatMessage, RewindCheckpointSummary } from "../../../../shared/types";
+import { isSupportedBackend } from "../../../../shared/productFeatures";
 
 export type SessionRuntimeInjectorProps = {
 	currentSessionId: string;
@@ -177,14 +178,9 @@ export const SessionRuntimeInjector = React.memo(function SessionRuntimeInjector
 
 	const activeAgent = runtime.activeAgentId ? services.agents.find((a) => a.id === runtime.activeAgentId) : undefined;
 	const canMutateActiveMessages = runtime.canMutateActiveMessages;
-	// 未启动时 activeAgent 为空，必须看 catalog backend，不能只看 live tab。
-	// DSH 本轮不做编辑/删除/重发（无 JSONL 离线改写）；
-	// fork 对 pi/DSH 都始终提供入口：DSH 未激活时由 forkFromUserMessage 内部
-	// 先 activateRuntime 再 fork，不再用 canMutateActiveMessages 门控——否则打开
-	// 历史 DSH 会话（runtime 懒启动）时 fork 入口时有时无。
-	const isDshBackend = sessionRecord?.backend === "dsh" || activeAgent?.backend === "dsh";
-	const canEditOrDeleteMessages = !isDshBackend;
-	const canResend = !isDshBackend;
+	// 旧后端历史只读；未激活的 Pi 历史仍可编辑，判据不能依赖进程是否存活。
+	const canEditOrDeleteMessages = isSupportedBackend(sessionRecord?.backend) && isSupportedBackend(activeAgent?.backend);
+	const canResend = canEditOrDeleteMessages;
 
 	// ── 回退到此消息：解析最近检查点 + 确认回退（仅 pi 后端注入入口）──
 	const [rewindConfirm, setRewindConfirm] = React.useState<RewindCheckpointSummary | null>(null);
@@ -268,8 +264,8 @@ export const SessionRuntimeInjector = React.memo(function SessionRuntimeInjector
 					onEditMessage={canEditOrDeleteMessages ? services.editMessage : undefined}
 					onDeleteMessage={canEditOrDeleteMessages ? services.deleteMessage : undefined}
 					onRemoveMessageImage={!services.isLanWeb && (!sessionRecord?.backend || sessionRecord.backend === "pi") && sessionRecord?.filePath && services.removeMessageImage ? (message, index) => services.removeMessageImage?.(currentSessionId, message, index) : undefined}
-					onForkMessage={services.forkFromUserMessage}
-					onRewindToMessage={isDshBackend ? undefined : handleRewindToMessage}
+					onForkMessage={canEditOrDeleteMessages ? services.forkFromUserMessage : undefined}
+					onRewindToMessage={canEditOrDeleteMessages ? handleRewindToMessage : undefined}
 					forkingMessageId={services.forkingMessageId}
 					onToast={(message: string) => services.showToast(message)}
 					onQuickPrompt={(message) => services.insertQuickPrompt(currentSessionId, message)}

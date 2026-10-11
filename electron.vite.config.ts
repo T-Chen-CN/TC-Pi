@@ -105,9 +105,7 @@ export default defineConfig({
     build: {
       lib: {
         // electron-vite 多入口：lib.entry 对象形式输出到 out/main。
-        // hostEntry 是 utilityProcess 的 DSH host 入口，独立 chunk 供 DshHostProcess fork；
-        // runnerConsolePreload 经 host 补丁 NODE_OPTIONS=--require 注入沙箱 runner。
-        // 持久 pwsh 已抽成独立包 dsh-tool-pwsh-persistent，不再打进 out/main。
+
         entry: {
           index: resolve(__dirname, "src/main/index.ts"),
         },

@@ -14,7 +14,7 @@ import { ChangelogDialog } from "./settings/ChangelogDialog";
 const WEBSITE_URL = "https://pideck.caoayu.top/";
 
 interface AboutPopoverProps {
-	/** 应用/pi/DSH/pi-ai 版本与时间信息，由 App 从主进程 AppInfo IPC 拉取后传入。 */
+	/** 应用/pi/pi-ai 版本与时间信息，由 App 从主进程 AppInfo IPC 拉取后传入。 */
 	appInfo: AppInfo;
 	/** 弹出触发区（BrandLockup 所在容器）；MorphPopoverTrigger 会为其注入点击控制。 */
 	children: ReactElement;
@@ -22,7 +22,7 @@ interface AboutPopoverProps {
 
 /**
  * 左上角品牌区「关于」弹框：点击 PiDeck 品牌弹出 MorphPopover，
- * 展示 Logo、应用版本（等宽小字）、开发分支，以及 pi CLI / DSH 运行时 / pi-ai 目录
+ * 展示 Logo、应用版本（等宽小字）、开发分支，以及 pi CLI / pi-ai 目录
  * 版本、Electron/Chromium/Node 栈版本、打包/安装时间与官网/GitHub/发布链接。
  */
 export function AboutPopover(props: AboutPopoverProps) {
@@ -67,7 +67,6 @@ export function AboutPopover(props: AboutPopoverProps) {
 						<BlockLabel>{t("about.runtimeInfo")}</BlockLabel>
 						{/* 探测失败/未安装的版本显示 —，同样保留行结构便于对照 */}
 						<VersionRow label="Pi CLI" value={info.piVersion} />
-						<VersionRow label={t("about.dshVersion")} value={info.dshRuntimeVersion} />
 						<VersionRow label={t("about.piAiVersion")} value={info.piAiVersion} />
 						<p className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
 							{t("about.runtimeStack", {

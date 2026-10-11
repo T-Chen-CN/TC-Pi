@@ -1,8 +1,7 @@
 /**
  * analyze-asar-waste —— 分析打包产物 asar 内的 node_modules 冗余。
  *
- * 原理：以「运行时根集合」（主进程 external 包 + 动态 import 目标 + hostEntry 动态加载的
- * @deepseek-ai 树 + asarUnpack 声明的原生包）为起点求依赖传递闭包，
+ * 原理：从主进程 external 包和动态 import 目标计算运行时依赖闭包。
  * asar 内不在闭包中的包即为冗余 —— 它们已被 electron-vite 打进 out/renderer 或 out/main，
  * 在 asar 里保留源码副本属于纯浪费（运行时不会去读）。
  *
@@ -19,8 +18,6 @@ const NM = "node_modules";
 const ASAR = process.argv[2] || "release/win-unpacked/resources/app.asar";
 
 // 必须读取 asar 内实际打入的 package.json，而不是开发工作区 node_modules：
-// catalog 来源 pi-ai@0.84.4 是 devDependency，但 DSH 在 app.asar 中保留的是 0.82.1，
-// 从工作区读取会把 0.84.4 的依赖图错误地当成生产闭包。
 function readPkg(name) {
 	try {
 		const p = path.join(NM, name, "package.json");
@@ -40,35 +37,26 @@ for (const [name, child] of Object.entries(hdr.files[NM].files)) {
 	}
 }
 
-// 运行时根集合（依据：out/main 产物静态 require 扫描 + 动态 import 扫描 + hostEntry 的 @deepseek-ai 动态加载 + asarUnpack 声明 + 扩展运行时）
-const roots = [...inAsar]
-	.filter((n) => n.startsWith("@deepseek-ai/"))
-	.concat([
-		"node-pty",
-		"sql.js",
-		"@electron-toolkit/utils",
-		"@larksuiteoapi/node-sdk",
-		"@img/sharp-win32-x64",
-		"@vscode/ripgrep-win32-x64",
-		"koffi",
-		"@koromix/koffi-win32-x64",
-		"node-addon-require-builtin-win32-x64-msvc",
-		"dsh-tool-pwsh-persistent",
-		"dsh-bill",
-		// PiDeck 主进程改读 extraResources catalog；DSH 的 pi-ai 由 @deepseek-ai 闭包追踪。
-		"undici",
-		// out/main 静态 require 的运行时库（2026-10 实测 grep 逐一验证；漏任何一个都会被误报
-		// 为可排除，照抄进 build.files 会运行时 MODULE_NOT_FOUND：
-		// zod+@modelcontextprotocol/sdk = CUA/MCP 默认关闭但 require 链存在；tar/smol-toml/
-		// minimatch/ignore = DSH/扩展运行时解析；electron-updater = 自动更新）。
-		"zod",
-		"@modelcontextprotocol/sdk",
-		"tar",
-		"electron-updater",
-		"minimatch",
-		"smol-toml",
-		"ignore",
-	]);
+// Runtime roots for the maintained Pi application.
+const roots = [
+	"node-pty",
+	"sql.js",
+	"@electron-toolkit/utils",
+
+	"undici",
+	// out/main 静态 require 的运行时库（2026-10 实测 grep 逐一验证；漏任何一个都会被误报
+	// 为可排除，照抄进 build.files 会运行时 MODULE_NOT_FOUND：
+	// zod+@modelcontextprotocol/sdk = MCP 默认关闭但 require 链存在；tar/smol-toml/
+	// minimatch/ignore = Pi 扩展运行时解析；electron-updater = 自动更新）。
+	"zod",
+	"@modelcontextprotocol/sdk",
+	"tar",
+	"electron-updater",
+	"minimatch",
+	"smol-toml",
+	"ignore",
+	"proper-lockfile",
+];
 
 const closure = new Set();
 const queue = roots.filter((n) => inAsar.has(n));

@@ -1,4 +1,4 @@
-import { requireSupportedBackend } from "../../shared/productFeatures";
+import { requireSupportedSessionRuntime } from "../../shared/productFeatures";
 import type {
 	AgentBackend,
 	AgentGatewayCapability,
@@ -53,21 +53,21 @@ export interface SessionCatalogGateway {
 			updatedAt?: number;
 		},
 	): Promise<SessionCatalogEntry>;
-	attachRuntime(input: { sessionId: string; filePath?: string; piSessionId?: string; dshSessionId?: string; acpSessionId?: string; agentPreset?: string; promoteToActive?: boolean }): Promise<unknown>;
+	attachRuntime(input: { sessionId: string; filePath?: string; piSessionId?: string }): Promise<unknown>;
 }
 
 export interface SessionAgentGateway {
-	/** 本网关的运行时后端身份（pi/dsh）；CompositeAgentGateway 按它路由。 */
+	/** 本网关的运行时后端身份；CompositeAgentGateway 按它路由。 */
 	readonly backend: AgentBackend;
 	/** 本网关持有的可选能力；缺失项由 UI 按能力禁用，禁止硬造等价物。 */
 	readonly capabilities: ReadonlySet<AgentGatewayCapability>;
 	list(): AgentTab[];
-	/** 发送提示词到 agent（pi: stdio RPC；dsh: session.prompt）。 */
+	/** 通过 stdio RPC 发送提示词到 Pi Agent。 */
 	sendPrompt(input: SendPromptInput): Promise<SendPromptResult>;
 	getMessages(agentId: string): ChatMessage[];
 	create(input: CreateAgentInput): Promise<AgentTab>;
-	/** 可选能力：standby 池认领（pi 提供；dsh 无进程池概念不实现）。命中返回已握手 idle tab。 */
-	claimStandbyAgent?(input: { projectId: string; sessionId: string; noSession?: boolean }): Promise<AgentTab | null>;
+	/** 可选能力：standby 池认领。命中返回已握手 idle tab。 */
+	claimStandbyAgent?(input: { projectId: string; sessionId: string }): Promise<AgentTab | null>;
 	/** 可选能力：standby 池补热（fire-and-forget，幂等）。 */
 	ensureStandbyAgent?(projectId: string): void;
 	/** 可选能力：草稿斜杠命令预览（只读查询 pi standby 进程的 get_commands；不可用返回 null，调用方回退本地发现）。 */
@@ -82,29 +82,27 @@ export interface SessionAgentGateway {
 	 * 可选能力：error 终态但进程仍存活时的原进程复活（error → idle，Issue #218）。
 	 * 回复级错误（API 400/模型报错/投递未知）不会杀死 pi 进程，此前被标成终态后，
 	 * 下一次激活要么抛「启动失败」、要么停掉活进程重建（扩展有问题时还会触发无插件回退）。
-	 * pi 网关实现进程存活探测；dsh 未实现则保持原终态语义。
 	 */
 	reviveIfProcessAlive?(agentId: string): boolean;
-	/** 可选能力：会话内命令列表（pi 经 get_commands RPC；dsh 经 host 命令注册表枚举桥 D15）。 */
+	/** 可选能力：会话内命令列表（get_commands RPC）。 */
 	getCommands?(agentId: string): Promise<unknown[]>;
 	getAvailableModels(agentId: string): Promise<AvailableModel[]>;
 	/** 可选能力：Pi 按当前模型返回可用 thinking levels；旧 Pi 返回 undefined 走 UI 兼容回退。 */
 	getAvailableThinkingLevels?(agentId: string): Promise<string[] | undefined>;
-	/** 可选能力：导出 HTML（pi 经 export_html RPC；dsh 投影式导出 G10）。 */
+	/** 可选能力：导出 HTML（export_html RPC）。 */
 	exportHtml?(agentId: string): Promise<unknown>;
-	/** 可选能力：checkpoint 列表（refs/pi-checkpoints；纯 git，pi 提供，dsh 暂缺）。支持分页。 */
+	/** 可选能力：checkpoint 列表（refs/pi-checkpoints；纯 Git）。支持分页。 */
 	listCheckpoints?(agentId: string, params?: RewindCheckpointPageParams): Promise<RewindCheckpointPage>;
 	/** 可选能力：checkpoint 与当前 index 树的 diff 摘要（回退预览）。 */
 	getCheckpointDiff?(agentId: string, checkpointId: string): Promise<string>;
 	/** 可选能力：回退到 checkpoint（scope 决定回退范围；当前仅 files 实现）。 */
 	restoreCheckpoint?(agentId: string, checkpointId: string, scope: RewindRestoreScope): Promise<RewindRestoreResult>;
-	/** 可选能力：编辑历史消息（pi 提供；dsh 缺失，capabilities 不含 editMessage）。 */
+	/** 可选能力：编辑历史消息。 */
 	editMessage?(agentId: string, messageId: string, newText: string): Promise<void>;
-	/** 可选能力：删除历史消息（pi 提供；dsh 缺失，capabilities 不含 deleteMessage）。 */
+	/** 可选能力：删除历史消息。 */
 	deleteMessage?(agentId: string, messageId: string): Promise<void>;
 	/**
 	 * 可选能力：无 runtime 时直接改 pi 会话 JSONL（编辑/删除/重发截断）。
-	 * DSH 无会话文件，不得实现；运行中不得调用（先 stopRuntime）。
 	 */
 	mutatePersistedSessionMessage?(
 		sessionPath: string,
@@ -123,11 +121,8 @@ export interface SessionAgentGateway {
 	getRuntimeModelThinkingState?(agentId: string): Promise<SessionRuntimeModelSelection | undefined>;
 	setModel(agentId: string, provider: string, modelId: string): Promise<unknown>;
 	setThinking(agentId: string, level: string): Promise<unknown>;
-	/** 可选能力：DSH 会话权限预设（/permission 命令）；pi 后端不持有。 */
-	setPermission?(agentId: string, preset: string): Promise<unknown>;
 	/**
 	 * 可选能力：会话内系统提示——catalog 保存的模型偏好已失效（模型被重命名/删除）
-	 * 被跳过，本次沿用 runtime 当前模型。DSH 后端不需要（降级无提示）。
 	 */
 	notifyModelPreferenceIgnored?(agentId: string, provider: string, modelId: string): void;
 	/** 主动推送一次完整 runtime state（get_state）给渲染层：懒启动/重启链路在偏好应用后调用。 */
@@ -137,12 +132,10 @@ export interface SessionAgentGateway {
 	sendUIResponse(agentId: string, requestId: string, response: SessionUiResponseInput["response"]): Promise<unknown> | unknown;
 	/**
 	 * GUI 扩展桥：把渲染层回灌的交互事件排入该 agent 的桥队列（可选能力）。
-	 * 未实现（如 DSH 后端）时返回 false，渲染层静默丢弃。
 	 */
 	pushBridgeEvent?(agentId: string, event: BridgeEvent): boolean;
 	/**
 	 * GUI 扩展桥：请求桥下一次轮询时全量重推一次（§9.4，可选能力）。
-	 * 未实现（如 DSH 后端）时返回 false，渲染层静默忽略。
 	 */
 	requestBridgeResync?(agentId: string): boolean;
 	/** 会话收到 Ask 类 UI 请求时触发桌面通知（由 AgentManager 实现，不再区分会话是否聚焦）
@@ -234,14 +227,12 @@ function isInteractiveUiMethod(method: unknown): boolean {
 type AppliedSessionPreferences = {
 	model?: SessionModelPreference;
 	thinkingLevel?: string;
-	permissionPreset?: string;
 };
 
 function snapshotPreferences(entry: SessionCatalogEntry): AppliedSessionPreferences {
 	return {
 		...(entry.model ? { model: createSessionModelPreference(entry.model.provider, entry.model.modelId, entry.model.modelName) } : {}),
 		...(entry.thinkingLevel ? { thinkingLevel: entry.thinkingLevel } : {}),
-		...(entry.permissionPreset ? { permissionPreset: entry.permissionPreset } : {}),
 	};
 }
 
@@ -253,7 +244,7 @@ function sameAppliedPreferences(a: AppliedSessionPreferences | undefined, b: App
 	if (aModel && bModel && (aModel.provider !== bModel.provider || aModel.modelId !== bModel.modelId)) {
 		return false;
 	}
-	return a.thinkingLevel === b.thinkingLevel && a.permissionPreset === b.permissionPreset;
+	return a.thinkingLevel === b.thinkingLevel;
 }
 
 export class SessionRuntimeCoordinator {
@@ -414,35 +405,6 @@ export class SessionRuntimeCoordinator {
 	}
 
 	/**
-	 * Register a runtime that is being started by a caller outside the normal
-	 * activateRuntime path (currently anonymous --no-session sessions).
-	 *
-	 * The promise is placed in the same per-Session activation gate before the
-	 * Session is returned to the renderer. Therefore a fast first send waits for
-	 * the already-created process instead of creating a second one.
-	 */
-	registerPendingRuntime(sessionId: string, activation: Promise<AgentTab>): void {
-		const normalizedSessionId = sessionId.trim();
-		if (!normalizedSessionId) throw new Error("Session ID is required");
-		if (this.activationBySession.has(normalizedSessionId)) return;
-
-		this.activationBySession.set(normalizedSessionId, activation);
-		// Do not use Promise.finally here: its derived rejection would become an
-		// unhandled promise when nobody races the background activation. The
-		// original promise remains the gate consumed by any concurrent caller.
-		void activation.then(
-			() => this.clearPendingRuntime(normalizedSessionId, activation),
-			() => this.clearPendingRuntime(normalizedSessionId, activation),
-		);
-	}
-
-	private clearPendingRuntime(sessionId: string, activation: Promise<AgentTab>): void {
-		if (this.activationBySession.get(sessionId) === activation) {
-			this.activationBySession.delete(sessionId);
-		}
-	}
-
-	/**
 	 * 删除前强制释放运行时：先解绑让侧栏立刻可删，agent 停在后台。
 	 * 运行中会话也允许删——用户不必先点停止。stop 失败也不挡 catalog 删除。
 	 */
@@ -466,7 +428,6 @@ export class SessionRuntimeCoordinator {
 			return;
 		}
 		this.unbindAgentUnchecked(target.agentId);
-		// 先解绑再停：删除 IPC 不必等 pi/DSH 进程退出。stop 完成前禁止重新 activate/bind。
 		void this.agents
 			.stop(target.agentId)
 			.catch(() => undefined)
@@ -495,28 +456,6 @@ export class SessionRuntimeCoordinator {
 		} catch (error) {
 			return this.commandFailure(error);
 		}
-	}
-
-	/**
-	 * An anonymous record already has a process created with `--no-session`.
-	 * Bind it directly instead of routing it through normal activation, which
-	 * would otherwise create a second runtime and a persisted pi session.
-	 */
-	bindAnonymousRuntime(sessionId: string, agentId: string): SessionRuntimeInfo {
-		const entry = this.catalog.get(sessionId);
-		if (!entry?.noSession) throw new Error(`Anonymous session not found: ${sessionId}`);
-		const tab = this.agents.list().find((candidate) => candidate.id === agentId);
-		if (!tab?.noSession || isTerminalAgent(tab)) {
-			throw new Error(`Anonymous runtime is not available: ${agentId}`);
-		}
-		const runtimeGeneration = this.bind(sessionId, agentId);
-		tab.runtimeGeneration = runtimeGeneration;
-		void this.logger?.info("session-runtime", "Anonymous runtime bound", {
-			sessionId,
-			agentId,
-			runtimeGeneration,
-		});
-		return this.runtimeInfo(sessionId, tab);
 	}
 
 	validateTarget(target: SessionRuntimeTarget): SessionCommandResult<SessionRuntimeTarget> {
@@ -583,7 +522,6 @@ export class SessionRuntimeCoordinator {
 
 	listRuntimeThinkingLevels(target: SessionRuntimeTarget): Promise<SessionCommandResult<SessionTargetedValue<string[] | undefined>>> {
 		return this.runTargetCommand(target, async (agentId) => {
-			// DSH does not own this Pi-specific RPC; callers use its host catalog instead.
 			if (typeof this.agents.getAvailableThinkingLevels !== "function") return undefined;
 			return this.agents.getAvailableThinkingLevels(agentId);
 		});
@@ -1011,7 +949,6 @@ export class SessionRuntimeCoordinator {
 	 *
 	 * 与 `respondToUi` 不同，这里**不要求**存在 pending UI 请求 ——
 	 * 桥的交互（点列表项、按按钮）不是 pi 的 ask 请求，而是扩展自己组件的回调。
-	 * 后端未实现该能力（如 DSH）时返回 false。
 	 */
 	pushBridgeEvent(agentId: string, event: BridgeEvent): boolean {
 		return this.agents.pushBridgeEvent?.(agentId, event) ?? false;
@@ -1021,7 +958,6 @@ export class SessionRuntimeCoordinator {
 	 * GUI 扩展桥：请求桥下一次轮询时全量重推一次（§9.4）。
 	 *
 	 * 渲染层丢过桥状态时调用（换绑定 / 切会话 / 开设置弹窗 / 应用启动）。
-	 * 后端未实现该能力（如 DSH）时返回 false。
 	 */
 	requestBridgeResync(agentId: string): boolean {
 		return this.agents.requestBridgeResync?.(agentId) ?? false;
@@ -1095,36 +1031,6 @@ export class SessionRuntimeCoordinator {
 		this.unbindAgentUnchecked(agentId);
 	}
 
-	/**
-	 * DSH fork/clone 前调用（D3）：确保该 agent 无在途发送（dispatch lease）。
-	 * pi fork 走 replaceBoundRuntime 内部已做此检查；DSH fork 是 manager 内原地换绑，
-	 * 不经过 replacement 流程，这里显式检查避免「fork 时 prompt 在途 → RPC 响应落到
-	 * 已废弃 mux」的结果丢失/串台。有在途发送时抛错（调用方转 SESSION_COMMAND_FAILED）。
-	 */
-	assertNoDispatchInFlight(agentId: string): void {
-		const sessionId = this.sessionIdByAgent.get(agentId);
-		if (sessionId) this.assertNoDispatchLease(sessionId, agentId);
-	}
-
-	/**
-	 * DSH fork/clone 的绑定预留（C10）：执行期间占用 replacement 槽位，阻止并发
-	 * restart/其他 replacement 命令交错（restart 的 reserveBoundRuntime 会发现
-	 * replacement 已被占用而拒绝）；执行完成后释放。DSH fork 保持同一
-	 * SessionRecord ↔ agentId 绑定（dshSessionId 由 manager/catalog 回写），
-	 * 无需像 restart 那样重建绑定。内部同样做 dispatch lease 检查。
-	 */
-	async withRuntimeReservation<T>(sessionId: string, agentId: string, fn: () => Promise<T>): Promise<T> {
-		const reservation = this.reserveBoundRuntime(sessionId, agentId);
-		try {
-			const result = await fn();
-			this.releaseRuntimeReplacement(reservation);
-			return result;
-		} catch (error) {
-			this.releaseRuntimeReplacement(reservation);
-			throw error;
-		}
-	}
-
 	/** Fail closed after a process reaches a terminal state, including mid-dispatch. */
 	unbindTerminalAgent(agentId: string): void {
 		this.unbindAgentUnchecked(agentId);
@@ -1150,7 +1056,7 @@ export class SessionRuntimeCoordinator {
 	async restartSession(sessionId: string, agentId: string): Promise<AgentTab> {
 		const entry = this.catalog.get(sessionId);
 		if (!entry) throw new Error(`Session not found: ${sessionId}`);
-		requireSupportedBackend(entry.backend);
+		requireSupportedSessionRuntime(entry);
 		// 直接读绑定表做「是否被其他 agent 抢占」的校验，不能走 getAgentId：
 		// getAgentId 对终态（error/closed）agent 有解绑副作用，会清掉绑定后导致
 		// 紧随其后的 reserveBoundRuntime 误抛「binding changed」（重启终态 Agent
@@ -1186,8 +1092,7 @@ export class SessionRuntimeCoordinator {
 			this.unbindAgentUnchecked(agentId);
 			const runtimeGeneration = this.bind(sessionId, tab.id);
 			tab.runtimeGeneration = runtimeGeneration;
-			// C9：attach patch 收拢 backend 特判（DSH 文件配对分支同时写 dshSessionId，
-			// 标题同步与重启后 attach 恢复依赖它）。
+			// 重启后重新绑定 Pi 文件身份。
 			const restartPatch = this.buildAttachPatch(sessionId, tab, entry);
 			if (restartPatch) {
 				await this.catalog.attachRuntime(restartPatch);
@@ -1275,20 +1180,13 @@ export class SessionRuntimeCoordinator {
 			if (!currentTab) {
 				return this.unknownDelivery(input, "Session runtime stopped during prompt dispatch");
 			}
-			// C9：attach patch 收拢 backend 特判（DSH 文件配对分支同时回写 dshSessionId）。
 			const dispatchEntry = this.catalog.get(input.sessionId);
 			const dispatchPatch = dispatchEntry ? this.buildAttachPatch(input.sessionId, currentTab, dispatchEntry) : null;
 			if (dispatchPatch) {
 				// Prompt acceptance is the latency-sensitive boundary. Catalog persistence is
 				// recovery metadata and must not keep the composer in a sending state; failures
 				// are intentionally isolated from the already accepted prompt.
-				// DSH 预热只绑 host id、保持 draft；真正发出去才 promoteToActive。
-				void this.catalog
-					.attachRuntime({
-						...dispatchPatch,
-						promoteToActive: true,
-					})
-					.catch(() => undefined);
+				void this.catalog.attachRuntime(dispatchPatch).catch(() => undefined);
 			}
 			if (!this.isCurrentDispatchLease(lease)) {
 				return this.unknownDelivery(input, "Session runtime binding changed after prompt dispatch");
@@ -1322,7 +1220,7 @@ export class SessionRuntimeCoordinator {
 		}
 		const entry = this.catalog.get(sessionId);
 		if (!entry) throw new Error(`Session not found: ${sessionId}`);
-		requireSupportedBackend(entry.backend);
+		requireSupportedSessionRuntime(entry);
 		if (this.replacementBySession.has(sessionId)) {
 			throw new Error(`Session runtime replacement reservation conflict: ${sessionId}`);
 		}
@@ -1366,12 +1264,11 @@ export class SessionRuntimeCoordinator {
 		const created = !tab;
 		if (!tab) {
 			// standby 池认领（仅 pi 网关实现，其余返回 null）：只服务「无既有会话文件」的新会话——
-			// 历史会话必须 --session 恢复，dsh 会话与 pi 进程形态不同，都回退正常创建。
 			// 认领到的进程模型/扩展是 spawn 时快照：模型/思考档由下面的 applyLatestPreferences
 			// 按 catalog 最新值热补；扩展/代理等 spawn-only 输入靠 AgentManager 的指纹比对，
 			// 不一致根本不会被认领。created 保持 true：认领的进程归本次激活所有，失败清理必须能停掉它。
-			if (entry.backend !== "dsh" && entry.backend !== "acp" && !entry.filePath) {
-				tab = (await this.agents.claimStandbyAgent?.({ projectId: entry.projectId, sessionId, noSession: entry.noSession }).catch(() => null)) ?? undefined;
+			if (!entry.filePath) {
+				tab = (await this.agents.claimStandbyAgent?.({ projectId: entry.projectId, sessionId }).catch(() => null)) ?? undefined;
 			}
 		}
 		if (!tab) {
@@ -1384,19 +1281,10 @@ export class SessionRuntimeCoordinator {
 				sessionPath: entry.filePath,
 				environment: entry.environment,
 				source: entry.source,
-				backend: entry.backend,
-				dshSessionId: entry.backend === "dsh" ? entry.dshSessionId : undefined,
-				// DSH agent 预设（会话「模式」）：草稿期预选，新建 host 会话时随 sessions.create
-				// 应用；attach 已有会话时由 DshAgentManager 从 host list 行读回（本字段被忽略）。
-				agentPreset: entry.backend === "dsh" ? entry.agentPreset : undefined,
-				// ACP：acpSessionId 存在则 session/load 恢复旧会话；工具选择复用 agentPreset
-				// 字段（AcpToolConfig.id），草稿预选优先 acpToolId。
-				acpSessionId: entry.backend === "acp" ? entry.acpSessionId : undefined,
-				...(entry.backend === "acp" ? { agentPreset: entry.acpToolId ?? entry.agentPreset } : {}),
+				backend: "pi",
 				wslDistro: entry.wslDistro,
 				wslUser: entry.wslUser,
 				importedSourceId: entry.importedSourceId,
-				noSession: entry.noSession,
 			});
 		}
 		if (tab.status === "starting") tab = await this.waitUntilReady(tab);
@@ -1411,15 +1299,6 @@ export class SessionRuntimeCoordinator {
 			await this.applyLatestPreferences(sessionId, tab.id);
 		} catch (error) {
 			if (created) {
-				// 激活失败兜底：DSH 的 host 会话已在 $DSH_HOME 创建，先落 dshSessionId
-				// 再停运行时，避免每次重试新建孤儿。保持 draft——还没开聊，不能抬成 active。
-				if (tab.backend === "dsh" && tab.sessionId) {
-					await this.catalog.attachRuntime({ sessionId, dshSessionId: tab.sessionId }).catch(() => undefined);
-				}
-				// ACP 同理：agent 侧会话可能已创建，先落 acpSessionId 再停，避免重试新建孤儿。
-				if (tab.backend === "acp" && tab.sessionId) {
-					await this.catalog.attachRuntime({ sessionId, acpSessionId: tab.sessionId }).catch(() => undefined);
-				}
 				await this.agents.stop(tab.id).catch(() => undefined);
 			}
 			throw new Error(`Failed to apply session preferences: ${errorMessage(error)}`);
@@ -1427,8 +1306,6 @@ export class SessionRuntimeCoordinator {
 
 		const runtimeGeneration = this.bind(sessionId, tab.id);
 		tab.runtimeGeneration = runtimeGeneration;
-		// C9：attach patch 收拢 backend 特判——DSH 会话没有 pi 会话文件，DSH sessionId
-		// 由 host 持久化（$DSH_HOME），回写 catalog 后重启 activate 走 attach 恢复。
 		const activatePatch = this.buildAttachPatch(sessionId, tab, entry);
 		if (activatePatch) {
 			await this.catalog.attachRuntime(activatePatch);
@@ -1437,48 +1314,13 @@ export class SessionRuntimeCoordinator {
 		// 且在偏好应用（setModel/setThinking）之后执行，渲染层底栏拿到的是真实模型而不是旧残留。
 		await this.agents.publishRuntimeState(tab.id).catch(() => undefined);
 		// standby 补热：本次激活可能消耗了池化进程（或用户正连续开新会话），后台补一个待命。
-		// 仅 pi 后端补（dsh 无进程池概念）；ensure 自身幂等，且受 standbyRuntimeEnabled 设置闸。
-		if (entry.backend !== "dsh" && entry.backend !== "acp") this.agents.ensureStandbyAgent?.(entry.projectId);
+		this.agents.ensureStandbyAgent?.(entry.projectId);
 		return tab;
 	}
 
-	/**
-	 * 会话运行时身份 → catalog attach patch（C9）：收拢 backend 特判——
-	 * - DSH：只回写 dshSessionId，**绝不写 filePath/piSessionId**（2026-08 兼容期教训：
-	 *   dsh 的 tab.sessionPath 是 host 的 zstd 会话文件，曾随文件分支落盘导致 pi 侧把
-	 *   zstd 文件当 pi 会话文件启动（pi exited code=1））；
-	 * - 通用/pi：sessionPath + piSessionId 落「文件配对」分支。
-	 * 返回 null 表示无需回写（匿名会话等）。
-	 */
-	private buildAttachPatch(
-		sessionId: string,
-		tab: Pick<AgentTab, "sessionPath" | "sessionId" | "backend" | "agentPreset">,
-		entry: Pick<SessionCatalogEntry, "noSession" | "backend">,
-	): { sessionId: string; filePath?: string; piSessionId?: string; dshSessionId?: string; acpSessionId?: string; agentPreset?: string; promoteToActive?: boolean } | null {
-		if (entry.backend === "dsh") {
-			return tab.sessionId && !entry.noSession
-				? {
-						sessionId,
-						dshSessionId: tab.sessionId,
-						// DSH 会话的 preset 只在 host 会话 header 里（草稿预选可能被 host 修正），
-						// attach/新建后把实际值回写 catalog，头部胶囊展示真实模式。
-						...(tab.agentPreset ? { agentPreset: tab.agentPreset } : {}),
-					}
-				: null;
-		}
-		// ACP：只回写 acpSessionId（历史在 agent 侧，无本地文件）；agentPreset（工具 id）
-		// 回写作展示镜像。
-		if (entry.backend === "acp") {
-			return tab.sessionId && !entry.noSession ? { sessionId, acpSessionId: tab.sessionId, ...(tab.agentPreset ? { agentPreset: tab.agentPreset } : {}) } : null;
-		}
-		if (tab.sessionPath && !entry.noSession) {
-			return {
-				sessionId,
-				filePath: tab.sessionPath,
-				piSessionId: tab.sessionId,
-			};
-		}
-		return null;
+	/** Persist only the Pi runtime identity; removed backends never activate here. */
+	private buildAttachPatch(sessionId: string, tab: Pick<AgentTab, "sessionPath" | "sessionId">, entry: Pick<SessionCatalogEntry, "noSession">): { sessionId: string; filePath: string; piSessionId?: string } | null {
+		return tab.sessionPath && !entry.noSession ? { sessionId, filePath: tab.sessionPath, piSessionId: tab.sessionId } : null;
 	}
 
 	private findAgentBySessionPath(entry: SessionCatalogEntry): AgentTab | undefined {
@@ -1526,60 +1368,32 @@ export class SessionRuntimeCoordinator {
 	}
 
 	private async applyPreferences(entry: SessionCatalogEntry, agentId: string): Promise<void> {
-		// DSH 草稿的 entry.model 可能来自 pi 的 models.json（引导页/欢迎页选型在
-		// 创建时不知道后端，或用户切了默认后端）；host 目录没有该 provider/模型时
-		// selectModel 会拒绝。降级为「应用宿主默认模型」并告警，不让整个激活失败
-		// （否则每次重试都新建一个 host 会话 = 孤儿堆积）。pi 保持严格（模型应在 models.json）。
-		const isDsh = entry.backend === "dsh";
 		if (entry.model) {
 			try {
 				await this.agents.setModel(agentId, entry.model.provider, entry.model.modelId);
 			} catch (error) {
-				// pi 后端：模型既不在本地 models.json 也不在 pi 目录（AgentManager 不带
-				// needsRestart 标记地抛 "Model not found"）= 模型已被重命名/删除。与 DSH
-				// 同语义降级：保留 catalog 偏好、沿用 runtime 当前模型并给会话内系统提示，
+				// 模型已从本地 models.json 与 Pi 目录删除时，沿用当前运行时模型。
+				// 保留 catalog 偏好并给会话内系统提示，
 				// 不让整个激活/发送失败——否则每次发送都被 "Failed to apply session
 				// preferences" 挡死（2026-09 用户反馈：models.json 重命名模型后旧会话
 				// 无法再发送，报 Model not found: nacho/gpt-5.6-sol）。
 				// 带 needsRestart 的失败（模型存在但运行中 Agent 快照过期）不降级——
 				// 渲染层会引导用户重启 Agent 加载新配置。
-				const modelGoneOnPi = !isDsh && this.isModelGoneError(error);
-				if (!isDsh && !modelGoneOnPi) throw error;
-				void this.logger?.warn("session-runtime", modelGoneOnPi ? "pi model preference ignored: model no longer exists" : "DSH model preference ignored", {
+				const modelGoneOnPi = this.isModelGoneError(error);
+				if (!modelGoneOnPi) throw error;
+				void this.logger?.warn("session-runtime", "pi model preference ignored: model no longer exists", {
 					sessionId: entry.id,
 					provider: entry.model.provider,
 					modelId: entry.model.modelId,
 					error: errorMessage(error),
 				});
-				// 降级路径两侧行为一致：保留 catalog 偏好、沿用当前模型，并**告知用户**。
-				// DSH 不提示的话，引导页点选（已作为显式 model 带入，issue #253）会在 host
-				// 拒绝时静默失效——底栏显示用户选的模型，实际跑的是部署默认。pi 侧本来就有
-				// 会话内系统消息；DSH 的 gateway 实现走 agentsNotice toast。
-				if (modelGoneOnPi || isDsh) {
+				// 告知用户实际沿用的运行时模型，避免底栏偏好和真实请求悄悄分叉。
+				if (modelGoneOnPi) {
 					this.agents.notifyModelPreferenceIgnored?.(agentId, entry.model.provider, entry.model.modelId);
 				}
 			}
 		}
-		if (entry.thinkingLevel) {
-			try {
-				await this.agents.setThinking(agentId, entry.thinkingLevel);
-			} catch (error) {
-				if (!isDsh) throw error;
-				const message = errorMessage(error);
-				void this.logger?.warn("session-runtime", "DSH thinking preference ignored", {
-					sessionId: entry.id,
-					thinkingLevel: entry.thinkingLevel,
-					error: message,
-				});
-				// 后端是档位能力的最终裁决者。即使本次 host 拒绝，也保留用户偏好：
-				// 目录配置、provider 或模型在之后变化时仍可重新应用，不能由 PiDeck
-				// 根据一条当前错误擅自清空用户选择。
-			}
-		}
-		// DSH 权限预设（草稿期预选 / 会话内切换回写）：激活时经 /permission 命令应用
-		if (entry.permissionPreset && this.agents.setPermission) {
-			await this.agents.setPermission(agentId, entry.permissionPreset);
-		}
+		if (entry.thinkingLevel) await this.agents.setThinking(agentId, entry.thinkingLevel);
 	}
 
 	/**
@@ -1599,7 +1413,6 @@ export class SessionRuntimeCoordinator {
 	 * error 终态 agent 的原进程复活：进程仍存活（回复级错误不会杀进程）时把状态
 	 * 回复为 idle 并复用，避免「激活即抛启动失败」或「发消息就杀掉活进程重建」
 	 * （重建在扩展有问题时还会触发无插件回退，Issue #218）。
-	 * 网关未实现该能力（dsh）或进程确已死亡时返回 false，调用方走原终态路径。
 	 */
 	private reviveTerminalAgent(agentId: string): boolean {
 		if (typeof this.agents.reviveIfProcessAlive !== "function") return false;
@@ -1896,7 +1709,6 @@ export class SessionRuntimeCoordinator {
 	}
 
 	/**
-	 * pi 历史会话文件改写：DSH / 未落盘 / 仍在运行一律拒绝。
 	 * 运行中改文件再 switch_session 会和用户「先停再改、下次发送才激活」的产品规则冲突。
 	 */
 	private async mutateCatalogMessage(

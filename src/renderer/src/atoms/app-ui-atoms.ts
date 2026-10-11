@@ -22,13 +22,13 @@ export const logoStyleAtom = atom<"classic" | "pi-tui">("pi-tui");
 export const activeEditorFileAtom = atom<string | null>(null);
 
 /** 与 SettingsModal 侧栏 tab 对齐；深链/焦点目标用同一套 id，避免 Git 去设置落到上次记住的非「常用」页。 */
-export type SettingsTabId = "common" | "shortcuts" | "appearance" | "terminal" | "proxy" | "web" | "editors" | "git" | "dev" | "im" | "pet" | "notification" | "storage" | "backup" | "usage" | "process" | "vision" | "imagegen" | "acp" | "hostplugins";
+export type SettingsTabId = "common" | "shortcuts" | "appearance" | "terminal" | "proxy" | "web" | "editors" | "git" | "dev" | "notification" | "storage" | "backup" | "usage" | "process" | "hostplugins";
 
 /**
  * 设置页内可直达的锚点 slug（对应 DOM 上的 `id="settings-section-<slug>"`）。
  *
  * 两类来源：
- * - 固定分区 git / dsh-runner-node / dev-pi-rpc：历史深链在用，显式列出；
+ * - 固定分区 git / dev-pi-rpc：历史深链在用，显式列出；
  * - 细粒度设置项：由 `utils/settingsFieldAnchors.ts` 的清单推导（`SettingsFieldAnchorSlug`），
  *   命令面板（Ctrl+P）搜到「某个具体设置项」时用它精确跳过去。
  *
@@ -36,9 +36,9 @@ export type SettingsTabId = "common" | "shortcuts" | "appearance" | "terminal" |
  * 静默放弃，不报错不提示），编译期联合是能在提交前拦住它的唯一关口。
  * 这里只 `import type`，atoms ↔ utils 的类型循环会被完全擦除，没有运行时依赖。
  */
-export type SettingsSectionId = "git" | "dsh-runner-node" | "dev-pi-rpc" | SettingsFieldAnchorSlug;
+export type SettingsSectionId = "git" | "dev-pi-rpc" | SettingsFieldAnchorSlug;
 
-/** 设置窗口顶层分区：系统设置 / 配置管理（顶部 tab，样式同配置页 Pi/DSH 分页）。 */
+/** 设置窗口顶层分区：系统设置 / 配置管理（顶部 tab）。 */
 export type SettingsPaneId = "settings" | "config";
 
 export type SettingsFocusTarget = {
@@ -53,12 +53,6 @@ export type SettingsFocusTarget = {
 	configTab?: "models" | "auth" | "settings" | "trust" | "mcp" | "raw";
 	/** configTab="models" 时要定位的供应商名：ModelsTab 展开该卡片并滚动高亮。 */
 	provider?: string;
-	/**
-	 * pane="config" 时要落在的配置管理后端分页（Pi 管理 / DSH 配置）；
-	 * 缺省保持上次位置（loadLastConfigBackendPane，默认 pi）。
-	 * 深链（如 DSH runtime 未装时的「去安装」）直达 DSH 配置页。
-	 */
-	backendPane?: "dsh" | "pi";
 };
 
 /**
@@ -83,28 +77,14 @@ export const openSettingsAtom = atom(null, (_get, set, target?: SettingsFocusTar
  */
 export const defaultAgentBackendAtom = atom<AgentBackend>("pi");
 
-/**
- * 「有效」默认后端（AgentRuntimeProvider 阶段 1）：设置值经 DSH runtime 安装态钳制。
- *
- * 为什么是派生 atom 而不是在 App 的 settings effect 里一次性修正：安装态由 IPC 异步
- * 送达（初值 checking），晚于 settings 落 atom；派生能保证状态到位后所有消费方
- * （新建会话 / 并行问询 / 启动默认值）同帧收敛，不会留下「设置=dsh 但已不可用」的窗口。
- * 钳制规则是纯函数 resolveEffectiveAgentBackend（shared/types/dshRuntime，有单测）。
- */
+/** 当前发行版的新会话只使用 Pi。 */
 export const effectiveAgentBackendAtom = atom<AgentBackend>("pi");
 
 /**
  * 用户隐藏的功能模块（设置项 hiddenModules 的渲染层快照，清单见 shared/hiddenModules.ts）。
- * App 在 settings 变化时写入；不持有 settings props 的消费方（ConfigModal 的 Pi/DSH 分页、
- * composer 后端下拉）从这里读，设置保存后立即生效。默认空 = 全部显示。
+ * App 在 settings 变化时写入；不持有 settings props 的消费方从这里读，设置保存后立即生效。默认空 = 全部显示。
  */
 export const hiddenModulesAtom = atom<readonly string[]>([]);
-
-/** DSH 后端入口是否隐藏：配置管理的 DSH 分页 + 新建会话的 DSH 后端选项。 */
-export const dshModuleHiddenAtom = atom((get) => isModuleHidden(get(hiddenModulesAtom), "dsh"));
-
-/** 生图入口是否隐藏：输入框后端下拉里的生图选项。 */
-export const imageGenModuleHiddenAtom = atom((get) => isModuleHidden(get(hiddenModulesAtom), "imagegen"));
 
 /** 输入框底栏模式选择器是否被隐藏（设置 → 外观 → 功能模块）。 */
 export const composerModesHiddenAtom = atom((get) => isModuleHidden(get(hiddenModulesAtom), "composerModes"));

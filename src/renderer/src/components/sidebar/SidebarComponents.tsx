@@ -1,3 +1,4 @@
+import { isSupportedBackend } from "../../../../shared/productFeatures";
 import {
 	Archive,
 	Boxes,
@@ -735,14 +736,13 @@ export function AgentContextMenu(props: {
 					{t(props.isPinned ? "menu.unpinSession" : "menu.pinSession")}
 				</DropdownMenuItem>
 			)}
-			{/* DSH 运行中会话的复制走 clone 分流（fork 无锚点完整副本），保留入口；
-			    导出 HTML 无 DSH 实现（G10 待决策），对 dsh agent 隐藏 */}
+			{/* 运行时操作仅支持 Pi 会话。 */}
 			<DropdownMenuItem disabled={busy} onSelect={props.onCopySession}>
 				{props.actionLoading === "copy" && <span className="mini-loader animate-pideck-spin" />}
 				<Copy className="size-3.5" aria-hidden="true" />
 				{props.actionLoading === "copy" ? t("menu.copying") : t("menu.copySession")}
 			</DropdownMenuItem>
-			{props.menu.agent.backend !== "dsh" && (
+			{isSupportedBackend(props.menu.agent.backend) && (
 				<DropdownMenuItem disabled={busy} onSelect={props.onExport}>
 					{props.actionLoading === "export" && <span className="mini-loader animate-pideck-spin" />}
 					<FileDown className="size-3.5" aria-hidden="true" />
@@ -756,7 +756,7 @@ export function AgentContextMenu(props: {
 						{t("menu.copySessionFilePath")}
 					</DropdownMenuItem>
 					{/* DSH 会话文件是 zstd 压缩的持久化日志，系统默认程序打开无意义：只留复制 */}
-					{props.menu.agent.backend !== "dsh" && (
+					{isSupportedBackend(props.menu.agent.backend) && (
 						<DropdownMenuItem disabled={busy} onSelect={props.onOpenSessionFile}>
 							<FileText className="size-3.5" aria-hidden="true" />
 							{t("menu.openAgentSessionFile")}
@@ -878,14 +878,14 @@ export function SessionContextMenu(props: {
 				<Settings2 className="size-3.5" aria-hidden="true" />
 				{t("menu.sessionProxy")}
 			</DropdownMenuItem>
-			{props.menu.session.backend !== "dsh" && (
+			{isSupportedBackend(props.menu.session.backend) && (
 				<DropdownMenuItem disabled={busy} onSelect={props.onCopySession}>
 					{props.actionLoading === "copy" && <span className="mini-loader animate-pideck-spin" />}
 					<Copy className="size-3.5" aria-hidden="true" />
 					{props.actionLoading === "copy" ? t("menu.copying") : t("menu.copySession")}
 				</DropdownMenuItem>
 			)}
-			{props.menu.session.backend !== "dsh" && (
+			{isSupportedBackend(props.menu.session.backend) && (
 				<DropdownMenuItem disabled={busy} onSelect={props.onExport}>
 					{props.actionLoading === "export" && <span className="mini-loader animate-pideck-spin" />}
 					<FileDown className="size-3.5" aria-hidden="true" />
@@ -900,7 +900,7 @@ export function SessionContextMenu(props: {
 						{t("menu.copySessionFilePath")}
 					</DropdownMenuItem>
 					{/* DSH 会话文件是 zstd 压缩的持久化日志，系统默认程序打开无意义：只留复制 */}
-					{props.menu.session.backend !== "dsh" && (
+					{isSupportedBackend(props.menu.session.backend) && (
 						<DropdownMenuItem disabled={busy} onSelect={props.onOpenSessionFile}>
 							<FileText className="size-3.5" aria-hidden="true" />
 							{t("menu.openSessionFile")}

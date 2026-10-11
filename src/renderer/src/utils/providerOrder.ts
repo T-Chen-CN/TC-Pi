@@ -1,9 +1,8 @@
 /**
- * 供应商卡片自定义顺序（settings.providerOrder / dshProviderOrder）的纯函数。
+ * 供应商卡片自定义顺序（settings.providerOrder）的纯函数。
  *
- * 三个消费者共用同一套规则：
+ * 两个消费者共用同一套规则：
  * - Pi 模型页供应商卡片（配置管理 → 模型）；
- * - DSH 模型页供应商卡片；
  * - 会话模型选择器的供应商分组（被自定义排序过的供应商严格按该顺序展示）。
  *
  * 为什么这样设计：
@@ -17,7 +16,7 @@
 
 /**
  * 供应商卡片拖拽的 MIME 类型：自定义类型避免浏览器把外部拖入的文本/链接当成卡片重排。
- * Pi 供应商卡片与 DSH 供应商卡片共用同一个 key（两页同一时刻只会拖一处，无需区分）。
+ * Pi 模型页和会话模型选择器共用同一个 key。
  */
 export const PROVIDER_CARD_DRAG_MIME = "application/x-pideck-provider-card";
 

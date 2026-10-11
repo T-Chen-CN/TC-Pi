@@ -282,51 +282,6 @@
   color: var(--color-text-primary);
 }
 
-/* ── Yao Open Prompts（中文精选） ── */
-.store-sub-tab {
-  display: grid;
-  gap: 14px;
-}
-.yao-category-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.yao-category-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-  background: var(--color-bg-muted);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.yao-category-chip:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-.yao-category-chip.active {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-}
-.yao-category-chip small {
-  color: var(--color-text-tertiary);
-  font-size: 11px;
-}
-.yao-category-chip.active small {
-  color: var(--color-accent);
-}
-.yao-card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
 /* ---------- Scratch Pad（草稿本）：布局与动画复用右侧抽屉 ---------- */
 /* ---------- Markdown 渲染 ---------- */
 .scratch-pad-md {

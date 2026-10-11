@@ -314,8 +314,6 @@ export function canAttachRuntimeMetadata(entry: SessionCatalogEntry | undefined,
 
 export class SessionCatalog {
 	private entries: SessionCatalogEntry[] = [];
-	/** Runtime-only records share the catalog lookup contract without durable storage. */
-	private transientEntries = new Map<string, SessionCatalogEntry>();
 	/** 侧栏删除过的 DSH host 会话：刷新/自动导入跳过；手动导入会清掉墓碑。 */
 	private dismissedDshSessionIds = new Set<string>();
 	private loaded = false;
@@ -439,8 +437,7 @@ export class SessionCatalog {
 		}
 
 		// 兼容旧数据：DSH 会话曾只按文件分支 attach（filePath/piSessionId 落盘，
-		// dshSessionId 缺失）——标题同步（findByDshSessionId）与重启后 attach 恢复
-		// 旧会话都依赖 dshSessionId。加载时把 backend=dsh 且缺 dshSessionId 的
+		// dshSessionId 缺失）；读取旧记录时保留实际后端身份。加载时把 backend=dsh 且缺 dshSessionId 的
 		// 记录用 piSessionId（当时存的就是 host 会话 id）补齐。
 		const migratedDsh = this.entries.some((entry) => entry.backend === "dsh" && !entry.dshSessionId && entry.piSessionId);
 		if (migratedDsh) {
@@ -507,20 +504,12 @@ export class SessionCatalog {
 
 	listEntries(): SessionCatalogEntry[] {
 		this.assertLoaded();
-		return [...this.entries.map(cloneEntry), ...Array.from(this.transientEntries.values(), cloneEntry)];
+		return this.entries.map(cloneEntry);
 	}
 
 	get(id: string): SessionCatalogEntry | undefined {
 		this.assertLoaded();
-		const entry = this.transientEntries.get(id) ?? this.entries.find((candidate) => candidate.id === id);
-		return entry ? cloneEntry(entry) : undefined;
-	}
-
-	/** 按 DSH host 会话 id 反查 catalog 记录（会话标题同步用；只读查询，不排队写）。
-	 *  transient 草稿尚未 attach host 会话（无 dshSessionId），只需查持久 entries。 */
-	findByDshSessionId(dshSessionId: string): SessionCatalogEntry | undefined {
-		this.assertLoaded();
-		const entry = this.entries.find((candidate) => candidate.dshSessionId === dshSessionId);
+		const entry = this.entries.find((candidate) => candidate.id === id);
 		return entry ? cloneEntry(entry) : undefined;
 	}
 
@@ -542,11 +531,6 @@ export class SessionCatalog {
 			this.dismissedDshSessionIds.add(id);
 			return { value: undefined, changed: true };
 		});
-	}
-
-	removeTransient(id: string): boolean {
-		this.assertLoaded();
-		return this.transientEntries.delete(id);
 	}
 
 	getRecord(id: string): SessionRecord | undefined {
@@ -772,27 +756,6 @@ export class SessionCatalog {
 		},
 	): Promise<SessionRecord> {
 		this.assertLoaded();
-		const transient = this.transientEntries.get(id);
-		if (transient) {
-			if (patch.title !== undefined) {
-				transient.title = patch.title;
-				assignTitleOrigin(transient, "manual");
-			}
-			if (patch.model !== undefined) transient.model = cloneModelPreference(patch.model ?? undefined);
-			if (patch.thinkingLevel !== undefined) transient.thinkingLevel = patch.thinkingLevel ?? undefined;
-			if (patch.permissionPreset !== undefined) transient.permissionPreset = patch.permissionPreset ?? undefined;
-			if (patch.agentPreset !== undefined) transient.agentPreset = patch.agentPreset ?? undefined;
-			if (patch.acpToolId !== undefined) transient.acpToolId = patch.acpToolId ?? undefined;
-			if (patch.backend !== undefined) transient.backend = patch.backend;
-			// 切到生图后端时需甩开 pi 会话文件（filePath/piSessionId 置空），否则残留文件引用
-			if (patch.filePath !== undefined) transient.filePath = patch.filePath ?? undefined;
-			if (patch.piSessionId !== undefined) transient.piSessionId = patch.piSessionId ?? undefined;
-			if (patch.forked === true) transient.forked = true;
-			// null = 清除覆盖恢复跟随全局
-			if (patch.proxy !== undefined) transient.proxy = patch.proxy ?? undefined;
-			transient.updatedAt = patch.updatedAt ?? Date.now();
-			return this.recordFromEntry(transient);
-		}
 		const entry = await this.enqueueMutation((entries) => {
 			const nextEntry = this.requireEntry(entries, id);
 			if (patch.title !== undefined) {
@@ -826,11 +789,6 @@ export class SessionCatalog {
 		this.assertLoaded();
 		const nextTitle = title.replace(/\s+/g, " ").trim();
 		if (!nextTitle) throw new Error("Automatic session title is required");
-		const transient = this.transientEntries.get(id);
-		if (transient) {
-			if (claimAutomaticTitle(transient, nextTitle, source)) transient.updatedAt = Date.now();
-			return this.recordFromEntry(transient);
-		}
 		const entry = await this.enqueueMutation((entries) => {
 			const nextEntry = this.requireEntry(entries, id);
 			const claimed = claimAutomaticTitle(nextEntry, nextTitle, source);
@@ -847,14 +805,6 @@ export class SessionCatalog {
 	 */
 	async claimTitleOwnership(id: string): Promise<SessionRecord> {
 		this.assertLoaded();
-		const transient = this.transientEntries.get(id);
-		if (transient) {
-			if (!isTitleLocked(transient)) {
-				assignTitleOrigin(transient, "manual");
-				transient.updatedAt = Date.now();
-			}
-			return this.recordFromEntry(transient);
-		}
 		const entry = await this.enqueueMutation((entries) => {
 			const nextEntry = this.requireEntry(entries, id);
 			if (isTitleLocked(nextEntry)) return { value: cloneEntry(nextEntry), changed: false };
@@ -975,7 +925,6 @@ export class SessionCatalog {
 
 	async remove(id: string): Promise<boolean> {
 		this.assertLoaded();
-		if (this.transientEntries.delete(id)) return true;
 		return this.enqueueMutation((entries) => {
 			const index = entries.findIndex((entry) => entry.id === id);
 			if (index < 0) return { value: false, changed: false };
@@ -989,54 +938,25 @@ export class SessionCatalog {
 	 *
 	 * 磁盘侧 `SessionScanner.archive/delete` 会把 sibling `<stem>/` 一并移走，但
 	 * `remove(id)` 只摘一条；`mergeScanned` 只增改不删，列表缓存会把失去父节点的
-	 * 子会话孤儿提升成顶层行，再点开就是残留聊天框。匿名会话和草稿没有 filePath，
+	 * 子会话孤儿提升成顶层行，再点开就是残留聊天框。草稿没有 filePath，
 	 * 不会被当成后代。其它项目即使路径碰巧相似，也按 projectId 隔离。
 	 */
 	async removeWithDescendants(id: string): Promise<string[]> {
 		this.assertLoaded();
-		const parent = this.transientEntries.get(id) ?? this.entries.find((entry) => entry.id === id);
+		const parent = this.entries.find((entry) => entry.id === id);
 		if (!parent) return [];
 		const projectEntries = this.listEntries().filter((entry) => entry.projectId === parent.projectId);
 		const ids = collectSessionSubtreeIds(projectEntries, parent);
 
-		const removed: string[] = [];
-		for (const sessionId of ids) {
-			if (this.transientEntries.delete(sessionId)) removed.push(sessionId);
-		}
-		const persistedIds = ids.filter((sessionId) => !removed.includes(sessionId));
-		if (persistedIds.length === 0) return removed;
-
 		const persistedRemoved = await this.enqueueMutation((entries) => {
-			const idSet = new Set(persistedIds);
+			const idSet = new Set(ids);
 			const next = entries.filter((entry) => !idSet.has(entry.id));
 			const actuallyRemoved = entries.filter((entry) => idSet.has(entry.id)).map((entry) => entry.id);
 			if (actuallyRemoved.length === 0) return { value: [] as string[], changed: false };
 			entries.splice(0, entries.length, ...next);
 			return { value: actuallyRemoved, changed: true };
 		});
-		return [...removed, ...persistedRemoved];
-	}
-
-	/**
-	 * 将 draft 会话提升为 active：生图草稿已把历史落盘到 ImageSession 独立存储后调用，
-	 * 避免重启时被 staleDrafts 清理逻辑剔掉（否则侧栏没有入口，历史无法恢复）。
-	 * 非 draft / 匿名会话幂等：只更新 updatedAt。
-	 */
-	async promoteToActive(sessionId: string): Promise<SessionRecord | undefined> {
-		this.assertLoaded();
-		const transient = this.transientEntries.get(sessionId);
-		if (transient) {
-			if (transient.status === "draft") transient.status = "active";
-			transient.updatedAt = Date.now();
-			return this.recordFromEntry(transient);
-		}
-		const entry = await this.enqueueMutation((entries) => {
-			const nextEntry = this.requireEntry(entries, sessionId);
-			if (nextEntry.status === "draft") nextEntry.status = "active";
-			nextEntry.updatedAt = Date.now();
-			return { value: cloneEntry(nextEntry), changed: true };
-		});
-		return this.recordFromEntry(entry);
+		return persistedRemoved;
 	}
 
 	/**
@@ -1045,9 +965,6 @@ export class SessionCatalog {
 	 */
 	async removeByProjectId(projectId: string): Promise<number> {
 		this.assertLoaded();
-		for (const [id, entry] of this.transientEntries) {
-			if (entry.projectId === projectId) this.transientEntries.delete(id);
-		}
 		return this.enqueueMutation((entries) => {
 			const next = entries.filter((entry) => entry.projectId !== projectId);
 			const removed = entries.length - next.length;
@@ -1317,14 +1234,7 @@ export class SessionCatalog {
 				value: records.sort((left, right) => right.updatedAt - left.updatedAt),
 				changed,
 			};
-		}).then((records) =>
-			[
-				...Array.from(this.transientEntries.values())
-					.filter((entry) => entry.projectId === projectId)
-					.map((entry) => this.recordFromEntry(entry)),
-				...records,
-			].sort((left, right) => right.updatedAt - left.updatedAt),
-		);
+		});
 	}
 
 	/** 对新文件、未确认 provisional 标题，或需要一次性回填旧子代理父关系的条目读取会话头。

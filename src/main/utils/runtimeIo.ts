@@ -1,13 +1,22 @@
 /**
- * DSH runtime 的 IO 适配层（下载与解压的真实实现）。
+ * Pi 运行时的 IO 适配层（下载与解压的真实实现）。
  *
- * 与 DshRuntimeManager 分离：管理器只管编排与校验规则，IO 是可替换的实现细节
+ * 安装管理器只管编排与校验规则，IO 是可替换的实现细节
  * （测试注入替身，不碰网络与 tar）。两处都遵守 PiDeck 既有约定：
  * - 下载走 Electron `net`（尊重应用代理设置，与 app update 同源），不走 node fetch；
  * - 解压优先走系统自带 tar（Windows/macOS/Linux 均有，原生实现快约 5 倍），
- *   npm `tar`（纯 JS、无原生模块）作为兜底，保证安全语义一致（见方案文档 §5）。
+ *   npm `tar`（纯 JS、无原生模块）作为兜底，保证安全语义一致。
  */
-import { copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+/**
+ * Pi 运行时的 IO 适配层（下载与解压的真实实现）。
+ *
+ * 安装管理器只管编排与校验规则，IO 是可替换的实现细节
+ * （测试注入替身，不碰网络与 tar）。两处都遵守 PiDeck 既有约定：
+ * - 下载走 Electron `net`（尊重应用代理设置，与 app update 同源），不走 node fetch；
+ * - 解压优先走系统自带 tar（Windows/macOS/Linux 均有，原生实现快约 5 倍），
+ *   npm `tar`（纯 JS、无原生模块）作为兜底，保证安全语义一致。
+ */
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname } from "node:path";

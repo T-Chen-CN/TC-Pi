@@ -1402,7 +1402,7 @@ export function createPreviewApi(): PiDesktopApi {
 			tokendanceTopUpCreate: async () => ({ ok: false, code: "not-configured" }),
 			tokendanceTopUpStatus: async () => ({ ok: false, code: "not-configured" }),
 			tokendanceTopUpOpenAlipay: async () => ({ ok: false, error: "preview" }),
-			installTokendance: async () => ({ ok: false, modelCount: 0, piSaved: false, dshSaved: false, error: "preview" }),
+			installTokendance: async () => ({ ok: false, modelCount: 0, piSaved: false, error: "preview" }),
 			testProvider: async () => ({
 				success: true,
 				model: "gpt-4o-mini",

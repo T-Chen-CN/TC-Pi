@@ -1,9 +1,7 @@
-import { memo, useMemo } from "react";
-import { useAtomValue } from "jotai";
+import { memo } from "react";
 import type { AppSettings } from "../../../../../shared/types";
 import { HIDEABLE_MODULE_IDS, isModuleHidden, toggleHiddenModule, type HideableModuleId } from "../../../../../shared/hiddenModules";
 import { t, type TranslationKey } from "../../../i18n";
-import { sessionRecordsAtom, sessionRuntimeByIdAtom } from "../../../atoms";
 import { Badge } from "../../ui-shadcn/badge";
 import { SettingsSection } from "./SettingsStorageTab";
 import { DirtyMarker, SettingRow } from "./SettingRows";
@@ -16,51 +14,26 @@ type ModuleVisibilitySectionProps = {
 	isDirty: (field: keyof AppSettings) => boolean;
 };
 
-/** 各模块行的标题 key：设置 tab 直接复用侧栏标题（命令面板同源），dsh 用配置管理分页的名字。 */
+/** 各模块行的标题 key：设置 tab 直接复用侧栏标题（命令面板同源）。 */
 const MODULE_LABEL_KEYS: Record<HideableModuleId, TranslationKey> = {
-	im: SETTINGS_TAB_LABEL_KEYS.im,
-	pet: SETTINGS_TAB_LABEL_KEYS.pet,
-	vision: SETTINGS_TAB_LABEL_KEYS.vision,
-	imagegen: SETTINGS_TAB_LABEL_KEYS.imagegen,
-	acp: SETTINGS_TAB_LABEL_KEYS.acp,
 	hostplugins: SETTINGS_TAB_LABEL_KEYS.hostplugins,
 	web: SETTINGS_TAB_LABEL_KEYS.web,
 	git: SETTINGS_TAB_LABEL_KEYS.git,
 	usage: SETTINGS_TAB_LABEL_KEYS.usage,
 	process: SETTINGS_TAB_LABEL_KEYS.process,
 	composerModes: "settings.modules.composerModes",
-	dsh: "settings.modules.dsh",
 };
 
 /** 每个模块隐藏后受影响的入口说明（行描述）。 */
 const MODULE_DESC_KEYS: Record<HideableModuleId, TranslationKey> = {
-	im: "settings.modules.imDesc",
-	pet: "settings.modules.petDesc",
-	vision: "settings.modules.visionDesc",
-	imagegen: "settings.modules.imagegenDesc",
-	acp: "settings.modules.acpDesc",
 	hostplugins: "settings.modules.hostpluginsDesc",
 	web: "settings.modules.webDesc",
 	git: "settings.modules.gitDesc",
 	usage: "settings.modules.usageDesc",
 	process: "settings.modules.processDesc",
 	composerModes: "settings.modules.composerModesDesc",
-	dsh: "settings.modules.dshDesc",
 };
 
-/**
- * 外观设置「功能模块」分区：每个可隐藏模块一行开关（开 = 显示）。
- *
- * 隐藏只收起 UI 入口，不清配置、不停后台功能，所以模块仍在运行/已启用时在标题旁挂
- * 「运行中 / 已启用」徽标——用户关掉入口后不至于忘了它还在跑（issue #248 维护者要求）。
- * 活动状态取自各模块现成的数据源，不新增 IPC：
- * - 飞书：Bridge 连接态（useFeishuBridge 内部订阅 IPC 推送）
- * - DSH：有 backend=dsh 且 runtime 未关闭的会话
- * - 桌宠 / Web 服务 / Git：AppSettings 里对应的启用开关（读草稿，与本页其它项一致）
- * - 视觉桥：pi-deck-vision.json 的 enabled
- * - 生图：已配置至少一个供应商（生图按需请求，无「运行中」概念）
- * 用量统计 / 进程监控只是展示页，没有活动状态。
- */
 export const ModuleVisibilitySection = memo(function ModuleVisibilitySection(props: ModuleVisibilitySectionProps) {
 	const { draft, updateDraft, isDirty } = props;
 	const hiddenModules = draft.hiddenModules ?? [];
@@ -73,7 +46,6 @@ export const ModuleVisibilitySection = memo(function ModuleVisibilitySection(pro
 				return draft.enableGitManagement ? "settings.modules.statusEnabled" : null;
 			case "usage":
 			case "process":
-			case "acp":
 			case "hostplugins":
 			case "composerModes":
 				return null;

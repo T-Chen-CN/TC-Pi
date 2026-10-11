@@ -183,9 +183,7 @@ export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 					</Select>
 				</SettingRow>
 
-				{/* DSH runtime 管理已迁至 DSH 配置 → 概览页（DshRuntimeSection 区块：
-            未装→安装引导，已装→版本/目录/卸载/导入），这里不再重复放状态行。 */}
-				{/* 忙碌时投递行为：Agent 回复期间发送消息的默认语义（pi/dsh 统一）。 */}
+				{/* 忙碌时投递行为：Agent 回复期间发送消息的默认语义。 */}
 				<SettingRow
 					title={
 						<>

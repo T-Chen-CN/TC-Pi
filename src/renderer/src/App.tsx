@@ -1,3 +1,4 @@
+import { isSupportedBackend } from "../../shared/productFeatures";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import {
 	Activity,
@@ -140,7 +141,6 @@ import { isChatProject, isPendingAgentId, isReplacementForPendingAgent, migrateA
 import { reorderProjectList } from "./utils/projectOrder";
 import { splitLayoutSessionIds } from "./utils/sessionSplitEdge";
 
-import { hydrateImageContents } from "../../shared/imageContentSrc";
 import type { AgentBackend, AgentTab, AppSettings, ComposerAgentMode, FileTreeNode, FocusTargetPayload, GitBranchInfo, ImageContent, Project, SessionLaunchPreferences, SessionRecord, SessionSummary, TerminalTarget, TerminalThemeId } from "../../shared/types";
 import { createDefaultAppSettings } from "../../shared/types";
 import { EnvironmentDialog, FileContextMenu, ImagePreviewModal, type SessionModifiedFile } from "./components/app/AppParts";
@@ -566,8 +566,7 @@ export function App() {
 	useEffect(() => {
 		setDefaultAgentBackend(settings.defaultAgentBackend);
 	}, [settings.defaultAgentBackend, setDefaultAgentBackend]);
-	// 派生出「有效」后端：设置值经 DSH runtime 安装态钳制（runtime 不可用时 dsh → pi）。
-	// 所有新建会话入口统一读这个值，避免设置里残留 dsh 而 runtime 已不可用导致裸报错。
+	// 旧设置的默认后端不影响新建会话，当前发行版统一使用 Pi。
 	const effectiveAgentBackend = useAtomValue(effectiveAgentBackendAtom);
 
 	// 忙碌时发送的默认投递行为同步给发送链路（composer/App 决策时刻从 atom 读取，
@@ -577,7 +576,7 @@ export function App() {
 		setBusySendDelivery(settings.busySendDelivery);
 	}, [settings.busySendDelivery, setBusySendDelivery]);
 
-	// 隐藏的功能模块同步给不持有 settings props 的消费方（ConfigModal Pi/DSH 分页、composer 后端下拉），
+	// 隐藏的功能模块同步给不持有 settings props 的消费方（配置管理和输入框），
 	// 与 defaultAgentBackend 同一模式。
 	const setHiddenModules = useSetAtom(hiddenModulesAtom);
 	useEffect(() => {
@@ -738,7 +737,7 @@ export function App() {
 	// 查看器已移除：activeAgent 直接从 displayAgents / pendingAgents 取，不再有伪 Agent。
 	const activeAgent = activeAgentId ? [...displayAgents, ...pendingAgents].find((agent) => agent.id === activeAgentId) : undefined;
 	// rewind（检查点）是 pi 后端能力：抽屉 rail 与底栏按钮同口径门控
-	// （dsh/imagegen 会话不展示入口）。与 Injector 的 isDshBackend 同源判定。
+	// （dsh/imagegen 会话不展示入口）。与 Injector 的后端只读判定一致。
 	const rewindBackend = activeAgent?.backend ?? currentSessionRecord?.backend;
 	const rewindSupported = rewindBackend === undefined || rewindBackend === "pi";
 
@@ -1013,7 +1012,7 @@ export function App() {
 		refreshProjectSessions,
 		api,
 		showToast,
-		// 新建会话默认后端：跟随设置项（默认 pi，可切换 dsh），经 DSH runtime 安装态钳制
+		// 新建会话统一使用 Pi 后端
 		defaultBackend: effectiveAgentBackend,
 	});
 
@@ -1184,27 +1183,17 @@ export function App() {
 				// 引导页 picker 无 record 分支把显式选择存进 localStorage；创建时将模型交给
 				// 主进程校验、将思考档位作为启动偏好带入。底栏展示和真实会话创建读取同一份值，
 				// 避免出现「菜单看似切换，首次发送后又回到默认档位」。
-				// 引导页底栏显式切换的后端（localStorage 偏好）优先于设置项默认；
-				// 选了 dsh 但 DSH runtime 不可用时按 effectiveAgentBackendAtom 同一条
-				// 钳制规则回落 pi，避免首次发送才在 createDraft 门控上抛错。
-				// 与 ComposerArea 的展示用同一纯函数：展示的后端和创建的后端必须一致。
+				// 引导页与首次发送统一使用当前 Pi 后端。
 				const draftBackend = resolveGuidePageBackend({ override: readWelcomeBackendPreference(), effectiveDefault: effectiveAgentBackend });
-				// 模型偏好按后端分开取（issue #253）：DSH 的模型是 host route 名，不在 models.json，
-				// 必须作为显式 model 直接带给 host；pi 的偏好走 welcomeModel（launchDefaults 会按
-				// models.json 校验存在性）。历史上 DSH 侧不读偏好，点选因此永远不生效。
-				const welcomeModel = draftBackend === "dsh" ? readWelcomeModelPreference()?.model : readWelcomeModelPreference()?.model;
+				const welcomeModel = readWelcomeModelPreference()?.model;
 				const welcomeThinking = readWelcomeThinkingPreference()?.thinkingLevel;
 				// 统一创建 draft 会话（Chat 项目也走普通会话、可保存）：创建不拉 pi，
 				// selectSessionCommand 同步切页、立即进入会话页。
-				// 默认后端跟随设置项（settings.defaultAgentBackend，默认 pi），
-				// 且经 DSH runtime 安装态钳制——runtime 不可用时不会尝试建 dsh 会话。
-				// 激活时 SessionRuntimeCoordinator.applyPreferences → DshAgentManager.setModel
-				// 会把这条显式 model 落到 host（host 拒绝时降级并告警，不让创建失败）。
 				const session = await api.sessions.createDraft({
 					projectId: project.id,
-					title: draftBackend === "dsh" ? `${project.name} DSH` : `${project.name} agent`,
+					title: `${project.name} agent`,
 					backend: draftBackend,
-					...(welcomeModel ? (draftBackend === "dsh" ? { model: welcomeModel } : { welcomeModel }) : {}),
+					...(welcomeModel ? { welcomeModel } : {}),
 					...(welcomeThinking ? { thinkingLevel: welcomeThinking } : {}),
 				});
 				upsertSession(session);
@@ -1579,7 +1568,7 @@ export function App() {
 	async function addProject() {
 		const project = await api.projects.add();
 		if (!project) return;
-		// 先同步 DSH：新目录注册后，原先按 cwd 找不到项目的外部会话才能挂进来。
+		// 新目录注册后同步历史，按 cwd 关联外部会话。
 
 		await refreshProjects();
 		if (!(await selectProjectCommand(project.id))) return;
@@ -1630,7 +1619,7 @@ export function App() {
 	// isAgentCurrentlyBusy / setPromptForAgent / setPrompt / livePromptByAgentRef).
 	/**
 	 * pi 历史消息改写：无 runtime 直接改 JSONL；有 runtime 先确认停止再改文件。
-	 * DSH 入口在 Injector 按 backend 隐藏。下次发送才重新激活 Agent。
+	 * 旧后端入口在 Injector 按 backend 隐藏。下次发送才重新激活 Agent。
 	 */
 	const { editMessage, deleteMessage, removeMessageImage, resendUserMessage, forkFromUserMessage, forkAtEntry, forkingMessageId } = useSessionHistoryMutations({
 		currentSessionId,
@@ -1653,10 +1642,7 @@ export function App() {
 			const record = getSessionRecord(sessionId);
 			return Boolean(record?.filePath) && !record?.noSession;
 		},
-		// 生图 draft：会话消息里存在生图占位/结果即判定为生图模式（无 pi runtime、无 pi JSONL）。
-		isImageGenSession: (sessionId) => (store.get(sessionMessagesCacheAtom)?.[sessionId]?.messages ?? []).some((message) => message.meta?.imageGen !== undefined),
-		// fork 化重发/编辑只服务 pi 后端：DSH 维持 legacy 路径（策略层返回 catalog）
-		isDshSession: (sessionId) => getSessionRecord(sessionId)?.backend === "dsh",
+		isUnsupportedBackend: (sessionId) => !isSupportedBackend(getSessionRecord(sessionId)?.backend),
 		// fork 锚点是否为最后一条用户消息：尾部 → 替换语义（旧会话隐藏）；非尾部 → 分支模式（旧会话保留可见）。
 		// 缓存缺失时按非尾部处理（false），宁可两会话并存也不隐藏可能还有独属内容的旧会话。
 		isLastUserMessage: (sessionId, message) => {
@@ -1665,23 +1651,6 @@ export function App() {
 			const index = cached.findIndex((candidate) => candidate.id === message.id);
 			if (index < 0) return false;
 			return !cached.slice(index + 1).some((candidate) => candidate.role === "user");
-		},
-		// 生图重发：把失败的提示词（+参考图）放回输入框供一键重试。参考图直接整体替换附件栏
-		//（重发目标就是这轮消息自身，不需要前插保留——那是失败后保留用户新粘贴图的场景）。
-		restoreImageGenTurn: (sessionId, text, images) => {
-			setSessionDraft({ sessionId, value: text });
-			if (!images?.length) return;
-			// 历史消息里的参考图是落盘引用（ref），附件栏与后续请求体要的是 base64：
-			// 异步回填，取不到字节的条目丢掉（不阻断提示词回填）。
-			void hydrateImageContents(images, (ref) => window.piDesktop.images.readBlob(ref))
-				.then((hydrated) => {
-					if (hydrated.length > 0) {
-						setSessionAttachments({ sessionId, value: hydrated });
-						return;
-					}
-					if (images.length > 0) showToast(t("imagegen.referenceUnavailable"));
-				})
-				.catch(() => showToast(t("imagegen.referenceUnavailable")));
 		},
 	});
 
@@ -1753,7 +1722,7 @@ export function App() {
 		[activeProjectId, showToast],
 	);
 
-	// 侧栏会话归档/删除族收口到 useSidebarArchiveActions（删除/归档/恢复 + DSH 归档）
+	// 侧栏会话归档/删除族收口到 useSidebarArchiveActions（删除/归档/恢复）
 	const { deleteSidebarSession, archiveSidebarSession, unarchiveSidebarSession, listArchivedSidebarSessions, deleteArchivedSidebarSession, requestDeleteSidebarSession } = useSidebarArchiveActions({
 		activeProjectId,
 		showToast,
@@ -1888,7 +1857,6 @@ export function App() {
 			export: runExportSidebarSession,
 			copy: runCopySidebarSession,
 			copyPath: async (session) => {
-				// DSH 会话没有 pi 会话文件：走主进程按 dshSessionId + cwd 推导 host 持久化路径（F5）。
 				// 失败/不可推导时提示而不是把空值写进剪贴板（原实现会把 undefined 写成 "undefined" 字符串）。
 				const path = session.filePath;
 				if (!path) {
@@ -2044,8 +2012,7 @@ export function App() {
 	// —— Tab 栏会话操作组（重命名 / 复制会话 / 导出 HTML / 复制路径 / 打开文件）——
 	// 与侧栏会话右键菜单同源同语义，参数化到任意 sessionId：⋯ 菜单喂当前会话，
 	// Tab 右键菜单（SessionTabsBar contextSessionActions）喂被右键的 Tab——后台 Tab
-	// 同样可操作。live 会话复制走 clone 分流（Agent 换绑新会话，DSH 亦可），历史/
-	// 未启动会话走 copyRecord；DSH 历史会话无宿主文件，隐藏复制/导出组（与侧栏一致）。
+	// 同样可操作。Pi live 会话复制走 clone，历史/未启动会话走 copyRecord；旧后端只读。
 	// record/runtime 用 store 现查（右键目标不在 current* 闭包里）；agent 列表闭包自
 	// 当次渲染（SessionTabsBar 的 renderTab 每渲染重建，无过期问题）。
 	const buildTabsSessionActions = (sessionId: string): SessionTabsBarProps["sessionActions"] => {
@@ -2058,8 +2025,8 @@ export function App() {
 		// 终态，扩展规划的会话名再也写不进来）；复制/导出同款闸门。
 		const canRename = record.status !== "draft";
 		return {
-			canCopySession: canRename && (isLive || record.backend !== "dsh"),
-			canExportHtml: canRename && record.backend !== "dsh",
+			canCopySession: canRename && isSupportedBackend(record.backend),
+			canExportHtml: canRename && isSupportedBackend(record.backend),
 			hasFilePath: Boolean(record.filePath),
 			onCopySession: () => {
 				if (isLive && agentId) {
@@ -2070,7 +2037,6 @@ export function App() {
 			},
 			onCopySessionFilePath: () => {
 				void (async () => {
-					// DSH 会话文件路径按 dshSessionId + cwd 推导（与侧栏 copyPath 同源）；
 					// 失败/不可推导时提示而不是把空值写进剪贴板。
 					const path = record.filePath;
 					if (!path) {
@@ -2177,7 +2143,7 @@ export function App() {
 				}
 			: undefined,
 		// 会话代理（网络代理）入口：与侧栏会话菜单同源，打开同一个弹框。
-		// 仅在有当前会话时给出；弹框内自行判断 DSH 等宿主差异并给出「下次启动生效」提示。
+		// 仅在有当前会话时给出；弹框内按 Pi 进程状态提示何时生效。
 		onOpenProxySetting: currentSessionId ? () => setProxyDialogSessionId(currentSessionId) : undefined,
 		onToggleDrawer: toggleRightDrawer,
 		drawerOpen: Boolean(drawer && !drawerCollapsed),

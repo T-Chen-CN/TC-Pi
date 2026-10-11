@@ -205,14 +205,7 @@ export const ComposerArea = forwardRef<HTMLElement, ComposerAreaProps>(function 
 									turnCount={props.turnCount}
 									contextMeter={
 										composer.mode === "imagegen" ? null : (
-											<SessionContextMeter
-												state={composer.runtime?.state}
-												onCompact={composer.delivery.compact}
-												overflowRecoveryTarget={composer.delivery.overflowRecoveryTarget}
-												onOverflowRecovery={composer.delivery.onOverflowRecovery}
-												backend={composer.backend === "dsh" ? "dsh" : "pi"}
-												fallbackProvider={composer.bootstrapDefaultModel?.provider}
-											/>
+											<SessionContextMeter state={composer.runtime?.state} onCompact={composer.delivery.compact} overflowRecoveryTarget={composer.delivery.overflowRecoveryTarget} onOverflowRecovery={composer.delivery.onOverflowRecovery} backend="pi" fallbackProvider={composer.bootstrapDefaultModel?.provider} />
 										)
 									}
 								/>

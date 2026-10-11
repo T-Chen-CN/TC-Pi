@@ -340,28 +340,16 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		if (!project) throw new Error(mainCopy("project.notFound"));
 		// Auto-fill model / thinkingLevel from pi config when the caller hasn't
 		// provided them, so the composer bar shows the effective default.
-		// DSH 后端不适用 pi 的模型配置（模型路由由 DSH host 自己的 settings 决定）：
-		// **显式传入的 model 仍然接受**（issue #253）——引导页在 DSH 态下的点选必须带到会话上，
-		// 否则 host 只能用部署默认（settings.yaml 的 agent-default-model），用户表现为
-		// 「切到 DSH 后模型换不了」。与侧栏「新建会话后切 DSH 再选模型」走 updateRecord 的
-		// 既有链路保持一致：只做形状归一化，不用 models.json 校验（DSH 的 provider 是
-		// host route 名，不在 models.json 里，校验会把合法选择全丢掉）。模型是否被 host
-		// 接受由激活时的 applyPreferences → DshAgentManager.setModel 裁决（host 拒绝时
-		// 降级到部署默认并告警，不让创建失败）。
-		// 缺省模型仍不从 pi 配置解析：DSH 没有可读的启动默认解析器（部署默认由 host 自己决定）。
-		// 思考档位值域与 DSH 兼容（off/high/max 等），新会话默认档位同样填充——否则 DSH
-		// 新会话的思考按钮只显示「思考」而非实际默认档位。
 		let model = normalizeSessionModelPreference(input.model);
 		let thinkingLevel = input.thinkingLevel;
-		const nonPiBackend = false;
-		if ((!nonPiBackend && !model) || !thinkingLevel) {
+		if (!model || !thinkingLevel) {
 			try {
 				const [settingsResult, modelsResult] = await Promise.all([configManager.getSettingsConfig(), configManager.getModelsConfig()]);
 				// 引导页/渲染层显式传入的模型（如欢迎页偏好）也可能指向已删除的供应商/模型：
 				// 校验其仍存在（models.json ∪ pi 目录，与选择器可选范围一致），不存在则交给
 				// 解析器按欢迎页点选 → 配置默认 → enabledModels → lastUsed 的顺序兜底，
 				// 避免新会话带着幽灵模型启动。
-				if (!nonPiBackend && model) {
+				if (model) {
 					if (
 						typeof model.provider !== "string" ||
 						typeof model.modelId !== "string" ||
@@ -392,15 +380,15 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 					lastUsedModel: settingsStore.get().lastUsedModel,
 					welcomeModel: input.welcomeModel && typeof input.welcomeModel.provider === "string" && typeof input.welcomeModel.modelId === "string" ? input.welcomeModel : undefined,
 				});
-				if (!nonPiBackend && !model) {
+				if (!model) {
 					model = defaults.model;
 				}
 				if (!thinkingLevel) {
 					// 每模型默认档位优先于全局默认，且必须按**最终生效的模型**查（显式传入的
 					// model / welcomeModel 可能不是解析器选出的默认模型）：pi 在新建与切换模型时
 					// 都按「显式选择 > 每模型默认 > 全局默认」解析再 clamp，这里同序才能保证
-					// 首轮请求用的档位与引导页底栏展示的一致。DSH 无 pi 模型身份，跳过。
-					const perModelThinkingLevel = !nonPiBackend && model && typeof model.provider === "string" && typeof model.modelId === "string" ? modelThinkingLevelOf(settingsResult.parsed, model.provider, model.modelId) : undefined;
+					// 首轮请求用的档位与引导页底栏展示的一致。
+					const perModelThinkingLevel = model && typeof model.provider === "string" && typeof model.modelId === "string" ? modelThinkingLevelOf(settingsResult.parsed, model.provider, model.modelId) : undefined;
 					thinkingLevel = perModelThinkingLevel ?? defaults.thinkingLevel;
 				}
 			} catch {
@@ -422,7 +410,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		});
 		// standby 补热：草稿创建是「用户马上要开聊」的最强信号，趁用户阅读/输入的空窗
 		// 后台预热一个 pi 进程待命（fire-and-forget；ensure 幂等且受 standbyRuntimeEnabled 闸）。
-		if (!nonPiBackend) agentManager.ensureStandbyAgent(input.projectId);
+		agentManager.ensureStandbyAgent(input.projectId);
 		return draft;
 	});
 	ipcMain.handle(ipcChannels.sessionsResolveLaunchDefaults, async (_event, input?: ResolveLaunchDefaultsInput): Promise<ResolvedLaunchDefaults> => {

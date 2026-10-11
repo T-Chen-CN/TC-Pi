@@ -179,26 +179,9 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 		}
 	}
 
-	function requestCloseAgent(agent: Pick<AgentTab, "id" | "noSession">): Promise<void> {
-		if (!agent.noSession) return closeAgent(agent.id);
-		overlays.showConfirm({
-			title: t("app.anonymousChatCloseTitle"),
-			message: t("app.anonymousChatCloseBody"),
-			danger: true,
-			confirmLabel: t("common.close"),
-			onConfirm: () => {
-				overlays.clearConfirm();
-				void closeAgent(agent.id).catch((error) => {
-					showToast(error instanceof Error ? error.message : String(error), 5000);
-				});
-			},
-		});
-		return Promise.resolve();
-	}
-
 	/**
 	 * 关闭 Agent（会话维度入口，供 Tab 下拉使用）：复用侧栏 Agent 菜单的确认逻辑
-	 * 与 closeAgent 链路（杀进程 + 解绑）。匿名会话内容不可恢复，会先弹确认。
+	 * 与 closeAgent 链路（杀进程 + 解绑）。
 	 */
 	function requestCloseAgentForSession(sessionId: string): void {
 		const target = getRuntimeTargetForSession(sessionId);
@@ -206,10 +189,7 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 			showToast(t("sessionCommand.runtimeUnavailable"), 3000);
 			return;
 		}
-		void requestCloseAgent({
-			id: target.agentId,
-			noSession: getSessionRecord(sessionId)?.noSession,
-		});
+		void closeAgent(target.agentId).catch((error: unknown) => showToast(error instanceof Error ? error.message : String(error), 5000));
 	}
 
 	async function abortAgent(agentId = activeAgentId) {
@@ -443,7 +423,7 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 		refreshRuntimeState,
 		reloadSessionMessages,
 		closeAgent,
-		requestCloseAgent,
+		requestCloseAgent: (agent: Pick<AgentTab, "id">) => closeAgent(agent.id),
 		requestCloseAgentForSession,
 		abortAgent,
 		restartActiveAgent,

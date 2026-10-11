@@ -86,8 +86,8 @@ export type UsageProbeRecognition = {
 	category: UsageProbeTemplateCategory;
 };
 
-/** 用量查询的配置宿主：pi（~/.pi/agent/usage-probes.json）或 dsh（$DSH_HOME/usage-probes.json）。 */
-export type UsageProbeBackend = "pi" | "dsh";
+/** 用量查询的配置宿主：Pi（~/.pi/agent/usage-probes.json）。 */
+export type UsageProbeBackend = "pi";
 
 /**
  * 单 provider 的用量查询配置（~/.pi/agent/usage-probes.json 的 providers 映射条目）。

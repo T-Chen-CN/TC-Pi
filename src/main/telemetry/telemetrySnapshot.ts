@@ -14,8 +14,6 @@ export type TelemetrySnapshotDeps = {
 	projectsTotal: number;
 	/** 当前活跃的 pi agent 进程数（AgentManager.list().length） */
 	agentsActive: number;
-	/** 已配置的飞书 Bot 数（>0 即视为飞书功能采用） */
-	feishuBotsTotal: number;
 	/** 定时任务总数（AutomationStore.listTasks().length） */
 	automationTasksTotal: number;
 	/** 系统 locale（app.getLocale()） */
@@ -51,17 +49,12 @@ export function collectTelemetrySnapshot(deps: TelemetrySnapshotDeps): Telemetry
 		projects_total: deps.projectsTotal,
 		agents_active: deps.agentsActive,
 		automation_tasks_total: deps.automationTasksTotal,
-		feishu_bots_total: deps.feishuBotsTotal,
 		// 功能采用度：开关状态 + 隐藏模块清单，回答「下个版本投入哪个功能」
-		feature_pet: settings.petEnabled,
-		feature_floating_ball: settings.floatingBallEnabled,
 		feature_web_service: settings.webServiceEnabled,
-		feature_cua: settings.cuaEnabled,
 		feature_standby: settings.standbyRuntimeEnabled ?? true,
 		feature_wsl: settings.wslEnabled,
 		feature_desktop_proxy: settings.desktopProxyEnabled,
 		feature_pi_proxy: settings.piProxyEnabled,
-		feature_feishu: deps.feishuBotsTotal > 0,
 		hidden_modules_total: hiddenModules.length,
 		hidden_modules: [...hiddenModules],
 	};

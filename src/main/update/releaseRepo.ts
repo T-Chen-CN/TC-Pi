@@ -7,7 +7,7 @@ import { UPDATE_REPO, UPDATE_REPO_OWNER } from "../../shared/updateSources";
  * （此前两处各写一份、靠人工同步，迟早漂移）。对外仍导出同名常量，消费方无需改动。
  *
  * electron-updater 的 GitHub provider 从 package.json build.publish 读取仓库坐标
- * （无需在此注入）；此常量仅用于非更新链路的 Release 资产 URL（如 DSH runtime 索引）。
+ * （无需在此注入）；此常量仅用于非更新链路的 Release 资产 URL（如便携 Node 发行包）。
  */
 export { UPDATE_REPO, UPDATE_REPO_OWNER };
 

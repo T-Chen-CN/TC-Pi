@@ -22,7 +22,7 @@ import type { BridgeEvent } from "../../shared/types/bridge";
 import type { SessionAgentGateway } from "../sessions/SessionRuntimeCoordinator";
 
 /**
- * 多后端 agent 网关装配器：把 pi / dsh 等具体网关聚合成一个
+ * 多后端 agent 网关装配器：将具体网关聚合成一个
  * `SessionAgentGateway`，供 SessionRuntimeCoordinator 无感消费。
  *
  * 路由规则：
@@ -84,7 +84,7 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 	}
 
 	/** 可选能力存在性检查（不抽方法，避免丢 this）；缺失时抛与旧行为一致的错误，由 Coordinator 转 SESSION_COMMAND_FAILED。 */
-	private requireCapability(gateway: SessionAgentGateway, method: "getCommands" | "exportHtml" | "editMessage" | "deleteMessage" | "setPermission" | "listCheckpoints" | "getCheckpointDiff" | "restoreCheckpoint"): void {
+	private requireCapability(gateway: SessionAgentGateway, method: "getCommands" | "exportHtml" | "editMessage" | "deleteMessage" | "listCheckpoints" | "getCheckpointDiff" | "restoreCheckpoint"): void {
 		if (typeof gateway[method] !== "function") {
 			throw new Error(`CompositeAgentGateway: backend "${gateway.backend}" does not support ${method}`);
 		}
@@ -109,7 +109,7 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 		return tab;
 	}
 
-	/** standby 认领只路由 pi 网关（dsh 无进程池概念）；命中后登记归属供后续 owner() 定位。 */
+	/** standby 认领只路由 pi 网关；命中后登记归属供后续 owner() 定位。 */
 	async claimStandbyAgent(input: { projectId: string; sessionId: string; noSession?: boolean }): Promise<AgentTab | null> {
 		const gateway = this.byBackend.get("pi");
 		if (typeof gateway?.claimStandbyAgent !== "function") return null;
@@ -118,12 +118,12 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 		return tab;
 	}
 
-	/** standby 补热只路由 pi 网关；dsh-only 部署不会因此多 spawn pi 进程。 */
+	/** standby 补热只路由 pi 网关。 */
 	ensureStandbyAgent(projectId: string): void {
 		this.byBackend.get("pi")?.ensureStandbyAgent?.(projectId);
 	}
 
-	/** 草稿命令预览只路由 pi 网关（dsh 无 standby 池）；网关缺失/失败返回 null。 */
+	/** 草稿命令预览只路由 pi 网关；网关缺失/失败返回 null。 */
 	async draftCommands(projectId: string): Promise<PiCommand[] | null> {
 		const gateway = this.byBackend.get("pi");
 		if (typeof gateway?.draftCommands !== "function") return null;
@@ -157,7 +157,7 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 		return this.owner(agentId).getRuntimeState(agentId);
 	}
 
-	/** 可选能力转发：error 终态但进程仍存活时的原进程复活（pi 实现；dsh 未实现返回 false）。 */
+	/** 可选能力转发：error 终态但进程仍存活时的原进程复活。 */
 	reviveIfProcessAlive(agentId: string): boolean {
 		const gateway = this.owner(agentId);
 		if (typeof gateway.reviveIfProcessAlive !== "function") return false;
@@ -218,7 +218,6 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 
 	/**
 	 * 无 runtime 的 JSONL 改写只属于 pi：按默认后端解析网关，不按 agentId。
-	 * DSH 网关没有该方法，走「不支持」错误，禁止硬造等价物。
 	 */
 	async mutatePersistedSessionMessage(
 		sessionPath: string,
@@ -258,13 +257,7 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 		return this.owner(agentId).setThinking(agentId, level);
 	}
 
-	async setPermission(agentId: string, preset: string): Promise<unknown> {
-		const gateway = this.owner(agentId);
-		this.requireCapability(gateway, "setPermission");
-		return gateway.setPermission!(agentId, preset);
-	}
-
-	/** 可选能力透传：pi 网关在会话时间线落系统提示；DSH 网关未实现则静默跳过。 */
+	/** 可选能力透传：pi 网关在会话时间线落系统提示。 */
 	notifyModelPreferenceIgnored(agentId: string, provider: string, modelId: string): void {
 		const gateway = this.owner(agentId);
 		gateway.notifyModelPreferenceIgnored?.(agentId, provider, modelId);
@@ -275,7 +268,7 @@ export class CompositeAgentGateway implements SessionAgentGateway {
 	 *
 	 * **必须显式转发**：`SessionRuntimeCoordinator` 走的是 `agents.pushBridgeEvent?.(...) ?? false`，
 	 * 本类漏实现时可选调用链会直接短路——渲染层所有桥事件（勾选/输入/按钮）
-	 * 都变成静默丢弃，表现为「面板点了没反应」。DSH 网关未实现则返回 false（同样静默）。
+	 * 都变成静默丢弃，表现为「面板点了没反应」。未实现的网关返回 false。
 	 */
 	pushBridgeEvent(agentId: string, event: BridgeEvent): boolean {
 		try {

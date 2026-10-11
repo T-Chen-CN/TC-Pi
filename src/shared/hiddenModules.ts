@@ -1,7 +1,7 @@
 /**
  * 「隐藏功能模块」（设置 → 外观 → 功能模块）：用户按需收起不用的模块 UI 入口。
  *
- * 只隐藏入口，不清配置、不停后台功能：飞书 Bridge 已连接就继续跑，DSH 会话照常运行；
+ * 只隐藏入口，不清配置、不停后台功能；
  * 用户要停用应先去对应页面关掉再隐藏。默认 `[]` = 全部显示，旧 settings.json 缺字段零迁移。
  *
  * 为什么存 id 数组而不是 N 个布尔：模块清单会随功能增减，数组只需在
@@ -17,18 +17,10 @@
  */
 import { isRemovedModule } from "./productFeatures";
 
-const LEGACY_SETTINGS_TAB_IDS = ["im", "pet", "vision", "imagegen", "acp", "hostplugins", "web", "git", "usage", "process"] as const;
-export const HIDEABLE_SETTINGS_TAB_IDS = LEGACY_SETTINGS_TAB_IDS.filter((id) => !isRemovedModule(id));
-
-/**
- * 全部可隐藏模块：设置 tab + `dsh`（DSH 后端不是设置 tab，它对应配置管理的 DSH 分页
- * 与新建会话的 DSH 后端选项）+ `composerModes`（输入框底栏的模式选择器）。
- */
-const LEGACY_MODULE_IDS = [...LEGACY_SETTINGS_TAB_IDS, "composerModes", "dsh"] as const;
-export const HIDEABLE_MODULE_IDS = LEGACY_MODULE_IDS.filter((id) => !isRemovedModule(id));
-
-export type HideableSettingsTabId = (typeof LEGACY_SETTINGS_TAB_IDS)[number];
-export type HideableModuleId = HideableSettingsTabId | "composerModes" | "dsh";
+export const HIDEABLE_SETTINGS_TAB_IDS = ["hostplugins", "web", "git", "usage", "process"] as const;
+export const HIDEABLE_MODULE_IDS = [...HIDEABLE_SETTINGS_TAB_IDS, "composerModes"] as const;
+export type HideableSettingsTabId = (typeof HIDEABLE_SETTINGS_TAB_IDS)[number];
+export type HideableModuleId = (typeof HIDEABLE_MODULE_IDS)[number];
 
 /** 上限：清单本身只有个位数条目，留余量容纳未知 id，同时挡住脏数据把 settings.json 塞爆。 */
 export const MAX_HIDDEN_MODULES = 64;
@@ -51,7 +43,7 @@ export function normalizeHiddenModules(value: unknown): string[] {
 }
 
 /** 某模块当前是否被用户隐藏。 */
-export function isModuleHidden(hiddenModules: readonly string[], moduleId: HideableModuleId): boolean {
+export function isModuleHidden(hiddenModules: readonly string[], moduleId: string): boolean {
 	return isRemovedModule(moduleId) || hiddenModules.includes(moduleId);
 }
 

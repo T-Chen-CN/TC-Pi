@@ -4,11 +4,6 @@ type DisplayBackendInput = {
 	platform?: NodeJS.Platform | "linux";
 	env?: NodeJS.ProcessEnv;
 	argv?: string[];
-	/**
-	 * 桌面宠物是否启用（启动时快照）。宠物依赖 X11 的绝对窗口定位，
-	 * 是应用 XWayland 兼容层的唯一理由；未启用时不得强制 XWayland（#108）。
-	 */
-	petEnabled?: boolean;
 };
 
 type CommandLineSwitch = {
@@ -31,18 +26,7 @@ function shouldDisableGpuForXWayland(env: NodeJS.ProcessEnv) {
 	return normalizeBackend(env[DISABLE_GPU_ENV]) !== "0";
 }
 
-/**
- * Ubuntu/GNOME defaults to Wayland, but Electron 38 cannot freely position
- * BrowserWindow instances there. The desktop pet depends on absolute window
- * coordinates for initial placement, dragging and patrol, so prefer XWayland
- * when the session exposes a DISPLAY server.
- *
- * 见 #108：Electron 38 在 GNOME/Wayland 上强制 XWayland 会导致主窗口不可见，
- * 而兼容层的唯一收益是宠物的自由定位，因此默认不再无条件应用：
- * `PIDECK_LINUX_DISPLAY_BACKEND=wayland` 强制原生 Wayland；`=x11` 强制 XWayland；
- * 未设置时仅当桌面宠物已启用（petEnabled）才应用，未启用宠物的用户走原生
- * Wayland，宠物按 PetWindowCaps 探测结果降级为圆角小窗。
- */
+/** Keep the native display backend unless the user explicitly requests XWayland. */
 export function getLinuxDisplayBackendSwitches(input: DisplayBackendInput = {}): CommandLineSwitch[] {
 	const platform = input.platform ?? process.platform;
 	const env = input.env ?? process.env;
@@ -55,8 +39,8 @@ export function getLinuxDisplayBackendSwitches(input: DisplayBackendInput = {}):
 		return [];
 	}
 
-	// 默认仅宠物启用时才强制 XWayland；显式 =x11 视为无条件开启。
-	if (requestedBackend !== "x11" && input.petEnabled !== true) return [];
+	// 只有显式请求 x11 才应用兼容层。
+	if (requestedBackend !== "x11") return [];
 
 	const isWaylandSession = normalizeBackend(env.XDG_SESSION_TYPE) === "wayland" || Boolean(env.WAYLAND_DISPLAY);
 	const hasXWaylandDisplay = Boolean(env.DISPLAY);
@@ -69,8 +53,8 @@ export function getLinuxDisplayBackendSwitches(input: DisplayBackendInput = {}):
 	return switches;
 }
 
-export function applyLinuxDisplayBackendWorkaround(petEnabled?: boolean) {
-	const switches = getLinuxDisplayBackendSwitches({ petEnabled });
+export function applyLinuxDisplayBackendWorkaround() {
+	const switches = getLinuxDisplayBackendSwitches();
 	if (switches.some((item) => item.name === "ozone-platform" && item.value === "x11") && shouldDisableGpuForXWayland(process.env)) {
 		app.disableHardwareAcceleration();
 	}
@@ -80,6 +64,6 @@ export function applyLinuxDisplayBackendWorkaround(petEnabled?: boolean) {
 	}
 }
 
-export function isUsingLinuxXWaylandWorkaround(petEnabled?: boolean) {
-	return getLinuxDisplayBackendSwitches({ petEnabled }).some((item) => item.name === "ozone-platform" && item.value === "x11");
+export function isUsingLinuxXWaylandWorkaround() {
+	return getLinuxDisplayBackendSwitches().some((item) => item.name === "ozone-platform" && item.value === "x11");
 }

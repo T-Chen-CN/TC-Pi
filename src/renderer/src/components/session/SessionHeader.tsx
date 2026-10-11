@@ -1,6 +1,6 @@
 import { useAtomValue } from "jotai";
 import { selectAtom } from "jotai/utils";
-import { HatGlasses, Maximize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { useMemo, type RefObject } from "react";
 import { projectByIdAtomFamily, sessionRecordByIdAtomFamily, sessionSendStateByIdAtom } from "../../atoms";
 import { isUserFacingSessionStart } from "../../hooks/useSessionTimelineController";
@@ -10,7 +10,6 @@ import { Button } from "../ui-shadcn/button";
 
 type HeaderActions = {
 	headerRef: RefObject<HTMLDivElement | null>;
-	isAnonymous?: boolean;
 	duration?: number;
 	/** 将状态/操作区嵌入 Tab 栏，避免当前会话再单独占一行。 */
 	embedded?: boolean;
@@ -62,7 +61,6 @@ export function SessionHeader(props: SessionHeaderProps) {
 	const sendState = useAtomValue(sendStateSelector);
 	// session 模式也只认用户发送；预热 starting 不能给标题栏加 loading（会顶高/半透明）。
 	const isStarting = sessionMode ? isUserFacingSessionStart(sendState?.status) : legacyProps.isStarting;
-	const isAnonymous = props.isAnonymous || (sessionMode && session?.noSession === true);
 	// 项目名：session 模式从会话记录解析 projectId → 项目目录名；
 	// legacy 模式（无 sessionId）由上层通过 projectName 传入。
 	const project = useAtomValue(projectByIdAtomFamily(session?.projectId ?? ""));
@@ -70,15 +68,7 @@ export function SessionHeader(props: SessionHeaderProps) {
 	// 会话标题：分屏优先用 paneTitle，其次 legacy title / session 模式记录标题。
 	const title = props.paneTitle ?? (sessionMode ? session?.title?.trim() || t("app.chatProject") : props.title);
 
-	const actions = (
-		<div ref={props.embedded ? props.headerRef : undefined} className={`chat-header-actions flex min-w-0 items-center justify-end gap-1.5${props.embedded ? " h-7 w-auto shrink-0" : ""}${isStarting ? " loading" : ""}`}>
-			{isAnonymous && (
-				<span className="anonymous-badge" title={t("app.anonymousChat")} aria-label={t("app.anonymousChat")}>
-					<HatGlasses size={14} aria-hidden="true" />
-				</span>
-			)}
-		</div>
-	);
+	const actions = <div ref={props.embedded ? props.headerRef : undefined} className={`chat-header-actions flex min-w-0 items-center justify-end gap-1.5${props.embedded ? " h-7 w-auto shrink-0" : ""}${isStarting ? " loading" : ""}`}></div>;
 
 	if (props.embedded) return actions;
 	return (

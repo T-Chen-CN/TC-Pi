@@ -14,7 +14,6 @@ test("main-process copy resolves locale and interpolates stable product text", (
 	assert.equal(normalizeMainProcessLocale("en-GB"), "en-US");
 	assert.equal(normalizeMainProcessLocale("de-DE"), "zh-CN");
 	assert.equal(mainProcessT("en-US", "tray.showWindow"), "Show window");
-	assert.equal(mainProcessT("en-US", "pet.switch"), "Switch pet");
 	assert.equal(mainProcessT("en-US", "session.historyTitle", { project: "PiDeck" }), "PiDeck history");
 	assert.equal(mainProcessT("en-US", "session.imagePlaceholder"), "[Image]");
 	assert.equal(mainProcessT("zh-CN", "session.importedPreview", { source: "Codex" }), "已导入的 Codex 会话");

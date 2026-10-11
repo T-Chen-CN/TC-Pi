@@ -37,7 +37,7 @@ test("session runtime lifecycle events are logged", () => {
 	assert.match(coordinator, /"Runtime renamed"/);
 	assert.match(coordinator, /"Runtime model changed", \{\s*sessionId: target\.sessionId,\s*agentId,\s*provider,\s*modelId,/);
 	assert.match(coordinator, /"Runtime thinking changed"/);
-	assert.match(coordinator, /"Anonymous runtime bound", \{\s*sessionId,\s*agentId,\s*runtimeGeneration,/);
+	assert.doesNotMatch(coordinator, /"Anonymous runtime bound"|bindAnonymousRuntime/);
 	assert.match(coordinator, /"Focused session changed", \{ sessionId \}\)/);
 	assert.match(coordinator, /"Agent stopped \(unbound\)", \{ agentId \}\)/);
 });

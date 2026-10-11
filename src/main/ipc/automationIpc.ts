@@ -60,6 +60,8 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): () => void {
 			throw new Error("Invalid automation task patch");
 		}
 		try {
+			// A patch must not silently migrate the identity of a legacy task.
+			requireSupportedBackend(automationStore.getTask(taskId.trim())?.backend);
 			requireSupportedBackend(patch.backend);
 			const task = await automationStore.updateTask(taskId.trim(), patch);
 			void appLogger.info("automation", "Updated task", { taskId: task.id, name: task.name });

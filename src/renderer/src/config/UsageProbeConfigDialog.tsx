@@ -113,7 +113,7 @@ export function UsageProbeConfigDialog(props: {
 	/** 供应商名（主进程解析端点与密钥；per-provider 配置的唯一作用域）。 */
 	provider: string;
 	/** 配置宿主：pi（缺省，~/.pi/agent/usage-probes.json）或 dsh（$DSH_HOME/usage-probes.json）。 */
-	backend?: "pi" | "dsh";
+	backend?: "pi";
 	/**
 	 * 关闭宿主窗口（设置窗口或独立配置弹窗）：走宿主自己的未保存确认流程，
 	 * 供「让 AI 帮我查」写入输入框后回到主会话（缺省只关本弹窗）。
@@ -385,13 +385,13 @@ export function UsageProbeConfigDialog(props: {
 	/**
 	 * 「让 AI 帮我查接口文档」：装技能 → 关闭弹窗与宿主窗口 → 提示词写进主会话输入框
 	 * （复用并行问询「插入主会话输入框」同一条 setSessionDraftAtom 通道，只填草稿不发送）。
-	 * 提示词模板带 provider 与配置路径（pi/DSH 的 usage-probes.json 位置不同），AI 拿到即可开工；
+	 * 提示词模板带 provider 与配置路径，AI 拿到即可开工；
 	 * 无活动会话（引导页）退回剪贴板兜底，不关窗口。
 	 */
 	const aiAssist = async () => {
 		const prompt = t("config.usageProbe.aiPrompt", {
 			provider: props.provider,
-			configPath: props.backend === "dsh" ? "$DSH_HOME/usage-probes.json" : "~/.pi/agent/usage-probes.json",
+			configPath: "~/.pi/agent/usage-probes.json",
 		});
 		try {
 			await desktopApi.config.installUsageSkill();
@@ -425,10 +425,7 @@ export function UsageProbeConfigDialog(props: {
 		<Dialog open onOpenChange={(next) => !next && handleClose()}>
 			<DialogContent className="max-h-[85vh] flex flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
 				<DialogHeader className="px-5 pt-4 pb-2">
-					<DialogTitle>
-						{t("config.usageProbe.titleWithProvider", { provider: props.provider })}
-						{props.backend === "dsh" ? t("config.usageProbe.dshSuffix") : null}
-					</DialogTitle>
+					<DialogTitle>{t("config.usageProbe.titleWithProvider", { provider: props.provider })}</DialogTitle>
 				</DialogHeader>
 				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-3">
 					{!loaded ? (

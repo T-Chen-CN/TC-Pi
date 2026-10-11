@@ -1,6 +1,5 @@
 import type { ThinkingLevelMap } from "./modelSpecs";
 import type { SessionEnvironment, SessionSource } from "./session";
-import type { TodoItem } from "./todo";
 
 export type AgentStatus = "starting" | "idle" | "running" | "error" | "closed";
 
@@ -203,15 +202,6 @@ export type CreateAgentInput = {
 	sessionPath?: string;
 	/** 运行时后端；缺省走当前装配的默认后端（pi），旧调用方无需改动。 */
 	backend?: AgentBackend;
-	/** DSH 会话身份（DSH host 的 sessionId）：backend=dsh 且已持久化时，attach 旧会话而非新建。 */
-	dshSessionId?: string;
-	/** DSH agent 预设（会话「模式」）；ACP 后端复用本字段承载 AcpToolConfig.id（选了哪个 CLI）。 */
-	agentPreset?: string;
-	/**
-	 * ACP 会话身份（agent 侧 sessionId）：backend=acp 且已持久化时，attach 旧会话
-	 * （session/load 恢复，agent 重放历史）而非新建。与 dshSessionId 语义平行。
-	 */
-	acpSessionId?: string;
 	/**
 	 * PiDeck 会话身份（SessionRecord.id，可能为 UUID 或会话文件路径）。
 	 * 会话级安全覆盖（SecurityStore.sessionOverrides）与 PIDECK_SESSION_ID 注入都使用这个 key；
@@ -225,7 +215,6 @@ export type CreateAgentInput = {
 	wslDistro?: string;
 	wslUser?: string;
 	importedSourceId?: string;
-	noSession?: boolean;
 };
 
 export type AgentUiResponse = {

@@ -25,7 +25,7 @@ function createDeps(overrides = {}) {
 		sessionsTotal: 42,
 		projectsTotal: 7,
 		agentsActive: 3,
-		feishuBotsTotal: 1,
+
 		automationTasksTotal: 2,
 		systemLocale: "zh-CN",
 		portable: false,
@@ -49,16 +49,14 @@ test("maps settings and counts into heartbeat snapshot properties", () => {
 	assert.equal(snapshot.projects_total, 7);
 	assert.equal(snapshot.agents_active, 3);
 	assert.equal(snapshot.automation_tasks_total, 2);
-	assert.equal(snapshot.feishu_bots_total, 1);
-	assert.equal(snapshot.feature_pet, true);
-	assert.equal(snapshot.feature_floating_ball, false);
+
 	assert.equal(snapshot.feature_web_service, true);
-	assert.equal(snapshot.feature_cua, false);
+
 	assert.equal(snapshot.feature_standby, false);
 	assert.equal(snapshot.feature_wsl, false);
 	assert.equal(snapshot.feature_desktop_proxy, true);
 	assert.equal(snapshot.feature_pi_proxy, false);
-	assert.equal(snapshot.feature_feishu, true);
+
 	assert.equal(snapshot.hidden_modules_total, 2);
 	// vm 沙箱返回的数组是另一个 realm 的对象，deepEqual 会比原型，用 JSON 比较内容
 	assert.equal(JSON.stringify(snapshot.hidden_modules), JSON.stringify(["pet", "dsh"]));
@@ -69,14 +67,12 @@ test("portable builds report install_mode=portable", () => {
 	assert.equal(snapshot.install_mode, "portable");
 });
 
-test("standby defaults to enabled and feishu adoption derives from bot count", () => {
-	const deps = createDeps({ feishuBotsTotal: 0 });
+test("standby defaults to enabled", () => {
+	const deps = createDeps();
 	delete deps.settings.standbyRuntimeEnabled;
 	const snapshot = collectTelemetrySnapshot(deps);
 
 	assert.equal(snapshot.feature_standby, true);
-	assert.equal(snapshot.feature_feishu, false);
-	assert.equal(snapshot.feishu_bots_total, 0);
 });
 
 test("missing hiddenModules falls back to empty list without mutating settings", () => {
@@ -94,4 +90,9 @@ test("snapshot contains only anonymous stats: no paths, names, secrets, or conte
 	for (const banned of ["path", "secret", "token", "api_key", "apikey", "password", "prompt", "message", "filename", "projectname", "project_name"]) {
 		assert.equal(serialized.includes(banned), false, `snapshot must not contain ${banned}`);
 	}
+});
+
+test("retired features are absent from telemetry", () => {
+	const snapshot = collectTelemetrySnapshot(createDeps());
+	for (const key of ["feishu_bots_total", "feature_pet", "feature_floating_ball", "feature_cua", "feature_feishu"]) assert.equal(Object.hasOwn(snapshot, key), false);
 });

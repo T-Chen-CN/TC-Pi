@@ -1,3 +1,4 @@
+import { requireSupportedSessionRuntime } from "../../shared/productFeatures";
 import { Notification, app, dialog, shell, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
@@ -573,10 +574,10 @@ export class AgentManager {
 			// PiDeck 自带扩展注入（普通资源启停已交给 pi 原生 settings.json 过滤规则）。
 			...createPiProcessExtensionResolvers(cwd, settings),
 			// 会话身份 = PiDeck 会话 key（SessionRecord.id，UUID 或旧版文件路径），扩展按它解析等级覆盖；
-			// 匿名会话（noSession）无 key，扩展仅用全局默认等级。
+			// 无会话身份时没有 key，扩展仅用全局默认等级。
 			securitySessionId: securitySessionKey ?? sessionPath,
 			// 会话级代理覆盖：spawn 时按会话记录覆盖全局设置（on → 强制代理 / off → 强制直连）。
-			// 与 securitySessionId 用同一 key，匿名会话（noSession）无 key → 跟随全局。
+			// 与 securitySessionId 用同一 key，无会话身份时没有 key → 跟随全局。
 			proxyOverride: this.resolveSessionProxy?.(securitySessionKey ?? sessionPath),
 
 			securitySnapshotPath: this.securityStore?.getSnapshotPath(),
@@ -726,7 +727,6 @@ export class AgentManager {
 			sessionPath?: string;
 			deckSessionId?: string;
 			trustOverride?: "approve" | "no-approve";
-			noSession?: boolean;
 			onExit: (payload: { code: number | null; signal: string | null }) => void;
 		},
 	): Promise<{
@@ -805,7 +805,6 @@ export class AgentManager {
 			sessionPath?: string;
 			deckSessionId?: string;
 			trustOverride?: "approve" | "no-approve";
-			noSession?: boolean;
 			onExit: (payload: { code: number | null; signal: string | null }) => void;
 		},
 		settingsOverride?: Partial<Pick<AppSettings, "piRpcNoExtensions">>,
@@ -838,7 +837,7 @@ export class AgentManager {
 			projectPath: options.projectPath,
 			onExit: options.onExit,
 		});
-		const client = await process.start(options.sessionPath, options.trustOverride, options.noSession);
+		const client = await process.start(options.sessionPath, options.trustOverride);
 		void this.appLogger?.info("agent", "Agent get_state request start", {
 			agentId,
 			timeoutMs: this.startupHandshakeTimeoutMs,
@@ -971,11 +970,11 @@ export class AgentManager {
 	/**
 	 * 认领 standby：命中（项目一致 + spawn 指纹一致 + 进程仍 idle）则转正返回已握手 tab，
 	 * 调用方跳过 createAgent 直接绑定会话；任何不满足都返回 null 回退正常创建。
-	 * 会话级代理覆盖（on/off）与飞书绑定是 spawn 时注入的 env，池化进程按全局/未绑定 spawn，
+	 * 会话级代理覆盖（on/off）是 spawn 时注入的 env，池化进程使用全局代理配置，
 	 * 服务不了这类会话，直接拒绝认领。
 	 */
-	async claimStandbyAgent(input: { projectId: string; sessionId?: string; noSession?: boolean }): Promise<AgentTab | null> {
-		if (this.projectRuntimeFence.isPaused(input.projectId) || !this.settingsStore.get().standbyRuntimeEnabled || input.noSession) return null;
+	async claimStandbyAgent(input: { projectId: string; sessionId?: string }): Promise<AgentTab | null> {
+		if (this.projectRuntimeFence.isPaused(input.projectId) || !this.settingsStore.get().standbyRuntimeEnabled) return null;
 		const project = this.getProject(input.projectId);
 		if (!project) return null;
 		const proxyMode = this.resolveSessionProxy?.(input.sessionId);
@@ -1542,6 +1541,7 @@ export class AgentManager {
 	}
 
 	async create(rawInput: CreateAgentInput) {
+		requireSupportedSessionRuntime(rawInput);
 		const input = rawInput.sessionPath ? { ...rawInput, sessionPath: this.toSessionProtocolPath(rawInput.sessionPath) } : rawInput;
 		const sessionKey = buildAgentSessionKey(input, this.getAgentSessionIdentityDefaults());
 		if (!sessionKey) return this.createUnlocked(input);
@@ -1664,7 +1664,6 @@ export class AgentManager {
 			wslDistro: input.wslDistro ?? (sessionEnvironment === "wsl" ? sessionIdentityDefaults.wslDistro : undefined),
 			wslUser: input.wslUser ?? (sessionEnvironment === "wsl" ? sessionIdentityDefaults.wslUser : undefined),
 			importedSourceId: input.importedSourceId,
-			noSession: input.noSession,
 			standby: input.standby ? true : undefined,
 			createdAt: Date.now(),
 		};
@@ -1689,7 +1688,6 @@ export class AgentManager {
 				sessionPath: input.sessionPath,
 				deckSessionId: input.deckSessionId,
 				trustOverride,
-				noSession: input.noSession,
 				onExit: (payload) => this.handleCreateProcessExit(id, tab, payload),
 			});
 		} catch (error) {
@@ -3438,7 +3436,7 @@ export class AgentManager {
 			projectId: runtime.tab.projectId,
 			sessionPath: runtime.tab.sessionPath,
 		});
-		const { projectId, title, sessionEnvironment: environment, sessionSource: source, wslDistro, wslUser, importedSourceId, noSession, deckSessionId } = runtime.tab;
+		const { projectId, title, sessionEnvironment: environment, sessionSource: source, wslDistro, wslUser, importedSourceId, deckSessionId } = runtime.tab;
 
 		// 优先从 pi 获取最新 sessionFile，兜底用 tab 上缓存的值；
 		// 避免首次创建时未指定 session 路径、restart 后丢失历史的情况。
@@ -3481,14 +3479,13 @@ export class AgentManager {
 		// 以 catalog 会话 ID 存储的 sessionOverrides，丢了会回退全局默认等级（issue #302）。
 		return this.create({
 			projectId,
-			sessionPath: noSession ? undefined : sessionPath,
+			sessionPath,
 			title,
 			environment,
 			source,
 			wslDistro,
 			wslUser,
 			importedSourceId,
-			noSession,
 			deckSessionId,
 		});
 	}

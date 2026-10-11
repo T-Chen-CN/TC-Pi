@@ -28,15 +28,6 @@ test("单项变更时 items 只含一项，tabKey/itemKey 指向该项", () => {
 	assert.deepEqual(JSON.parse(JSON.stringify(summary.items.map((i) => [i.tabKey, i.itemKey]))), [["settings.tabs.git", "settings.gitCommitMessageModel"]]);
 });
 
-test("视觉桥脏标记挂到视觉桥 tab，而不是当成未知 AppSettings 字段", () => {
-	const summary = summarizeSettingsUnsavedChanges({
-		dirtyFields: [],
-		visionDirty: true,
-	});
-	assert.equal(summary.totalCount, 1);
-	assert.deepEqual(JSON.parse(JSON.stringify(summary.items.map((i) => [i.tabKey, i.itemKey]))), [["settings.tabs.vision", "settings.vision.section"]]);
-});
-
 test("webServiceRequiresAuth 变更指向 Web 设置 tab 的访问令牌项", () => {
 	const summary = summarizeSettingsUnsavedChanges({
 		dirtyFields: ["webServiceRequiresAuth"],

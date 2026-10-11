@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from "react";
  * 保存注册表（C22）：收敛「子分区/子页注册保存函数 + 脏状态聚合 + 批量保存」模式。
  *
  * 使用场景：
- * - DshConfigTab：子分区（instanceId）注册保存函数，顶部保存按钮 saveAll；
  * - 配置页/设置页：tab 级保存分发 + 关闭确认的脏状态。
  *
  * 语义：

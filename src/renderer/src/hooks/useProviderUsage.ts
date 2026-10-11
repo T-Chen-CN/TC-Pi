@@ -40,7 +40,7 @@ export {
  * Pi 缓存使用 provider；旧后端只保留隔离的缓存身份，不再发起查询。
  */
 export function usageCacheKey(provider: string, backend: UsageProbeBackend): string {
-	return backend === "pi" ? provider : `${backend}:${provider}`;
+	return provider;
 }
 
 /** provider → 正在进行的请求；模块级一处，避免多组件同时挂载重复弹请求。 */

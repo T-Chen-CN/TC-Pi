@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 /**
  * System IPC handlers: pi check/exec, WSL, model list, logging, config, app update, dev tools.
  * Phase 3.7: extracted from src/main/index.ts registerIpc().
@@ -156,7 +157,7 @@ export type SystemIpcDeps = {
 	 * 使项目 MCP 读写不会在缺少门禁的路径上放开。
 	 */
 	isProjectTrusted?: (projectId: string, projectRoot: string) => Promise<boolean>;
-	/** pi 环境引导：便携 Node 安装器（下载/解压 IO 由 index.ts 装配 DSH 同源实现）；未装配 = 引导入口降级不可用。 */
+	/** pi 环境引导：便携 Node 安装器（下载/解压 IO 由 index.ts 装配通用实现）；未装配 = 引导入口降级不可用。 */
 	piRuntimeNodeInstaller?: import("../pi/runtimeNodeInstall").RuntimeNodeInstallerDeps;
 	/** 开发诊断采样（设置开关热启停） */
 	diagnosticsMonitor?: DiagnosticsMonitor;
@@ -170,7 +171,7 @@ export type SystemIpcDeps = {
 	tokendanceAuth?: TokendanceAuthStore;
 	/** 内置 TokenDance 充值会话（创建 + 状态查询，Key 不出主进程）；未装配 = 充值入口不可用。 */
 	tokendancePayment?: TokendancePaymentStore;
-	/** TokenDance 一键安装（写入 pi models.json + DSH llm-pi-ai）；未装配 = 配置入口不可用。 */
+	/** TokenDance 一键安装（写入 pi models.json）；未装配 = 配置入口不可用。 */
 	tokendanceInstall?: (apiKey?: string) => Promise<TokendanceInstallResult>;
 	getMainWindow: () => Electron.BrowserWindow | null;
 	/** 当前托盘实例（index.ts 持有）；Logo 风格切换时一并刷新托盘图标，未创建/已销毁返回 null。 */
@@ -196,10 +197,7 @@ export type SystemIpcDeps = {
 	/** Session scanner WSL config */
 	configureSessionScannerWsl?: (env: import("../wsl/WslPaths").WslEnvironment) => Promise<void>;
 	clearSessionScannerWsl?: () => void;
-	/** Set feishu locale */
-	setFeishuLocale?: (locale: unknown) => void;
 	/** Set default bot name */
-	setFeishuConfigDefaultBotName?: (name: string) => void;
 	/** Refresh tray context menu */
 	refreshTrayContextMenu?: () => void;
 	/** Notify title bar change */
@@ -332,8 +330,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		reactToCuaSettings,
 		configureSessionScannerWsl,
 		clearSessionScannerWsl,
-		setFeishuLocale,
-		setFeishuConfigDefaultBotName,
 		refreshTrayContextMenu,
 		updateService,
 		notifyTitleBarChange,
@@ -1057,7 +1053,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 
 	// ── 应用信息 ─────────────────────────────────────────────────────
 
-	// appInfo 现在包含 pi / DSH runtime / pi-ai 目录版本探测（pi 需要 spawn 一次进程），
+	// appInfo 包含 pi / pi-ai 目录版本探测（pi 需要 spawn 一次进程），
 	// 结果按进程生命周期缓存：并发请求共享同一 in-flight promise，失败也缓存，
 	// 避免每次打开/启动反复 spawn `pi --version` 拖慢路径。
 	let appInfoPromise: Promise<AppInfo> | undefined;
@@ -1275,7 +1271,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		// target 校验失败时返回 false（而非 enabled）：此前静默返回 enabled 会让渲染层
 		// 弹「RPC 日志已打开」提醒框，实际主进程从未开启记录，导致弹窗永远无数据。
 		if (!agentId) return false;
-		// G17：DSH 会话的 RPC 日志走 DshAgentManager（领域调用记录），pi 走 AgentManager。
 		{
 			agentManager.setRpcLogging(agentId, enabled);
 		}
@@ -1289,8 +1284,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	});
 	// 实时日志面板挂载/卸载登记观看状态：没有观看者时主进程跳过广播（落盘与环形缓冲不受影响），
 	// 避免重度会话里无人认领的批次每 80ms 跨一次进程克隆。
-	// G17+DSH：观看登记同样按 backend 分流——DSH 经注入的 setDshRpcLogWatching 走
-	// RpcLogLiveBroadcaster，pi 走 AgentManager 自带的实时广播。
 	ipcMain.handle(ipcChannels.rpcLogsSetWatching, async (_event, agentId?: unknown, watching?: unknown) => {
 		if (typeof agentId !== "string" || !agentId || typeof watching !== "boolean") return false;
 		{
@@ -1507,8 +1500,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			if (applyNativeThemeSource) applyNativeThemeSource(settings);
 		}
 		if ("language" in patch) {
-			if (setFeishuLocale) setFeishuLocale(undefined);
-			if (setFeishuConfigDefaultBotName) setFeishuConfigDefaultBotName("");
 			if (refreshTrayContextMenu) refreshTrayContextMenu();
 		}
 		if ("useNativeTitleBar" in patch) {
@@ -1928,11 +1919,11 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	ipcMain.handle(ipcChannels.configInstallTokendance, async (_event, payload: unknown) => {
 		// 边界校验：apiKey 为可选字符串（渲染层入参不可信）；Key 不写日志。
 		if (!tokendanceInstall) {
-			return { ok: false, modelCount: 0, piSaved: false, dshSaved: false, error: "TokenDance install unavailable" };
+			return { ok: false, modelCount: 0, piSaved: false, error: "TokenDance install unavailable" };
 		}
 		const apiKey = payload && typeof payload === "object" ? (payload as { apiKey?: unknown }).apiKey : undefined;
 		if (typeof apiKey !== "undefined" && typeof apiKey !== "string") {
-			return { ok: false, modelCount: 0, piSaved: false, dshSaved: false, error: "Invalid install input" };
+			return { ok: false, modelCount: 0, piSaved: false, error: "Invalid install input" };
 		}
 		try {
 			const result = await tokendanceInstall(typeof apiKey === "string" && apiKey.trim() ? apiKey.trim() : undefined);
@@ -1940,10 +1931,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 				ok: result.ok,
 				modelCount: result.modelCount,
 				piSaved: result.piSaved,
-				dshSaved: result.dshSaved,
-				dshWroteViaHost: result.dshWroteViaHost,
-				// 失败原因仅诊断用（DSH schema 拒绝等），不含任何 Key 内容
-				dshError: result.dshError,
 			});
 			if (result.ok) {
 				// 写盘后立即失效 model capability 快照：watcher（250ms debounce）会接管刷新
@@ -1956,7 +1943,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			void appLogger.warn("config", "TokenDance install failed", {
 				error: error instanceof Error ? error.message : String(error),
 			});
-			return { ok: false, modelCount: 0, piSaved: false, dshSaved: false, error: "TokenDance install failed" };
+			return { ok: false, modelCount: 0, piSaved: false, error: "TokenDance install failed" };
 		}
 	});
 	ipcMain.handle(ipcChannels.configTokendanceTopUpCreate, async (_event, payload: unknown) => {
@@ -2053,14 +2040,15 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
 		}
 	});
-	ipcMain.handle(ipcChannels.configFetchUsage, async (_event, payload: { provider: string; backend?: "pi" | "dsh" }) => {
+	ipcMain.handle(ipcChannels.configFetchUsage, async (_event, payload: { provider: string; backend?: "pi" }) => {
 		// 1) 边界校验：provider 名必须是有限的非空字符串，避免把任意 IPC 载荷当路径/URL 用。
 		const provider = payload?.provider?.trim() ?? "";
 		if (!provider || provider.length > 128) {
 			return { success: false, error: "Invalid provider name" };
 		}
-		// backend 白名单：pi（缺省）/ dsh（DSH 链路：$DSH_HOME 配置 + 凭据库）。
-		const backend = payload?.backend === "dsh" ? "dsh" : "pi";
+		// 旧后端载荷明确拒绝，不能静默写入 Pi 配置。
+		requireSupportedBackend(payload?.backend);
+		const backend = "pi";
 		// 2) 主进程按 provider 名路由：门控（未开启）→ 端点解析 → 模板探测，key 不出主进程。
 		const result = await configManager.fetchProviderUsage(provider, backend);
 		void appLogger.info("config", "Provider usage fetched", {
@@ -2079,7 +2067,8 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		if (!provider || provider.length > 128) {
 			return { success: false, error: "Invalid provider name" };
 		}
-		const backend = raw.backend === "dsh" ? "dsh" : "pi";
+		requireSupportedBackend(raw.backend);
+		const backend = "pi";
 		return configManager.getUsageProbeSettings(provider, backend);
 	});
 	// 按 provider 合并保存：入口校验与落盘同一套规则，零错误才写（保留文件里其它 providers 与旧 probes）。
@@ -2089,7 +2078,8 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		if (!provider || provider.length > 128) {
 			return { ok: false, error: "Invalid provider name" };
 		}
-		const backend = input.backend === "dsh" ? "dsh" : "pi";
+		requireSupportedBackend(input.backend);
+		const backend = "pi";
 		const result = await saveUsageProbeForProvider(configManager.getUsageProbeConfigDir(backend), provider, input.config as UsageProbeProviderConfig);
 		// 日志只记 provider 与结果；apiKey/accessToken 等字段一律不落日志。
 		void appLogger.info("config", "Usage probe config saved", {
@@ -2102,7 +2092,8 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	// 批量状态表（徽章开关 / 启动预热选源）：只回开关/模板/间隔，不回传任何密钥。
 	ipcMain.handle(ipcChannels.configListUsageProbeStates, async (_event, payload: unknown) => {
 		const raw = payload && typeof payload === "object" ? (payload as { backend?: unknown; providers?: unknown }) : {};
-		const backend = raw.backend === "dsh" ? "dsh" : "pi";
+		requireSupportedBackend(raw.backend);
+		const backend = "pi";
 		// 渲染层数据不可信：只接受字符串数组，并限制条目数（防超大 payload 触发 N 次解析）。
 		const providers = Array.isArray(raw.providers) ? raw.providers.filter((name): name is string => typeof name === "string").slice(0, 512) : [];
 		return configManager.listUsageProbeStates(backend, providers);
@@ -2124,9 +2115,10 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 				return { success: false, error: "Unknown template" };
 			}
 		}
+		requireSupportedBackend(input.backend);
 		const result = await configManager.testUsageProbe({
 			provider,
-			backend: input.backend === "dsh" ? "dsh" : "pi",
+			backend: "pi",
 			...(template ? { template } : {}),
 			...(typeof input.apiKey === "string" ? { apiKey: input.apiKey } : {}),
 			...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
@@ -2144,7 +2136,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		});
 		void appLogger.info("config", "Usage probe tested", {
 			provider,
-			backend: input.backend === "dsh" ? "dsh" : "pi",
+			backend: "pi",
 			template: template ?? "(auto)",
 			success: result.success,
 		});

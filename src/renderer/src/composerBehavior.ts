@@ -5,24 +5,9 @@ export type ComposerEnterIntent = "ignore" | "newline" | "send";
 import type { AgentBackend, ComposerAgentMode } from "@shared/types";
 import { formatPromptTemplateBlock } from "./components/session/composer/referenceBlocks";
 
-export const PI_DECK_PLAN_MODE_MARKER = "__PI_DECK_PLAN_MODE__";
-export const PI_DECK_GOAL_MODE_MARKER = "__PI_DECK_GOAL_MODE__";
+export { PI_DECK_PLAN_MODE_MARKER, PI_DECK_GOAL_MODE_MARKER, buildComposerPromptSubmission, type ComposerPromptSubmission } from "../../shared/promptSubmission";
 
-export type ComposerPromptSubmission = {
-	/** 用户在 PiDeck 时间线里看到的原始消息，不能包含桌面端内部控制标记。 */
-	message: string;
-	/** 仅发给 pi agent/extension 的隐藏消息，用于触发桌面端专属模式。 */
-	agentMessage?: string;
-};
-
-/**
- * 构造发送给主进程的 composer 快照。
- * Plan 模式依赖 PiDeck 内置 extension 在 pi 的 input 事件里识别隐藏标记；
- * 用户可见消息保持原文，避免会话时间线出现实现细节或控制 token。
- */
-/**
- * Prompt Template 类型，与 App.tsx 中 promptTemplateList 类型一致。
- */
+/** 提示词模板元数据。 */
 export type PromptTemplateInfo = {
 	name: string;
 	path: string;
@@ -268,31 +253,6 @@ export function parsePiGoalWidget(lines: readonly string[] | undefined):
 		maxGoalRounds: Number(match[3]),
 		...(phaseToken === "blocked" && lines[2]?.trim() ? { blockReason: lines[2].trim() } : {}),
 	};
-}
-
-export function buildComposerPromptSubmission(message: string, mode: ComposerAgentMode): ComposerPromptSubmission {
-	const trimmed = message.trim();
-	// 斜线命令原样发送，让 pi 解析执行——plan/goal 模式下也能用 /plan off、/goal pause。
-	// 否则隐藏标记前缀会把命令变成普通消息发给 LLM。
-	if (trimmed.startsWith("/")) return { message };
-
-	if (mode === "plan") {
-		const visibleInstruction = trimmed || "请根据已附加的图片或上下文先制定实施计划。";
-		return {
-			message,
-			agentMessage: [PI_DECK_PLAN_MODE_MARKER, visibleInstruction, "", "请先只做只读分析，不要修改文件。最后必须输出以 `Plan:` 开头的编号计划，格式如下：", "Plan:", "1. 第一步", "2. 第二步"].join("\n"),
-		};
-	}
-
-	if (mode === "goal") {
-		const visibleInstruction = trimmed || "请继续当前目标。";
-		return {
-			message,
-			agentMessage: [PI_DECK_GOAL_MODE_MARKER, visibleInstruction].join("\n"),
-		};
-	}
-
-	return { message };
 }
 
 type ComposerKeyboardState = {

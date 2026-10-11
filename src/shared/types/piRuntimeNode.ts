@@ -2,18 +2,17 @@
  * pi 运行时便携 Node 的按需分发契约。
  *
  * 背景：全新机器上没有 Node/npm 时，PiDeck 的环境引导只能停在「打开 nodejs.org」外链，
- * 链路断裂。这里定义一条与 DSH runner node 同构、但面向最终用户的便携安装链路：
+ * 链路断裂。这里定义面向最终用户的便携安装链路：
  * 下载官方 Node 发行包（zip/tar.gz）→ sha256 校验 → 解压到 <userData>/pi-runtime/node/
  * → node 自带 npm → 随后用户可一键 `npm install -g` pi（--prefix 指向 pi-runtime）。
  *
- * 与 DSH sidecar 共用同一份官方完整发行包资产（DSH 解压时只抽 node.exe，pi 引导全解）。
  * 下载源回退链见 piRuntimeNodeDownloadUrls：npmmirror → 自有 Release（win32）→
  * 华为云 → nodejs.org 官方；哈希直接固化在代码里，不需要再维护一份索引清单。
  */
 
 import { atomGitFeedUrl, gitHubLatestDownloadBase } from "../updateSources";
 
-/** 引导安装的 Node 版本。与项目 CI / DSH sidecar 对齐的 Node 24 LTS 线。 */
+/** 引导安装的 Node 版本。与项目 CI 对齐的 Node 24 LTS 线。 */
 export const PI_RUNTIME_NODE_VERSION = "24.13.0";
 
 /** 官方 SHASUMS256.txt（v24.13.0）中各平台发行包的哈希，写死做离线校验，防镜像被篡改。 */
@@ -48,9 +47,8 @@ export function officialPiRuntimeNodeUrl(platform: PiRuntimePlatform, arch: PiRu
 export const PI_RUNTIME_NODE_MIRRORS = ["https://npmmirror.com/mirrors/node", "https://mirrors.huaweicloud.com/nodejs"] as const;
 
 /**
- * PiDeck 自有 Release 资产（AtomGit/GitHub latest）兜底：DSH runner node 打包流程
- * 已经把 win-x64/arm64 官方完整 zip（含 npm，sha256 与官方 SHASUMS 一致）挂到了
- * latest 应用 Release 上，Windows 可直接复用；mac/Linux 无该资产，不在此列。
+ * PiDeck Release 资产（AtomGit/GitHub latest）作为可选兜底。
+ * 只尝试 Windows 官方完整 zip；资产缺席时安装器继续使用后续镜像/官方源。
  */
 export function piRuntimeNodeReleaseAssetUrls(arch: PiRuntimeArch): string[] {
 	const file = piRuntimeNodeArchiveName("win32", arch);
@@ -66,7 +64,7 @@ export function piRuntimeNodeDownloadUrls(platform: PiRuntimePlatform, arch: PiR
 	const file = piRuntimeNodeArchiveName(platform, arch);
 	const mirrorUrls = PI_RUNTIME_NODE_MIRRORS.map((mirror) => `${mirror}/v${PI_RUNTIME_NODE_VERSION}/${file}`);
 	// 自有 Release 资产插在 npmmirror 之后：优先用最快的公共镜像，
-	// 第三方镜像异常时回落到自有资产（DSH 链路已验证可用）。
+	// 第三方镜像异常时尝试 Release 资产。
 	const releaseAssetUrls = platform === "win32" ? piRuntimeNodeReleaseAssetUrls(arch) : [];
 	return [...mirrorUrls.slice(0, 1), ...releaseAssetUrls, ...mirrorUrls.slice(1), officialPiRuntimeNodeUrl(platform, arch)];
 }

@@ -6,7 +6,6 @@
 // 4) IPC 边界：get-live / save（输入校验与条数上限，保存直写自动文件）/ preload 订阅；
 // 5) 抽屉承载语义：不参与项目持久化、关闭还原打开前的面板；
 // 6) 开启自动打开 + 活动栏 rpcLog 专属 Tab（镜像 atom 门控显隐）；
-// 7) DSH 实时广播：RpcLogLiveBroadcaster 镜像 pi 语义，IPC 观看登记按 backend 分流。
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -380,19 +379,4 @@ test("drawer rail gains a gated rpcLog tab: 默认隐藏，开启记录且 agent
 	// 文案双语同步（TranslationKey 由 zh-CN 推导，en-US 必须同步）
 	assert.match(zhCopy, /"drawer\.rpcLog": "RPC 日志"/);
 	assert.match(enCopy, /"drawer\.rpcLog": "RPC Log"/);
-});
-const liveBroadcaster = readFileSync("src/main/logging/RpcLogLiveBroadcaster.ts", "utf8");
-const mainIndex = readFileSync("src/main/index.ts", "utf8");
-
-test("RpcLogLiveBroadcaster 镜像 pi 的批量节流语义，边界有界", () => {
-	// 常量与 pi AgentManager 一致：~80ms 聚合、单批 100、待发缓冲 1000
-	assert.match(liveBroadcaster, /DEFAULT_FLUSH_MS = 80/);
-	assert.match(liveBroadcaster, /MAX_BATCH = 100/);
-	assert.match(liveBroadcaster, /MAX_PENDING = 1000/);
-	// 观看闸门：面板没打开直接丢弃（落盘/环形缓冲不受影响）
-	assert.match(liveBroadcaster, /if \(!this\.watchingAgents\.has\(entry\.agentId\)\) return;/);
-	// 单批超限的余量留到下一轮，不丢日志
-	assert.match(liveBroadcaster, /const rest = entries\.slice\(RpcLogLiveBroadcaster\.MAX_BATCH\);/);
-	// clear 清登记/缓冲/在途定时器（配对清理，防泄漏）
-	assert.match(liveBroadcaster, /clearTimeout\(this\.flushTimer\)/);
 });

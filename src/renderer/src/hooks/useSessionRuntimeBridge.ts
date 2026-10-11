@@ -82,7 +82,7 @@ export function useSessionRuntimeBridge(callbacks: RuntimeBridgeCallbacks = {}):
 										action: {
 											// 去配置管理 → MCP 页（Pi 后端）；与设置页「配置管理」深链同一套目标结构。
 											label: t("notice.openMcpSettings"),
-											onClick: () => store.set(openSettingsAtom, { pane: "config", tab: "dev", backendPane: "pi", configTab: "mcp" }),
+											onClick: () => store.set(openSettingsAtom, { pane: "config", tab: "dev", configTab: "mcp" }),
 										},
 									}
 								: undefined;

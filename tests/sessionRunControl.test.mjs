@@ -187,11 +187,11 @@ test("proxy apply strategy waits for next start when there is no live process", 
 	assert.equal(resolveProxyApplyStrategy({ backend: "pi", hasBinding: true, isLive: false }), "next-start");
 });
 
-test("proxy apply strategy never auto-restarts the shared DSH host", () => {
+test("proxy apply strategy rejects removed backends", () => {
 	// DSH 是单一共享 host：按会话重启会杀掉所有 DSH 会话，必须只提示不重启。
 	for (const isLive of [true, false]) {
 		for (const hasBinding of [true, false]) {
-			assert.equal(resolveProxyApplyStrategy({ backend: "dsh", hasBinding, isLive }), "dsh-host-restart", `dsh live=${isLive} binding=${hasBinding} must not auto-restart`);
+			assert.equal(resolveProxyApplyStrategy({ backend: "dsh", hasBinding, isLive }), "unsupported-backend", `removed backend live=${isLive} binding=${hasBinding} must not auto-restart`);
 		}
 	}
 });

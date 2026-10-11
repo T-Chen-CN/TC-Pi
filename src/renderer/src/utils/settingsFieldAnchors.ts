@@ -265,7 +265,7 @@ export const SETTINGS_FIELD_ANCHORS: readonly SettingsFieldAnchor[] = [
 		tab: "appearance",
 		slug: "appearance-modules",
 		labelKey: "settings.modules.title",
-		keywords: ["隐藏模块", "功能模块", "隐藏", "显示模块", "hide", "modules", "收起", "dsh", "飞书", "桌宠", "生图"],
+		keywords: ["隐藏模块", "功能模块", "隐藏", "显示模块", "hide", "modules", "收起"],
 	},
 
 	// ── Git ──────────────────────────────────────────────────────────

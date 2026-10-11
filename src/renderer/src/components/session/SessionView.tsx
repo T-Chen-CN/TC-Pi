@@ -269,17 +269,7 @@ export function SessionView({
 			{/* Tab 栏已统一外置；运行控制（停止/重启）在共享 Tab 栏的 Tab 下拉；
           本栏只保留会话状态徽章与分屏身份标题（抽屉开关在共享 Tab 栏）。 */}
 			{(!paneServices.simpleNavigation || splitPane) && (
-				<SessionHeader
-					headerRef={chatHeaderRef}
-					statusSessionId={sessionId}
-					title={sessionTitle}
-					projectName={projectName}
-					paneTitle={splitPane ? sessionTitle : undefined}
-					onExitSplit={splitPane ? () => paneServices.exitSessionSplit(sessionId) : undefined}
-					isAnonymous={activeAgent?.noSession}
-					duration={sessionDuration}
-					isStarting={isAgentStarting}
-				/>
+				<SessionHeader headerRef={chatHeaderRef} statusSessionId={sessionId} title={sessionTitle} projectName={projectName} paneTitle={splitPane ? sessionTitle : undefined} onExitSplit={splitPane ? () => paneServices.exitSessionSplit(sessionId) : undefined} duration={sessionDuration} isStarting={isAgentStarting} />
 			)}
 			{/* GUI 扩展桥：会话头部状态区落点（ctx.gui.setStatusbarItem）。
 			    紧贴会话头之下的小条目行；无贡献时返回 null，不占位。 */}

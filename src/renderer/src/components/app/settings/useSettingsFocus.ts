@@ -25,7 +25,7 @@ function flashAnchor(el: HTMLElement): void {
  * Git「去设置」等深链依赖这条路径；消费后必须清空 atom，否则下次侧栏打开仍会抢走 tab。
  *
  * `section` 现在是开放锚点 slug（`settings-section-<slug>`）：既覆盖 tab 内的分区
- * （如 git / dsh-runner-node），也覆盖**单个设置项**（命令面板 Ctrl+P 搜到某一行就跳过去，
+ * （如 git / pi-runtime），也覆盖**单个设置项**（命令面板 Ctrl+P 搜到某一行就跳过去，
  * 见 utils/settingsFieldAnchors.ts）。落点会闪一下描边，长 tab 里才看得出落在哪。
  */
 export function useSettingsFocus(activeTab: SettingsTabId, setActiveTab: (tab: SettingsTabId) => void, persistTab: (tab: SettingsTabId) => void): void {

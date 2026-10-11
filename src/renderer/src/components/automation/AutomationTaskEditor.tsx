@@ -1,3 +1,4 @@
+import { isSupportedBackend } from "../../../../shared/productFeatures";
 import { useAtomValue } from "jotai";
 import { ChevronDown, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -46,17 +47,11 @@ const TASK_MODE_OPTIONS: Array<{
 ];
 
 /**
- * 定时任务执行后端：pi（本地 pi 进程）或 dsh（DSH host 进程）。
- * 与 AutomationTask.backend 同型（Exclude<AgentBackend, "imagegen">），
- * 编辑器只关心这两个值，不引全量 AgentBackend。
- */
-type TaskBackend = "pi" | "dsh";
-
-/**
  * 定时任务新建与编辑表单。
  * 模型/思考走会话同款选择器，调度走可视化 Cron，避免用户手输 provider/model-id 和五段表达式。
  */
 export function AutomationTaskEditor({ task, defaultProjectId, lockProject = false, onSave, onCancel }: AutomationTaskEditorProps) {
+	const supported = isSupportedBackend(task?.backend);
 	const projects = useAtomValue(projectInventoryAtom);
 
 	const [name, setName] = useState(task?.name ?? "");
@@ -64,10 +59,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 	const [cronExpression, setCronExpression] = useState(task?.schedule.type === "cron" ? task.schedule.expression : "0 9 * * 1-5");
 	const [prompt, setPrompt] = useState(task?.prompt ?? "");
 	const [selectedModel, setSelectedModel] = useState<{ provider: string; modelId: string } | undefined>(task?.model);
-	// 执行后端：旧任务无 backend 字段时缺省 pi。切换 dsh 后 mode/thinking 会被
-	// 锁定回继承/普通（DSH 无 plan/goal 扩展与独立思考档位，见下方 UI 约束）。
-	// automation 首版不支持 acp 后端（主进程白名单同源收窄），显式归一防枚举扩散。
-	const [backend, setBackend] = useState<TaskBackend>("pi");
 	const [thinkingLevel, setThinkingLevel] = useState(task?.thinkingLevel ?? "");
 	// 缺省（含旧任务）不在下拉里显示普通模式，而显示「跟随项目/全局」——
 	// 普通模式本就是默认行为，说「跟随」比说「普通」更贴近实际语义。
@@ -100,8 +91,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 
 	const lockedProjectName = projects.find((project) => project.id === projectId)?.name ?? projectId;
 
-	// DSH 无 plan/goal 模式与独立思考档位（都是 pi 侧内置扩展），
-	// 提交时强制退回缺省；UI 上 Select 置灰 + 锁定显示值，避免用户配了不生效。
 	const effectiveMode: AutomationTaskMode | typeof THINKING_INHERIT = mode || THINKING_INHERIT;
 	const effectiveThinking = thinkingLevel || THINKING_INHERIT;
 
@@ -127,9 +116,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 	} = useBackendModelCatalog({
 		sessionId: "automation-editor",
 		projectId: projectId || undefined,
-		// DSH 任务选 DSH host 的模型目录（listDshModels），pi 任务用默认目录；
-		// 切换 backend 后目录随动，避免把 pi 模型填进 DSH 任务的 model 字段。
-		backend: undefined,
 		enabled: modelPickerOpen,
 	});
 
@@ -182,6 +168,7 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		if (!supported) return;
 		if (!name.trim()) {
 			showNotice(t("automation.namePlaceholder"), 2000);
 			return;
@@ -224,13 +211,12 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					},
 					prompt: prompt.trim(),
 					model: selectedModel ?? { provider: "", modelId: "" },
-					// DSH 无独立档位：thinking/mode 强制回缺省（清空即「跟随/普通」）。
+
 					thinkingLevel: thinkingLevel.trim(),
 					// 与 model/thinkingLevel 同理：用空串表示「恢复默认（普通模式）」,
 					// 而不是省略键——省略会被主进程当成「保持原值」。
 					mode: (mode || "normal") as AutomationTaskMode,
-					// 显式覆盖后端：旧任务没有该字段时也写死当前选择，防止「保持原值」歧义。
-					backend,
+					backend: "pi",
 					enabled,
 					budget,
 				};
@@ -246,9 +232,9 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					prompt: prompt.trim(),
 					enabled,
 					budget,
-					backend,
+					backend: "pi",
 					...(selectedModel ? { model: selectedModel } : {}),
-					// DSH 无独立档位，thinking/mode 一律不写（store 缺省即继承/普通）。
+
 					...(thinkingLevel.trim() ? { thinkingLevel: thinkingLevel.trim() } : {}),
 					// 普通模式是缺省，不必写进创建入参；store 侧也只持久化非 normal。
 					...(mode && mode !== "normal" ? { mode } : {}),
@@ -267,162 +253,152 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 
 	return (
 		<form onSubmit={handleSubmit} className="flex flex-col gap-4 py-1">
-			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="task-name" className="text-xs font-medium">
-						{t("automation.name")} <span className="text-destructive">*</span>
-					</Label>
-					<Input id="task-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("automation.namePlaceholder")} className="h-8 text-xs" required />
-				</div>
+			{!supported && (
+				<p role="status" className="text-xs text-muted-foreground">
+					{t("automation.legacyBackendReadOnly")}
+				</p>
+			)}
+			<fieldset disabled={!supported} className="contents">
+				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="task-name" className="text-xs font-medium">
+							{t("automation.name")} <span className="text-destructive">*</span>
+						</Label>
+						<Input id="task-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("automation.namePlaceholder")} className="h-8 text-xs" required />
+					</div>
 
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="task-project" className="text-xs font-medium">
-						{t("automation.project")} <span className="text-destructive">*</span>
-					</Label>
-					{lockProject ? (
-						<Input id="task-project" value={lockedProjectName} className="h-8 text-xs" disabled />
-					) : (
-						<Select value={projectId} onValueChange={setProjectId}>
-							<SelectTrigger id="task-project" className="h-8 text-xs">
-								<SelectValue placeholder={t("automation.projectSelect")} />
-							</SelectTrigger>
-							<SelectContent>
-								{projects.map((p) => (
-									<SelectItem key={p.id} value={p.id} className="text-xs">
-										{p.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					)}
-				</div>
-			</div>
-
-			<CronScheduleBuilder value={cronExpression} onChange={setCronExpression} previews={cronPreviews} error={cronError} />
-
-			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="task-backend" className="text-xs font-medium">
-						{t("automation.backend")}
-					</Label>
-					<Select value={backend} onValueChange={(value) => setBackend(value as TaskBackend)}>
-						<SelectTrigger id="task-backend" className="h-8 text-xs">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="pi" className="text-xs">
-								{t("automation.backendPi")}
-							</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="task-mode" className="text-xs font-medium">
-						{t("automation.mode")}
-					</Label>
-					<Select
-						value={effectiveMode}
-						onValueChange={(value) => {
-							setMode(value === THINKING_INHERIT ? "" : (value as AutomationTaskMode));
-						}}
-					>
-						<SelectTrigger id="task-mode" className="h-8 text-xs">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={THINKING_INHERIT} className="text-xs">
-								{t("automation.modeInherit")}
-							</SelectItem>
-							{TASK_MODE_OPTIONS.map((option) => (
-								<SelectItem key={option.value} value={option.value} className="text-xs">
-									{t(option.labelKey)}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-					<p className="text-micro leading-snug text-muted-foreground">{t("automation.modeHint")}</p>
-				</div>
-			</div>
-
-			<div className="flex flex-col gap-1.5">
-				<Label htmlFor="task-prompt" className="text-xs font-medium">
-					{t("automation.prompt")} <span className="text-destructive">*</span>
-				</Label>
-				<Textarea id="task-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("automation.promptPlaceholder")} rows={4} className="text-xs font-mono" required />
-			</div>
-
-			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div className="flex flex-col gap-1.5">
-					<Label className="text-xs font-medium">{t("automation.model")}</Label>
-					<div className="flex items-center gap-1">
-						<Button type="button" variant="outline" className="h-8 min-w-0 flex-1 justify-between px-2 font-mono text-xs" title={modelLabel} onClick={() => setModelPickerOpen(true)}>
-							<span className="min-w-0 truncate">{modelLabel}</span>
-							<ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-						</Button>
-						{selectedModel && (
-							<Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0" title={t("automation.modelUnset")} onClick={() => setSelectedModel(undefined)}>
-								<X className="size-3.5" />
-							</Button>
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="task-project" className="text-xs font-medium">
+							{t("automation.project")} <span className="text-destructive">*</span>
+						</Label>
+						{lockProject ? (
+							<Input id="task-project" value={lockedProjectName} className="h-8 text-xs" disabled />
+						) : (
+							<Select value={projectId} onValueChange={setProjectId}>
+								<SelectTrigger id="task-project" className="h-8 text-xs">
+									<SelectValue placeholder={t("automation.projectSelect")} />
+								</SelectTrigger>
+								<SelectContent>
+									{projects.map((p) => (
+										<SelectItem key={p.id} value={p.id} className="text-xs">
+											{p.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 						)}
 					</div>
 				</div>
 
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="task-thinking" className="text-xs font-medium">
-						{t("automation.thinkingLevel")}
-					</Label>
-					<Select
-						value={effectiveThinking}
-						onValueChange={(value) => {
-							setThinkingLevel(value === THINKING_INHERIT ? "" : value);
-						}}
-					>
-						<SelectTrigger id="task-thinking" className="h-8 text-xs">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={THINKING_INHERIT} className="text-xs">
-								{t("automation.thinkingInherit")}
-							</SelectItem>
-							{THINKING_LEVELS.map((level) => (
-								<SelectItem key={level.value} value={level.value} className="text-xs">
-									{t(level.labelKey)}
+				<CronScheduleBuilder value={cronExpression} onChange={setCronExpression} previews={cronPreviews} error={cronError} />
+
+				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="task-mode" className="text-xs font-medium">
+							{t("automation.mode")}
+						</Label>
+						<Select
+							value={effectiveMode}
+							onValueChange={(value) => {
+								setMode(value === THINKING_INHERIT ? "" : (value as AutomationTaskMode));
+							}}
+						>
+							<SelectTrigger id="task-mode" className="h-8 text-xs">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={THINKING_INHERIT} className="text-xs">
+									{t("automation.modeInherit")}
 								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-			</div>
-
-			<div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-bg-panel/40 p-3">
-				<Label className="flex items-center gap-1.5 text-xs font-medium">
-					<Sparkles className="size-3.5 text-amber-500" />
-					{t("automation.budgets")}
-				</Label>
-				<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-					<div className="flex flex-col gap-1">
-						<span className="text-micro text-muted-foreground">{t("automation.timeoutMinutes")}</span>
-						<Input type="number" min="1" value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(e.target.value)} placeholder="30" className="h-7 font-mono text-xs" />
-					</div>
-					<div className="flex flex-col gap-1">
-						<span className="text-micro text-muted-foreground">{t("automation.maxTokens")}</span>
-						<Input type="number" min="1000" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} placeholder="e.g. 500000" className="h-7 font-mono text-xs" />
-					</div>
-					<div className="flex flex-col gap-1">
-						<span className="text-micro text-muted-foreground">{t("automation.maxCostUsd")}</span>
-						<Input type="number" step="0.01" min="0.01" value={maxCostUsd} onChange={(e) => setMaxCostUsd(e.target.value)} placeholder="e.g. 1.00" className="h-7 font-mono text-xs" />
-					</div>
-					<div className="flex flex-col gap-1">
-						<span className="text-micro text-muted-foreground">{t("automation.maxSteps")}</span>
-						<Input type="number" min="1" value={maxSteps} onChange={(e) => setMaxSteps(e.target.value)} placeholder="e.g. 50" className="h-7 font-mono text-xs" />
+								{TASK_MODE_OPTIONS.map((option) => (
+									<SelectItem key={option.value} value={option.value} className="text-xs">
+										{t(option.labelKey)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<p className="text-micro leading-snug text-muted-foreground">{t("automation.modeHint")}</p>
 					</div>
 				</div>
-			</div>
 
+				<div className="flex flex-col gap-1.5">
+					<Label htmlFor="task-prompt" className="text-xs font-medium">
+						{t("automation.prompt")} <span className="text-destructive">*</span>
+					</Label>
+					<Textarea id="task-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("automation.promptPlaceholder")} rows={4} className="text-xs font-mono" required />
+				</div>
+
+				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-xs font-medium">{t("automation.model")}</Label>
+						<div className="flex items-center gap-1">
+							<Button type="button" variant="outline" className="h-8 min-w-0 flex-1 justify-between px-2 font-mono text-xs" title={modelLabel} onClick={() => setModelPickerOpen(true)}>
+								<span className="min-w-0 truncate">{modelLabel}</span>
+								<ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+							</Button>
+							{selectedModel && (
+								<Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0" title={t("automation.modelUnset")} onClick={() => setSelectedModel(undefined)}>
+									<X className="size-3.5" />
+								</Button>
+							)}
+						</div>
+					</div>
+
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="task-thinking" className="text-xs font-medium">
+							{t("automation.thinkingLevel")}
+						</Label>
+						<Select
+							value={effectiveThinking}
+							onValueChange={(value) => {
+								setThinkingLevel(value === THINKING_INHERIT ? "" : value);
+							}}
+						>
+							<SelectTrigger id="task-thinking" className="h-8 text-xs">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={THINKING_INHERIT} className="text-xs">
+									{t("automation.thinkingInherit")}
+								</SelectItem>
+								{THINKING_LEVELS.map((level) => (
+									<SelectItem key={level.value} value={level.value} className="text-xs">
+										{t(level.labelKey)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				</div>
+
+				<div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-bg-panel/40 p-3">
+					<Label className="flex items-center gap-1.5 text-xs font-medium">
+						<Sparkles className="size-3.5 text-amber-500" />
+						{t("automation.budgets")}
+					</Label>
+					<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+						<div className="flex flex-col gap-1">
+							<span className="text-micro text-muted-foreground">{t("automation.timeoutMinutes")}</span>
+							<Input type="number" min="1" value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(e.target.value)} placeholder="30" className="h-7 font-mono text-xs" />
+						</div>
+						<div className="flex flex-col gap-1">
+							<span className="text-micro text-muted-foreground">{t("automation.maxTokens")}</span>
+							<Input type="number" min="1000" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} placeholder="e.g. 500000" className="h-7 font-mono text-xs" />
+						</div>
+						<div className="flex flex-col gap-1">
+							<span className="text-micro text-muted-foreground">{t("automation.maxCostUsd")}</span>
+							<Input type="number" step="0.01" min="0.01" value={maxCostUsd} onChange={(e) => setMaxCostUsd(e.target.value)} placeholder="e.g. 1.00" className="h-7 font-mono text-xs" />
+						</div>
+						<div className="flex flex-col gap-1">
+							<span className="text-micro text-muted-foreground">{t("automation.maxSteps")}</span>
+							<Input type="number" min="1" value={maxSteps} onChange={(e) => setMaxSteps(e.target.value)} placeholder="e.g. 50" className="h-7 font-mono text-xs" />
+						</div>
+					</div>
+				</div>
+			</fieldset>
 			<div className="flex items-center justify-between border-t border-border/40 pt-2">
 				<div className="flex items-center gap-2">
-					<Switch id="task-enabled" checked={enabled} onCheckedChange={setEnabled} />
+					<Switch disabled={!supported} id="task-enabled" checked={enabled} onCheckedChange={setEnabled} />
 					<Label htmlFor="task-enabled" className="cursor-pointer text-xs">
 						{enabled ? t("automation.enabled") : t("automation.disabled")}
 					</Label>
@@ -432,7 +408,7 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					<Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={onCancel} disabled={isSubmitting}>
 						{t("automation.cancel")}
 					</Button>
-					<Button type="submit" size="sm" className="h-8 text-xs" disabled={isSubmitting || !!cronError}>
+					<Button type="submit" size="sm" className="h-8 text-xs" disabled={!supported || isSubmitting || !!cronError}>
 						{t("automation.saveTask")}
 					</Button>
 				</div>

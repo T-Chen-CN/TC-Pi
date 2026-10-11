@@ -1,7 +1,7 @@
 import { Button } from "../components/ui-shadcn/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui-shadcn/table";
 import { useEffect, useState, type ReactNode } from "react";
-import { Loader2, ShoppingBag, ToggleLeft, ToggleRight, Hammer } from "lucide-react";
+import { Loader2, Hammer } from "lucide-react";
 import type { PiCliUpdateResult, PiExtensionListResult, PiExtensionSummary, ProjectResourceOverrides } from "../../../shared/types";
 import { t } from "../i18n";
 import { showNotice } from "../utils/notice";
@@ -12,7 +12,6 @@ import { isProjectDiscoverySource, type ResourceScope } from "./resourceScopeMod
 import { buildProjectOverrideKeyIndex, matchesProjectOverride, type ProjectOverrideKeyIndex } from "./projectOverrideKeys";
 import { useResourceTogglePending } from "../hooks/useResourceTogglePending";
 import { DiscoveredExtensionRow, ExtensionTableRow } from "./extensionsTableRows";
-import { RecommendedPackagesPanel } from "./extensionsRecommendedPackages";
 import { BuiltInExtensionsUpdatePanel } from "./BuiltInExtensionsUpdatePanel";
 import { PiBuiltinExtensionsPanel } from "./PiBuiltinExtensionsPanel";
 
@@ -276,7 +275,6 @@ export function ExtensionsTab(props: {
 							</div>
 						</div>
 					)}
-					{false && <RecommendedPackagesPanel data={props.data} onRefresh={props.onRefresh} />}
 
 					{/* 已安装扩展列表 */}
 					<div className="config-section">

@@ -3,7 +3,7 @@ import { getDefaultStore, useAtom, useAtomValue } from "jotai";
 import { settingsFocusAtom, type SettingsPaneId, type SettingsTabId } from "../../atoms";
 import { hasPendingUpdateAtom } from "../../atoms/update-atoms";
 import { useSettingsFocus } from "./settings/useSettingsFocus.ts";
-import { Settings2, Network, Wrench, PawPrint, Bell, Trash2, Brush, Eye, ChartColumnBig, Activity, MessageSquare, ImageIcon, DatabaseBackup, Globe, FileCode2, GitBranch, Loader2, SlidersHorizontal, MonitorCog, Keyboard, TerminalSquare, X, Bot, Puzzle } from "lucide-react";
+import { Settings2, Network, Wrench, Bell, Trash2, Brush, ChartColumnBig, Activity, DatabaseBackup, Globe, FileCode2, GitBranch, Loader2, SlidersHorizontal, MonitorCog, Keyboard, TerminalSquare, X, Puzzle } from "lucide-react";
 import { t, type TranslationKey } from "../../i18n";
 import { applyAppearanceAttributes, type AppearanceSettings } from "../../themeAppearance";
 import { applyCustomThemeTokens, applyFontSizeAttributes } from "../../hooks/appearance/useAppAppearance";
@@ -47,7 +47,6 @@ const TerminalTab = lazy(() => import("./settings/TerminalTab").then((m) => ({ d
 const ConfigPane = lazy(() => import("../../ConfigModal").then((m) => ({ default: m.ConfigPane })));
 import type { ConfigPaneHandle, ConfigPaneState } from "../../ConfigModal";
 
-// DSH 配置（HOME / 审批 / 外部会话）只放配置管理，避免设置页再开一个重复 tab
 // SettingsTabId 定义在 atoms，深链与侧栏共用同一套合法 tab；
 // 展示顺序与分组分割线统一收敛在 settings/settingsTabLayout.ts。
 
@@ -245,16 +244,11 @@ const TAB_META: Record<SettingsTabId, { labelKey: TranslationKey; icon: ReactNod
 	editors: { labelKey: SETTINGS_TAB_LABEL_KEYS.editors, icon: <FileCode2 size={16} /> },
 	git: { labelKey: SETTINGS_TAB_LABEL_KEYS.git, icon: <GitBranch size={16} /> },
 	dev: { labelKey: SETTINGS_TAB_LABEL_KEYS.dev, icon: <Wrench size={16} /> },
-	im: { labelKey: SETTINGS_TAB_LABEL_KEYS.im, icon: <MessageSquare size={16} /> },
-	pet: { labelKey: SETTINGS_TAB_LABEL_KEYS.pet, icon: <PawPrint size={16} /> },
 	notification: { labelKey: SETTINGS_TAB_LABEL_KEYS.notification, icon: <Bell size={16} /> },
 	storage: { labelKey: SETTINGS_TAB_LABEL_KEYS.storage, icon: <Trash2 size={16} /> },
 	backup: { labelKey: SETTINGS_TAB_LABEL_KEYS.backup, icon: <DatabaseBackup size={16} /> },
 	usage: { labelKey: SETTINGS_TAB_LABEL_KEYS.usage, icon: <ChartColumnBig size={16} /> },
 	process: { labelKey: SETTINGS_TAB_LABEL_KEYS.process, icon: <Activity size={16} /> },
-	vision: { labelKey: SETTINGS_TAB_LABEL_KEYS.vision, icon: <Eye size={16} /> },
-	imagegen: { labelKey: SETTINGS_TAB_LABEL_KEYS.imagegen, icon: <ImageIcon size={16} /> },
-	acp: { labelKey: SETTINGS_TAB_LABEL_KEYS.acp, icon: <Bot size={16} /> },
 	hostplugins: { labelKey: SETTINGS_TAB_LABEL_KEYS.hostplugins, icon: <Puzzle size={16} /> },
 };
 
@@ -299,14 +293,14 @@ function SettingsModalContent(props: SettingsModalProps) {
 	const [focusPaneTarget] = useAtom(settingsFocusAtom);
 	// 深链的配置分页/供应商定位：快照进本地 state（focus atom 随后会被 useSettingsFocus 清空，
 	// 配置分区深链「圆球 → 去配置用量」需要在整个设置会话期间保持可投递给 ConfigPane）。
-	const [configFocus, setConfigFocus] = useState<{ configTab?: "models" | "auth" | "settings" | "trust" | "mcp" | "raw"; provider?: string; backendPane?: "dsh" | "pi" } | null>(() => {
+	const [configFocus, setConfigFocus] = useState<{ configTab?: "models" | "auth" | "settings" | "trust" | "mcp" | "raw"; provider?: string } | null>(() => {
 		const target = getDefaultStore().get(settingsFocusAtom);
-		return target?.pane === "config" ? { configTab: target.configTab, provider: target.provider, backendPane: target.backendPane } : null;
+		return target?.pane === "config" ? { configTab: target.configTab, provider: target.provider } : null;
 	});
 	useEffect(() => {
 		if (focusPaneTarget?.pane === "config") {
 			setPane("config");
-			setConfigFocus({ configTab: focusPaneTarget.configTab, provider: focusPaneTarget.provider, backendPane: focusPaneTarget.backendPane });
+			setConfigFocus({ configTab: focusPaneTarget.configTab, provider: focusPaneTarget.provider });
 		}
 	}, [focusPaneTarget]);
 	useSettingsFocus(activeTab, setActiveTab, persistTab);
@@ -324,23 +318,14 @@ function SettingsModalContent(props: SettingsModalProps) {
 	 * 遍历键并集（computeDirtyFields）而非仅草稿键，避免漏掉「字段被删除」的差异。
 	 */
 	const dirtyFields = useMemo(() => computeDirtyFields(draftSettings as Record<string, unknown>, baseSnapshotRef.current as Record<string, unknown>), [draftSettings, baselineToken]);
-	// ── 生图草稿：独立文件 userData/imagegen.json，不属于 pi/dsh，放在设置页统一管理 ──
-	const imageGenRef = useRef<{ save: () => Promise<boolean> } | null>(null);
-	const [imageGenDirty, setImageGenDirty] = useState(false);
-	const handleImageGenDirtyChange = useCallback((dirty: boolean) => setImageGenDirty(dirty), []);
-	// ── ACP 工具表：独立 settings.acpTools 字段，保存链与生图一致（ref.save + 脏标记） ──
-	const acpToolsRef = useRef<{ save: () => Promise<boolean> } | null>(null);
-	const [acpDirty, setAcpDirty] = useState(false);
-	const handleAcpDirtyChange = useCallback((dirty: boolean) => setAcpDirty(dirty), []);
 	// 快捷键存在冲突等非法状态时禁用保存（ShortcutsTab 上报，见 saveAll 按钮）
 	const [shortcutsInvalid, setShortcutsInvalid] = useState(false);
 	const handleShortcutsInvalidChange = useCallback((invalid: boolean) => setShortcutsInvalid(invalid), []);
 	// 左侧导航黄点来源：与关闭确认同一套字段目录，避免两处口径不一致
-	const dirtyTabIds = useMemo(() => dirtySettingsTabIds({ dirtyFields, visionDirty: false, imageGenDirty, acpDirty }), [dirtyFields, false, imageGenDirty, acpDirty]);
+	const dirtyTabIds = useMemo(() => dirtySettingsTabIds({ dirtyFields }), [dirtyFields]);
 	/** 各 tab 的局部编辑态（WSL 输入/Web 端口/宠物预览模式）在取消时通过递增信号重置 */
 	const [devTabResetKey, setDevTabResetKey] = useState(0);
 	const [webTabResetKey, setWebTabResetKey] = useState(0);
-	const [petTabResetKey, setPetTabResetKey] = useState(0);
 
 	/** 更新草稿；脏字段由 useMemo 按真实差异推导，无需手动登记（改回原值自动变干净）。 */
 	const updateDraft = useCallback((patch: Partial<AppSettings>) => {
@@ -441,7 +426,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 		// tab 局部编辑态（WSL 输入、Web 端口、宠物预览）由各自 tab 监听信号重置
 		setDevTabResetKey((k) => k + 1);
 		setWebTabResetKey((k) => k + 1);
-		setPetTabResetKey((k) => k + 1);
 	};
 
 	// ── 配置管理分区（ConfigPane）标题栏状态：保存禁用 / 黄点 / 确认清单由嵌入分区上报 ──
@@ -461,7 +445,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 	/** 关闭弹框：系统设置草稿与配置管理草稿任一有未保存变化都统一弹确认（不再按分区委托），
 	 *  配置分区的脏状态由 ConfigPane 上报（onStateChange.hasDirty）；无任何脏直接关闭。 */
 	const handleClose = () => {
-		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0;
 		if (settingsDirty || configPaneState.hasDirty) {
 			setCloseConfirmOpen(true);
 		} else {
@@ -471,7 +455,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 
 	/** 保存关闭/安装前的全部脏来源；任一来源失败时保留弹窗和草稿供用户重试。 */
 	const savePendingChanges = async (): Promise<boolean> => {
-		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0;
 		const settingsOk = settingsDirty ? await saveAll() : true;
 		const configOk = configPaneState.hasDirty ? ((await configPaneRef.current?.saveAllDirty()) ?? false) : true;
 		return settingsOk && configOk;
@@ -500,7 +484,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 
 	/** 安装会终止进程；任何内存草稿都必须先由用户保存或明确放弃。 */
 	const handleInstallUpdate = () => {
-		const settingsDirty = dirtyFields.size > 0 || false || imageGenDirty;
+		const settingsDirty = dirtyFields.size > 0;
 		if (settingsDirty || configPaneState.hasDirty) {
 			setInstallConfirmOpen(true);
 			return;
@@ -574,11 +558,8 @@ function SettingsModalContent(props: SettingsModalProps) {
 		() =>
 			summarizeSettingsUnsavedChanges({
 				dirtyFields,
-				visionDirty: false,
-				imageGenDirty,
-				acpDirty,
 			}),
-		[dirtyFields, false, imageGenDirty, acpDirty],
+		[dirtyFields],
 	);
 	const unsavedCloseMessage = useMemo(() => formatSettingsUnsavedMessage(unsavedSummary, t), [unsavedSummary]);
 	// 关闭确认清单 = 系统设置 + 配置管理两区未保存项合并（配置项由 ConfigPane 上报）
@@ -608,17 +589,9 @@ function SettingsModalContent(props: SettingsModalProps) {
 								</Button>
 							</>
 						) : (
-							/* 应用设置分区：保存常驻且不因「无修改」禁用（无修改也允许再次保存）；
-							   视觉桥保存中禁用防重复提交；有未保存变更时显示「放弃更改」 */
+							/* 保存常驻，允许无修改时再次保存。 */
 							<>
-								<Button
-									variant="default"
-									size="sm"
-									onClick={saveAll}
-									disabled={shortcutsInvalid}
-									// 视觉桥开启但未选模型时禁用保存：悬停说明原因（对应 visionDraft 的 modelRequired 提示）
-									title={shortcutsInvalid ? t("settings.shortcuts.saveBlocked") : false && false ? t("settings.vision.modelRequired") : undefined}
-								>
+								<Button variant="default" size="sm" onClick={saveAll} disabled={shortcutsInvalid} title={shortcutsInvalid ? t("settings.shortcuts.saveBlocked") : undefined}>
 									{t("common.save")}
 								</Button>
 								{hasAnyDirtyChanges ? (
@@ -638,7 +611,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 						</DialogClose>
 					</div>
 				</DialogHeader>
-				{/* 顶层分区：系统设置 / 配置管理。样式对齐配置页 Pi/DSH 分页（config-backend-switch），
+				{/* 顶层分区：系统设置 / 配置管理。统一使用配置分页控件，
 			    黄点 = 对应分区的未保存草稿；两个分区都保持挂载（forceMount + hidden）不丢草稿 */}
 				<Tabs
 					value={pane}
@@ -676,7 +649,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 								projects={props.projects}
 								focusConfigTab={configFocus?.configTab}
 								focusProvider={configFocus?.provider}
-								focusBackendPane={configFocus?.backendPane}
 								onStateChange={handleConfigPaneStateChange}
 								// 嵌套弹层（用量查询「让 AI 帮我查」）整窗关闭走统一关闭确认，
 								// 不直连 onClose 裸关闭——系统设置/配置管理草稿都不能被静默丢弃。
@@ -843,10 +815,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 								</TabsContent>
 							)}
 
-							{/* ── 外部连接 tab（飞书机器人，由 Pi 管理界面迁入） ── */}
-
-							{/* ── 桌面宠物 tab ── */}
-
 							{/* ── 通知设置 tab（系统通知 + 声音提醒） ── */}
 							{activeTab === "notification" && (
 								<TabsContent value="notification" className="settings-panel min-w-0">
@@ -888,13 +856,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 									</Suspense>
 								</TabsContent>
 							)}
-							{/* ── 视觉桥 tab：草稿/脏标记/保存由弹框统一管理，本组件只呈现表单 */}
-
-							{/* ── 生图 tab：独立 imagegen.json，不属于 pi/dsh，放在设置页统一管理。
-					    草稿保存在 ImageGenSection 内部，切换 tab 时保持挂载（hidden 而非卸载）以免丢失未保存修改。 */}
-
-							{/* ── ACP 工具 tab：独立 settings.acpTools 字段；草稿自持，切换 tab 保持挂载（hidden）以免丢失未保存行 ── */}
-
 							{/* ── PiDeck 插件 tab：宿主插件管理（安装/授权/启停）。独立于 pi 配置弹窗，
 							    归属应用设置；无草稿语义，切 tab 即卸载（动作型 IPC 即时生效）。 ── */}
 							<TabsContent value="hostplugins" className="settings-panel min-w-0" hidden={activeTab !== "hostplugins"}>

@@ -4,7 +4,7 @@ import type { SessionRuntimeLogger } from "./SessionRuntimeCoordinator";
 /**
  * 零内容草稿自动清理器。
  *
- * 背景：小窗/主窗「新建会话」会立即把 draft 写进 catalog（侧栏可见），
+ * 背景：主窗口「新建会话」会立即把 draft 写进 catalog（侧栏可见），
  * 但用户可能从不输入——每点一次新建就留下一条永久空白的会话记录，
  * 只有重启（SessionCatalog.load 的 staleDrafts 清理）才消掉。本清理器把
  * 同一清理语义搬到运行期间：定期剔除「零内容 + 闲置超时」的 pi 草稿。
@@ -26,7 +26,7 @@ export function isReapableStaleDraft(entry: SessionCatalogEntry, now: number, op
 	// ACP 草稿（无本地文件，删除即丢失预选配置）保留
 	if (entry.backend === "dsh" || entry.dshSessionId) return false;
 	if (entry.backend === "acp" || entry.acpSessionId) return false;
-	// 匿名/引导页会话（transientEntries）本来就是进程内临时面，不归本清理器
+	// 历史匿名标记只用于兼容读取，不自动清理用户旧记录
 	if (entry.noSession) return false;
 	// 已落盘或激活过 = 发送过消息（mergeScanned 会把有文件的条目抬成 active，双保险）
 	if (entry.filePath || entry.piSessionId) return false;

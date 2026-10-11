@@ -356,15 +356,16 @@ test("removed backend activation rejects without claiming or spawning", async ()
 	assert.deepEqual(harness.calls.ensureStandby, [], "dsh 激活不补 pi standby");
 });
 
-test("activation passes noSession through to claim so the gateway can decline", async () => {
+test("legacy anonymous entries cannot claim a standby or create a runtime", async () => {
 	const { SessionRuntimeCoordinator } = loadCoordinator();
 	const harness = createClaimHarness({ entry: { noSession: true }, claimResult: null });
 	const coordinator = new SessionRuntimeCoordinator(harness.catalog, harness.agents, harness.sender);
 
 	const result = await coordinator.activateRuntime("session-1");
-	assert.equal(result.ok, true);
-	assert.equal(harness.calls.claimInputs[0]?.noSession, true);
-	assert.equal(harness.calls.create, 1);
+	assert.equal(result.ok, false);
+	assert.match(result.error.debugDetails, /Anonymous chats are not supported/);
+	assert.equal(harness.calls.claimInputs.length, 0);
+	assert.equal(harness.calls.create, 0);
 });
 
 test("a claimed standby is stopped when preference application fails", async () => {

@@ -1071,10 +1071,10 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 					.readRecordMessagePage(sessionId, before, RUNTIME_HISTORY_TURN_PAGE_SIZE)
 					.then((page: SessionMessagePage) => {
 						if (latestLoadBySession.get(sessionId) !== sequence) return;
-						// 翻页期间 host 被停：保留已加载内容，出可辨识的失败行（静默丢弃这一页
+						// 旧后端历史不可用时保留已加载内容，出可辨识的失败行（静默丢弃这一页
 						// 会让「加载更多」看起来没反应），下次点击仍可重试。
 						if (sessionHistoryUnavailableState(page)) {
-							setLoadMoreError(t("timeline.dshHostStopped"));
+							setLoadMoreError(t("app.legacyBackendReadOnly"));
 							return;
 						}
 						if (prependMessagePage({ sessionId, before, expectedRevision, page })) {
@@ -1133,9 +1133,9 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 					})
 					.then((page: SessionMessagePage) => {
 						if (latestLoadBySession.get(sessionId) !== sequence) return;
-						// 与 disk 翻页同一语义：host 被停时不把空页当新历史，出失败行
+						// 与 disk 翻页同一语义：历史不可用时不把空页当新历史，出失败行
 						if (sessionHistoryUnavailableState(page)) {
-							setLoadMoreError(t("timeline.dshHostStopped"));
+							setLoadMoreError(t("app.legacyBackendReadOnly"));
 							return;
 						}
 						if (prependHistoryPage({ sessionId, expectedRevision, before, page })) {

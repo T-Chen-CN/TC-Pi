@@ -9,8 +9,18 @@ export function isRemovedModule(id: string): boolean {
 }
 
 /** Reject unsupported backends before they can write a draft or spawn a runtime. */
+export function isSupportedBackend(backend: unknown): boolean {
+	return backend === undefined || backend === "pi";
+}
+
 export function requireSupportedBackend(backend: unknown): void {
-	if (backend !== undefined && backend !== "pi") throw new Error("This PiDeck distribution only supports the pi backend.");
+	if (!isSupportedBackend(backend)) throw new Error("This PiDeck distribution only supports the pi backend.");
+}
+
+/** Historic runtime flags are readable metadata, never a way to restart removed chat modes. */
+export function requireSupportedSessionRuntime(input: { backend?: unknown; noSession?: unknown }): void {
+	requireSupportedBackend(input.backend);
+	if (input.noSession === true) throw new Error("Anonymous chats are not supported in this PiDeck distribution.");
 }
 
 /** Old default preferences may fall back to pi; existing session identities never do. */

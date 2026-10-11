@@ -1,3 +1,4 @@
+import { isSupportedBackend } from "../../../../shared/productFeatures";
 import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
 import { Edit, Play, Plus, Trash2 } from "lucide-react";
@@ -162,6 +163,7 @@ export function AutomationTaskList({ projectId, onEditTask, onCreateTask }: Auto
 					</TableHeader>
 					<TableBody>
 						{tasks.map((task) => {
+							const supported = isSupportedBackend(task.backend);
 							const isRunning = runningTaskIds.has(task.id);
 							const isTriggering = triggeringTaskIds.has(task.id);
 							const latestRun = latestRunByTaskId.get(task.id);
@@ -197,7 +199,7 @@ export function AutomationTaskList({ projectId, onEditTask, onCreateTask }: Auto
 									</TableCell>
 									<TableCell>
 										<Badge className={`h-5 border px-1.5 text-[10px] font-normal ${isRunning ? "animate-pulse border-info/30 bg-info/15 text-info" : task.enabled ? "border-success/30 bg-success/15 text-success" : "border-border bg-muted/50 text-muted-foreground"}`}>
-											{isRunning ? t("automation.running") : task.enabled ? t("automation.enabled") : t("automation.disabled")}
+											{!supported ? t("automation.legacyBackendReadOnly") : isRunning ? t("automation.running") : task.enabled ? t("automation.enabled") : t("automation.disabled")}
 										</Badge>
 									</TableCell>
 									<TableCell className="text-micro text-muted-foreground">{task.nextRunAt ? formatTime(task.nextRunAt) : t("automation.manualTrigger")}</TableCell>
@@ -213,8 +215,8 @@ export function AutomationTaskList({ projectId, onEditTask, onCreateTask }: Auto
 									</TableCell>
 									<TableCell>
 										<div className="flex items-center justify-end gap-1">
-											<Switch checked={task.enabled} onCheckedChange={(checked) => handleToggleEnable(task, checked)} aria-label={task.enabled ? t("automation.enabled") : t("automation.disabled")} />
-											<Button type="button" variant="ghost" size="icon-sm" className="size-7 text-success hover:bg-success/10 hover:text-success" disabled={isRunning || isTriggering} title={t("automation.runNow")} aria-label={t("automation.runNow")} onClick={() => handleRunNow(task)}>
+											<Switch disabled={!supported} checked={task.enabled} onCheckedChange={(checked) => handleToggleEnable(task, checked)} aria-label={task.enabled ? t("automation.enabled") : t("automation.disabled")} />
+											<Button type="button" variant="ghost" size="icon-sm" className="size-7 text-success hover:bg-success/10 hover:text-success" disabled={!supported || isRunning || isTriggering} title={t("automation.runNow")} aria-label={t("automation.runNow")} onClick={() => handleRunNow(task)}>
 												<Play className="size-3.5" />
 											</Button>
 											<Button type="button" variant="ghost" size="icon-sm" className="size-7 text-muted-foreground hover:bg-muted hover:text-foreground" title={t("automation.editTask")} aria-label={t("automation.editTask")} onClick={() => onEditTask(task)}>

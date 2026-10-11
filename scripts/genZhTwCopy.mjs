@@ -9,7 +9,6 @@
  *   src/renderer/src/i18n/rendererCopy.zh-TW.ts   ← rendererCopy.zh-CN.ts
  *   src/shared/i18n/mainProcessCopy.zh-TW.ts      ← mainProcessCopy.ts 的 mainProcessZhCN
  *   src/main/web/WebI18n.zh-TW.ts                 ← WebI18n.ts 的 webZhCN（web 客户端专属键）
- *   src/main/feishu/FeishuI18n.zh-TW.ts           ← FeishuI18n.ts 的 zhCN
  *
  * 生成策略是「逐行替换字面量」而不是重新序列化：键序、注释、空行、展开语法、换行排版都原样
  * 保留，因此 zh-TW 与 zh-CN 的 diff 只有值本身；注释保持简体（开发者视角文本，不面向用户）。
@@ -59,8 +58,7 @@ const OVERRIDES = [
 	// 分词误配：整串转换把词切错，选到了不对的字
 	["隻影響", "只影響"],
 	["錶面", "表面"],
-	["回撥", "回呼"],
-	["后展開", "後展開"],
+
 	["名稱空間", "命名空間"],
 	["腳本里", "腳本裡"],
 	["運行了程式碼", "執行了程式碼"],
@@ -70,7 +68,6 @@ const OVERRIDES = [
 	["許可權", "權限"],
 	["賬", "帳"],
 	["兼容", "相容"],
-	["支持", "支援"],
 ];
 
 const overrideHits = new Map(OVERRIDES.map(([from]) => [from, 0]));
