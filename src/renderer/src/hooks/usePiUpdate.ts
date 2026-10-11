@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useSetAtom } from "jotai";
 import { t } from "../i18n";
 import { settingsOpenAtom } from "../atoms";
-import type { AppSettings, NpmAvailabilityResult, PiCliUpdateResult, PiInstallation, PiInstallExecResult, PiInstallStatus, PiUpdateCheckResult } from "../../../shared/types";
+import type { AppSettings, PiCliUpdateResult, PiInstallation, PiInstallExecResult, PiInstallStatus, PiUpdateCheckResult } from "../../../shared/types";
 import type { PiDesktopApi } from "../../../preload";
 
 export interface UsePiUpdateOptions {

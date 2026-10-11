@@ -369,7 +369,7 @@ export class AutomationRunCoordinator {
 					runtimeGeneration: result.runtimeGeneration,
 				};
 				if (this.disposed) return;
-				// dispatch 已接受、attachRuntime 在 sendOnce 内异步回写 dshSessionId：
+
 				// 再广播一次，让渲染层重拉到 promoteToActive 后的会话状态。
 				this.notifySessionCatalogChanged?.(project.id);
 				await this.store.updateRun(
@@ -406,27 +406,6 @@ export class AutomationRunCoordinator {
 		}
 	}
 
-	/**
-	 * Run 事件状态机（终态判定契约）。
-	 *
-	 * 为什么不能用 isTurnActive 缺失/false 判定完成：agents:runtime-state 事件大多是
-	 * 「局部补丁」——emitStreamingStatePatch（消息 flush 时 50ms 节流）与工具边沿事件
-	 * 只带 isStreaming/isExecutingTool，不带 isTurnActive；若把缺失字段当作 false，
-	 * run 会在首个流式补丁/首个工具结束时被误判为「回合已结束」→ 立即 finalize(succeeded)
-	 * 并 stopRuntime 杀掉 pi 进程，会话文件来不及落盘（表现为历史会话打开空白、0 token）。
-	 *
-	 * 因此终态只信 agents:state（AgentTab 快照，emitState 在 agent_settled/error/退出时发出）：
-	 *   idle    → 回合真正完成（settled 是 pi 的最终稳定点，无重试/压缩排队）→ succeeded
-	 *   error   → 回合出错（agent_end 带 error 时 tab.status 置 error）→ failed
-	 *   closed  → pi 进程在回合结束前退出 → failed（防止 run 挂到 timeoutMs）
-	 *   running → 回合开始证据（turnStarted）。DSH 控制态只有 idle/running 两值
-	 *             （dshRuntimeControl：turn/start → running），applyControl 在状态变化时
-	 *             必发 agents:state 快照；pi 只在 agent_settled/error/退出时发快照，
-	 *             收到 running 快照同样说明回合已开始。DSH 纯对话回合没有工具边沿、
-	 *             runtime-state 也没有 isTurnActive，只能靠 running 快照确认「回合开始过」
-	 *             ——否则 dispatch 后残留的 idle 快照会把 run 误判成完成。
-	 * runtime-state 只用于 turnStarted 记账、工具步数、预算校验与指标采集。
-	 */
 	private handleTrackerEvent(runId: string, tracker: ActiveRunTracker, event: SessionRuntimeEvent): void {
 		if (tracker.completed || tracker.settling) return;
 		const now = Date.now();
@@ -448,9 +427,8 @@ export class AutomationRunCoordinator {
 				return;
 			}
 			if (status === "running") {
-				// DSH 回合开始证据：applyControl 在 idle→running 状态变化时必发快照
 				// （turn/start 触发）；pi 侧若发出 running 快照同样说明回合已开始（无害）。
-				// 不能放在 idle 分支兜底——DSH 没有其他 turnStarted 来源。
+
 				tracker.turnStarted = true;
 				return;
 			}

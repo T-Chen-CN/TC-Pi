@@ -1,4 +1,4 @@
-import type { TodoItem, TodoItemStatus } from "../agents/todo-list";
+import type { TodoItem } from "../agents/todo-list";
 
 /** 与官方 BeUI TodoItem 对齐的解析结果（title 恒为 string）。 */
 export type AgentTodoItem = TodoItem;
@@ -85,12 +85,6 @@ export function sessionTodoSnapshotToItems(snapshot: import("../../../../shared/
 	return parseAgentTodoItems(lines);
 }
 
-/**
- * 将 DSH runtime 的结构化 todo 投影适配为与 Pi widget 相同的展示模型。
- *
- * DSH 已提供稳定的状态字段，不能绕回行文本 parser；按正文生成稳定 key，
- * 并为重复正文追加序号，避免状态更新时 React 列表错误复用行节点。
- */
 export function runtimeTodosToItems(todos: readonly import("../../../../shared/types").TodoItem[] | null | undefined): AgentTodoItem[] {
 	if (!todos) return [];
 	const occurrences = new Map<string, number>();

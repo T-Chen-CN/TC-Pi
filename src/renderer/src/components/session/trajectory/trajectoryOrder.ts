@@ -1,10 +1,6 @@
 import type { ChatMessage } from "../../../../../shared/types";
 import type { TrajectoryRecord, TrajectoryRecordKind, TrajectoryTurn } from "./buildTrajectory";
 
-/**
- * 墙钟归一：DSH SessionEvent.time 与 pi JSONL 都是 epoch ms。
- * 若误把秒当毫秒（~1e9），重试/过程事件会排到整段会话之前。
- */
 export function wallTime(value: number | undefined): number {
 	if (value === undefined || !Number.isFinite(value) || value <= 0) return 0;
 	if (value > 1e9 && value < 1e11) return Math.round(value * 1000);
@@ -15,7 +11,6 @@ function asNumber(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-/** 消息事件序号：meta.seq 优先，其次 dsh:${seq} 消息 id（投影器约定）。 */
 export function seqOfMessage(message: ChatMessage): number | undefined {
 	const fromMeta = asNumber(message.meta?.seq);
 	if (fromMeta !== undefined) return fromMeta;
@@ -25,7 +20,6 @@ export function seqOfMessage(message: ChatMessage): number | undefined {
 	return Number.isFinite(seq) ? seq : undefined;
 }
 
-/** 同 seq 时 thinking → assistant → tool，对齐 dsh-web expandAssistant 的展开顺序。 */
 function kindTie(kind: TrajectoryRecordKind): number {
 	if (kind === "systemPrompt") return 0;
 	if (kind === "user") return 1;
@@ -37,10 +31,6 @@ function kindTie(kind: TrajectoryRecordKind): number {
 	return 7;
 }
 
-/**
- * 账本顺序 = dsh-web layoutEntryOrder：初始系统提示最先，其余按 seq；
- * 无 seq 时退回墙钟。JS sort 稳定，同键保留折叠时的相对顺序。
- */
 export function compareTrajectoryRecords(left: TrajectoryRecord, right: TrajectoryRecord): number {
 	if (left.kind === "systemPrompt" && right.kind !== "systemPrompt") return -1;
 	if (right.kind === "systemPrompt" && left.kind !== "systemPrompt") return 1;

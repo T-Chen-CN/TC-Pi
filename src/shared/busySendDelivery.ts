@@ -1,12 +1,3 @@
-/**
- * Agent 忙碌时发送消息的默认投递行为（设置项 busySendDelivery 的取值与解析）。
- *
- * 纯函数无依赖：主进程 SettingsStore 用 parse 做磁盘值校验，
- * 渲染层发送链路用 resolveBusySendDelivery 做统一决策——pi/dsh 共用同一入口，
- * UI 行为对齐；各后端主进程自行把语义映射到 wire 协议
- * （pi streamingBehavior / DSH sessions.prompt mode）。
- */
-
 /** 忙碌时默认投递行为：steer=插入当前回合（尽快送达）；followUp=排队到下一轮 */
 export type BusySendDelivery = "steer" | "followUp";
 

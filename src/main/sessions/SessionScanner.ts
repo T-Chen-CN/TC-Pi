@@ -5,10 +5,10 @@ import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { appendFile, mkdir, open as openFile, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { basename as posixBasename, dirname as posixDirname, isAbsolute as posixIsAbsolute, join as posixJoin } from "node:path/posix";
-import type { ArchivedPiSession, ChatMessage, ChatRole, SessionSummary } from "../../shared/types";
+import type { ArchivedPiSession, ChatMessage, SessionSummary } from "../../shared/types";
 import type { MainProcessTranslationKey } from "../../shared/i18n/mainProcessCopy";
 import { getCodexSessionThreadInfo } from "../../shared/codexSessionMeta";
-import { isInSubagentArtifactsDir, isValidPiSessionFileHead, looksLikePiSessionFileStem, SUBAGENT_ARTIFACTS_DIR_NAME } from "../../shared/sessionIdentity";
+import { isValidPiSessionFileHead, looksLikePiSessionFileStem, SUBAGENT_ARTIFACTS_DIR_NAME } from "../../shared/sessionIdentity";
 import { extractMessageText, extractThinkingRaw } from "../pi/messageContent";
 import { isRoleMessageRole } from "../pi/sessionEntryIds";
 import { replaceExpandedRefBlocksWithLabels, textForSessionTitle } from "../../shared/expandedRefBlocks";
@@ -41,7 +41,6 @@ type SessionScanMessage = {
 	model?: string;
 	/** 生图消息标识：PiDeck 本地写入的 api=openai-images 或 imageGen 元数据 */
 	api?: string;
-	imageGen?: unknown;
 };
 
 type SessionScanLine = {
@@ -1465,14 +1464,11 @@ export class SessionScanner {
 					const images = this.extractImagesFromContent(msg.content);
 					// SessionFileEditor 将 extra 展开到 message 顶层，因此历史 JSONL
 					// 实际字段是 message.api / message.imageGen，而不是 message.extra。
-					const extraRecord = msg;
 					// 旧历史只保存了 openai-images 标识，没有 imageGen 元数据；补齐标记后
 					// 才能进入生图结果组件，显示复制/保存操作，而不是普通图片预览。
-					const isImageGen = extraRecord.api === "openai-images" || (extraRecord.imageGen && typeof extraRecord.imageGen === "object");
-					const text = extractMessageText(msg.content) || (isImageGen ? "[imagegen]" : "");
+					const text = extractMessageText(msg.content);
 					if (!text.trim() && images.length === 0) continue;
 					const thinking = extractThinkingRaw(msg.content);
-					const imageGen = isImageGen ? (extraRecord.imageGen && typeof extraRecord.imageGen === "object" ? extraRecord.imageGen : { status: "complete", prompt: "" }) : undefined;
 					messages.push({
 						id: `sv-a-${seq++}`,
 						agentId: "_viewer",
@@ -1481,7 +1477,6 @@ export class SessionScanner {
 						timestamp: ts,
 						...(thinking ? { thinking } : {}),
 						...(images.length > 0 ? { images } : {}),
-						...(imageGen ? { meta: { imageGen } } : {}),
 					});
 				} else if (msg.role === "toolResult") {
 					const toolCallId = String(msg.toolCallId ?? `sv-tool-${seq}`);
@@ -1772,7 +1767,6 @@ export class SessionScanner {
 		let modelId: string | undefined;
 		let thinkingLevel: string | undefined;
 		/** 扫描范围内是否出现生图消息（侧栏图片角标用） */
-		let hasImageGen = false;
 		/** 最后一条 assistant 消息携带的 provider/model（旧格式兼容回退）。 */
 		let lastAssistantModel: { provider: string; modelId: string } | undefined;
 
@@ -1939,7 +1933,6 @@ export class SessionScanner {
 			parentSessionPath,
 			model: modelProvider && modelId ? { provider: modelProvider, modelId } : undefined,
 			thinkingLevel,
-			hasImageGen: hasImageGen || undefined,
 			// 标记 WSL 来源，供 rename/delete/copy/readMessages 等操作识别
 			wsl: isWsl || undefined,
 		};

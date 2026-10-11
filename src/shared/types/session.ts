@@ -33,24 +33,11 @@ export type ChatMessage = {
 	stopReason?: string;
 };
 
-/**
- * 历史暂时不可读的结构化原因（渲染层据此出专态 UI，而不是让 IPC 抛裸错误）。
- * 目前只有一种：DSH host 被用户手动停止——此时 host 不会自动拉起，历史读取
- * 必然失败且不会自愈，「启动 host」是唯一恢复路径。
- */
-export type SessionHistoryUnavailableReason = "dsh-host-stopped";
-
 /** A bounded historical timeline slice. `nextBefore` is the exclusive index for an older page. */
 export type SessionMessagePage = {
 	messages: ChatMessage[];
 	total: number;
 	nextBefore: number | null;
-	/**
-	 * 本页不是「读到了空历史」而是「历史暂时读不了」：messages 为空且原因为 unavailable。
-	 * 渲染层必须据此进错误专态，不能按空会话渲染起始页——DSH 会话没有 pi 会话文件，
-	 * 把 host 未运行显示成「文件已删除/路径失效」会把用户引向错误方向。
-	 */
-	unavailable?: SessionHistoryUnavailableReason;
 	/** 当前活动分支最后使用的模型；由历史索引读取时顺手提取。 */
 	model?: { provider: string; modelId: string };
 	/** 当前活动分支最后记录的思考档位；无显式记录但有模型时回退为 off。 */
@@ -122,15 +109,6 @@ export type SessionRuntimeModelSelection = SessionModelPreference & {
 	thinkingLevel?: string;
 };
 
-/**
- * 项目会话列表排序模式（settings.sessionSortMode）：
- * - updatedAt：最近活跃（历史默认，会话/置顶行为不变）
- * - createdAt：创建时间（catalog 回填，扫描摘要缺省时回退 updatedAt）
- * - title：标题字典序（localeCompare，同名再按 updatedAt 降序稳定）
- * 新增方案：往渲染层策略目录 sessionSortModes.ts 注册一项即可，主进程只存字符串。
- */
-export type SessionSortModeId = "updatedAt" | "createdAt" | "title";
-
 export type SessionSummary = {
 	id: string;
 	filePath: string;
@@ -165,34 +143,18 @@ export type SessionSummary = {
 	messageCount: number;
 	/** 会话来源：pi 原生、Codex 导入、Claude 导入、OpenCode 导入 */
 	source?: SessionSource;
-	/** 运行时后端；缺省 "pi"。草稿/历史行用来区分 DSH 会话。 */
+
 	backend?: import("./agent").AgentBackend;
 	/** 标记此会话文件来自 WSL，rename/delete/copy 等操作需走 wsl.exe */
 	wsl?: boolean;
 	/** 从 JSONL 中的 model_change / thinking_level_change 提取的最后值 */
 	model?: { provider: string; modelId: string };
 	thinkingLevel?: string;
-	/** 会话里存在生图消息（openai-images / imageGen 标记）；侧栏显示图片角标便于查找 */
-	hasImageGen?: boolean;
-	/** DSH 会话身份（DSH host 的 sessionId）；backend=dsh 的会话用来重启后 attach 旧会话。 */
-	dshSessionId?: string;
 	codexSessionId?: string;
 	codexThreadSource?: "user" | "subagent";
 	codexParentThreadId?: string;
 	codexAgentRole?: string;
 	codexAgentNickname?: string;
-};
-
-/**
- * DSH 归档区会话清单行（G14）：host 目录已移入 .pideck-archive 的会话。
- * title 可选：归档 manifest 自 G14+ 起携带，旧归档缺省时由主进程
- * 从归档目录的会话日志前缀只读折叠补全；仍缺省则 UI 回退 cwd 末段/id。
- */
-export type ArchivedDshSession = {
-	dshSessionId: string;
-	cwd: string;
-	archivedAt: number;
-	title?: string;
 };
 
 /**
@@ -238,21 +200,6 @@ export type SessionRecord = {
 	status: "draft" | "active";
 	model?: SessionModelPreference;
 	thinkingLevel?: string;
-	/** DSH 权限预设（read-only / workspace-write / danger-full-access）；
-	 *  草稿期预选，激活时经 /permission 命令应用到 host 会话。 */
-	permissionPreset?: string;
-	/**
-	 * DSH agent 预设（会话「模式」：standard/code/minimal/cordis 或用户预设）。
-	 * 草稿期预选，激活新建 host 会话时随 sessions.create 应用（host 持久化到会话 header）；
-	 * attach 已存在会话时从 host 读回实际值回写。会话创建后固定，不可运行时切换。
-	 */
-	agentPreset?: string;
-	/** DSH 会话身份（DSH host 的 sessionId）；backend=dsh 的会话用来重启后 attach 旧会话。 */
-	dshSessionId?: string;
-	/** ACP 会话身份（agent 侧 sessionId）；backend=acp 的会话用来重启后 session/load 恢复。 */
-	acpSessionId?: string;
-	/** ACP 工具预选（AcpToolConfig.id）：backend=acp 草稿期选哪个 CLI；激活后回写实际工具。 */
-	acpToolId?: string;
 	/** 会话级代理覆盖（缺省 = 跟随全局）；沿用全局代理 URL，仅生效于下次 spawn。 */
 	proxy?: SessionProxyOverride;
 	createdAt: number;
@@ -275,10 +222,6 @@ export type CreateSessionDraftInput = {
 	thinkingLevel?: string;
 	/** 运行时后端；缺省 "pi"（旧调用方无需改动）。 */
 	backend?: import("./agent").AgentBackend;
-	/** DSH agent 预设（会话「模式」）草稿期预选；激活时随 sessions.create 应用。 */
-	agentPreset?: string;
-	/** ACP 工具预选（AcpToolConfig.id）：backend=acp 草稿期选哪个 CLI，激活时随 create 应用。 */
-	acpToolId?: string;
 };
 
 /** 启动前选择的模型与思考级别；显式值优先于 pi 配置默认值。 */
@@ -298,17 +241,10 @@ export type ResolvedLaunchDefaults = {
 	 *  渲染层据此决定欢迎页偏好是否参与展示回退：显式默认存在时偏好被覆盖
 	 *  （用户规则：默认模型 > 偏好 > 上次使用 > 空）。 */
 	defaultModelConfigured?: boolean;
-	/**
-	 * pi settings.json 的「每模型默认档位」表快照（键 `provider/modelId`，见
-	 * shared/modelThinkingLevels.ts）。thinkingLevel 只按解析出的模型算一份，而引导页
-	 * 用户可以改选模型——渲染层拿这张表按**当前展示的模型**反查，才能让底栏显示与
-	 * 创建时实际套用（createDraft 同样按最终模型查表）保持一致。
-	 * 非 DSH 后端且表非空时才返回。
-	 */
+
 	modelThinkingLevels?: Record<string, string>;
 };
 
-/** sessions.resolve-launch-defaults 入参：只需声明后端；缺省按非 DSH 解析。 */
 export type ResolveLaunchDefaultsInput = {
 	backend?: import("./agent").AgentBackend;
 };
@@ -318,15 +254,8 @@ export type UpdateSessionRecordInput = {
 	/** null = 清空（切后端时丢掉另一套目录里的模型）。 */
 	model?: SessionModelPreference | null;
 	thinkingLevel?: string | null;
-	/** DSH 会话权限预设（草稿期预选；激活会话经 /permission 命令应用后回写同步）。 */
-	permissionPreset?: string | null;
-	/** DSH agent 预设（会话「模式」）：仅草稿期可改；激活后由 host 会话 header 回写为准。 */
-	agentPreset?: string | null;
-	/** 后端（pi/dsh）：仅草稿期可变更；会话激活（active/有 runtime）后锁定——pi 会话文件
-	 *  与 DSH session log 格式不同，中途切换会导致消息同步渲染不可靠。 */
+
 	backend?: import("./agent").AgentBackend;
-	/** ACP 工具预选（AcpToolConfig.id）：与 backend:"acp" 配套，仅草稿期可改；null = 清除预选。 */
-	acpToolId?: string | null;
 	/** 会话级代理覆盖；null = 恢复跟随全局（清除已保存覆盖）。 */
 	proxy?: SessionProxyOverride | null;
 };
@@ -353,13 +282,7 @@ export type ImageContent = {
 	 * 发给 pi / 生图供应商的图片必须带 data（ref 形态只在展示与历史回读之间流转）。
 	 */
 	data?: string;
-	mimeType: string; // 如 "image/png", "image/jpeg", "image/gif", "image/webp"
-	/**
-	 * 落盘引用：`userData/imagegen/blobs` 下的内容寻址文件名（sha256 + 扩展名）。
-	 * 与 data 二选一，两者同时存在时 data 优先（见 shared/imageContentSrc.ts）。
-	 * 白名单与协议解析见 main/imagegen/ImageBlobStore.ts、ImageGenImageProtocol.ts。
-	 */
-	ref?: string;
+	mimeType: string;
 };
 
 export type SendPromptInput = {

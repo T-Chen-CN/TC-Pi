@@ -22,12 +22,7 @@ export const IMPORT_PATHS: readonly string[] = [
 	"automation.json",
 	"quick-messages.json",
 	"voice-transcription.json",
-	"imagegen.json",
 	"security-policy.json",
-	"pet-position.json",
-	"pi-desktop/feishu*.json", // feishu 全套：受限 glob 展开（feishu.json / feishu-bindings-*.json 等）
-	"imagegen/sessions/",
-	"imagegen/blobs/",
 	"builtin-extensions/",
 	"skills-overlay/",
 	`${PROMPT_OVERLAY_DIR_NAME}/`,

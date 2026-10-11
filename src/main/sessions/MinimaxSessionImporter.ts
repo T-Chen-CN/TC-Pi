@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import type { MinimaxImportReport, MinimaxImportResult, MinimaxImportStatus, MinimaxSessionSummary } from "../../shared/types";
 import { convertMinimaxSessionTo, type MinimaxMessageRecord } from "./minimaxSessionConvert";
 import { getMinimaxTargetPath, minimaxSessionsRoot, readMinimaxImportMeta, readMinimaxSessionMeta, readMinimaxSqliteIndex, scanMinimaxSessions, type MinimaxSessionMeta, type MinimaxSqliteEntry } from "./minimaxSessionSource";
-import { ensureProjectSessionDir, normalizePath } from "./kimiSessionSource";
+import { ensureProjectSessionDir } from "./kimiSessionSource";
 import { assertSourceWithinRoot } from "./importPathGuard";
 import { defaultSessionImportCopy, type SessionImportCopy } from "./SessionImportCopy";
 import { createBufferedLineSink, readJsonlObjects, renameWithRetry } from "./sessionSourceHead";

@@ -1,6 +1,6 @@
 import { useAtomValue } from "jotai";
 import { Check, ChevronDown, ChevronRight, CircleStop, CircleX, Copy, FileDown, FileText, Fingerprint, Globe, Link2, MoreHorizontal, Pencil, PanelLeft, PanelRight, Pin, PinOff, Play, Plus, RefreshCw, RotateCw, X } from "lucide-react";
-import { Fragment, useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion, useReducedMotion, type Transition } from "motion/react";
 import { sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionRecordsAtom, projectInventoryByIdAtom, projectByIdAtomFamily } from "../../atoms";
 import { t } from "../../i18n";
@@ -13,10 +13,9 @@ import { sessionDisplayName } from "../../utils/sessionDisplayName";
 import { Button } from "../ui-shadcn/button";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../ui-shadcn/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../ui-shadcn/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "../ui-shadcn/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
 import { cn } from "../../lib/utils";
-import { SessionBackendBadge } from "./SessionSourceBadge";
 import { TitleScrollText } from "../sidebar/TitleScrollText";
 import { SessionHeader } from "./SessionHeader";
 import { SessionActivityIndicator } from "./SessionActivityIndicator";
@@ -181,18 +180,9 @@ export type SessionTabsBarProps = {
 		onCloseAgent?: () => void;
 		onAction: (action: SessionRunAction) => void;
 	};
-	/**
-	 * 打开当前会话的代理设置弹框（网络代理）。
-	 * 与侧栏「会话代理」同源：改完保存即自动重启 runtime 生效，不需要手动「停止 → 启动」。
-	 * undefined = 无当前会话或宿主不支持（如 DSH 共享 host）。
-	 */
+
 	onOpenProxySetting?: () => void;
-	/**
-	 * 当前会话的「会话操作」组：重命名 / 复制会话 / 导出 HTML / 复制会话文件路径 / 打开会话文件。
-	 * 搜索定位到的会话可能不在侧栏可见（侧栏只渲染部分行），⋯ 菜单是唯一稳定入口；
-	 * 可见性判定与侧栏会话右键菜单同一套（DSH 历史会话无宿主文件 → 隐藏复制/导出/路径组）。
-	 * undefined = 无当前会话（引导页等），整组不渲染。
-	 */
+
 	sessionActions?: SessionTabActions;
 	/**
 	 * Tab 右键菜单的「会话操作」组：按被右键 Tab 的 sessionId 参数化（后台 Tab 同样可操作）。
@@ -201,14 +191,11 @@ export type SessionTabsBarProps = {
 	contextSessionActions?: (sessionId: string) => SessionTabActions | undefined;
 };
 
-/** 会话操作组（⋯ 菜单与 Tab 右键菜单共用）：能力闸门由装配层按目标会话算好
- *  （草稿/DSH/无文件路径），渲染层只按 flags 与回调存在性出菜单项。 */
 export type SessionTabActions = {
-	/** 复制会话：live 走 clone 分流（DSH 亦可），历史走 copyRecord；草稿会话隐藏 */
 	canCopySession: boolean;
-	/** 导出 HTML：DSH 无实现，隐藏 */
+
 	canExportHtml: boolean;
-	/** 有会话文件：无（草稿/DSH）则隐藏「复制路径 / 打开文件」 */
+
 	hasFilePath: boolean;
 	onCopySession: () => void;
 	onCopySessionFilePath: () => void;
@@ -967,13 +954,13 @@ function SessionTab(props: {
 		isReloading: props.isReloading,
 	});
 	const title = sessionDisplayName(record?.title, record?.forked) || t("common.untitled");
-	// DSH/生图徽标与计划/目标模式 chip 都是不可压缩的固定宽度内容。
+
 	// 上限收窄史：峰值 208/256 → 176/224（用户反馈「Tab 变长了」）→ 116/148（再收 1/3）
 	// → 104/132px（视觉上再小一档）。固定开销约 54px（px-2 16 + 状态点 10 + 关闭按钮 16 +
 	// 两处 gap-1.5 12），104px 下标题只剩约 50px ≈ 4-5 个汉字，已在可读性下限附近：
 	// 若还嫌宽，应先改「状态点/关闭按钮只在激活或 hover 时占位」的取舍，而不是继续压宽度。
 	// 截断细节由 hover 富提示（标题 + 工作区）与 TitleScrollText 滚动兜底。
-	const hasLeadingBadges = Boolean(record?.backend === "dsh" || record?.backend === "imagegen");
+	const hasLeadingBadges = Boolean(false);
 	// Tab 级操作（固定/关闭等）改为右键菜单（ContextMenu，光标处弹出）；Tab 本体点击仍是切换，
 	// 拖拽排序与中键关闭与菜单互不干扰（drag/auxclick 不触发 click）。
 	// 运行控制（停止/重启/重新加载）只作用于当前会话，已上收右上角 ⋯ 更多操作菜单。
@@ -991,7 +978,7 @@ function SessionTab(props: {
 						<SessionActivityIndicator status={status} sessionId={sessionId} busy={props.isRestarting || props.isStopping || props.isReloading} />
 						{pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />}
 						<TitleScrollText text={title} disabled className="truncate font-bold" />
-						{(record?.backend === "dsh" || record?.backend === "imagegen") && <SessionBackendBadge backend={record.backend} className="h-4 shrink-0" />}
+						{false}
 					</div>
 				</TooltipTrigger>
 				<TooltipContent side="bottom" align="start" className="max-w-80">
@@ -1040,7 +1027,7 @@ function SessionTab(props: {
 								"session-tab group relative flex h-7 shrink-0 cursor-pointer select-none items-center rounded-md border px-2 text-[length:var(--font-size-tab)] leading-(--line-height-tab) transition-[color,background-color,border-color,box-shadow,transform] duration-base",
 								// 固定 Tab 与普通 Tab 同宽策略（按内容收缩）：固定 Tab 无关闭按钮，
 								// hover 不会因按钮出现而跳动，无需 w-20 占位；固定宽度反而让 Pin 图标挤占标题空间。
-								// 有 DSH/生图徽标或模式 chip 时放宽上限：基础上限 + 徽标预留 28px
+
 								// （SESSION_TAB_BADGE_EXTRA_WIDTH，旧 132/104 差值）。
 								hasLeadingBadges ? "w-fit max-w-(--session-tab-max-w-badged)" : "w-fit max-w-(--session-tab-max-w)",
 								dragging && "opacity-50",
@@ -1061,7 +1048,7 @@ function SessionTab(props: {
 								)}
 								{pinned && <Pin className="size-3 shrink-0 text-muted-foreground/70" aria-hidden="true" />}
 								{/* DSH/生图是文字标记，保留自然宽度；固定 size-4 会让文字溢出到右侧操作按钮区域。 */}
-								{(record?.backend === "dsh" || record?.backend === "imagegen") && <SessionBackendBadge backend={record?.backend} className="h-4 shrink-0" />}
+								{false}
 								{/* G12：DSH plan 模式 / danger 权限预设全局可见（数据来自 runtime state，tab 级常显） */}
 
 								{/* 标题复用侧栏 TitleScrollText：溢出时 hover 滚动到尾、离开回开头（与左侧会话列表一致）。

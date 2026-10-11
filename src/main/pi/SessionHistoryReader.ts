@@ -1960,12 +1960,6 @@ export class SessionHistoryReader {
 		return lines.map((line) => JSON.parse(line));
 	}
 
-	/**
-	 * 直接从历史会话 JSONL 读取最近 N 轮对话。
-	 * 必须走会 yield 的显示索引：attach 时若再整文件 split + JSON.parse，
-	 * 主进程事件循环会被堵住，窗口关闭/最小化都点不了（pi 会话卡死、DSH 没事）。
-	 * 返回兼容 get_messages 的 RpcResponse，供 loadMessages 复用。
-	 */
 	async readRecentMessages(sessionPath: string, maxTurns: number): Promise<RpcResponse> {
 		const t0 = Date.now();
 		let index: Awaited<ReturnType<SessionHistoryReader["getSessionDisplayIndex"]>>;

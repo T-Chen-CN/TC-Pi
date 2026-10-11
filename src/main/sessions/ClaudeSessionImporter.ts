@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readdir, rm, stat, utimes } from "node:fs/promises";
+import { mkdir, open, readdir, rm, utimes } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { ClaudeImportReport, ClaudeImportResult, ClaudeImportStatus, ClaudeSessionSummary } from "../../shared/types";
 import { defaultSessionImportCopy, type SessionImportCopy } from "./SessionImportCopy";

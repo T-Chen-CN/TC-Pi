@@ -109,27 +109,7 @@ export class AgentMessageProjector {
 						const thinking = this.extractThinking(typed.content);
 						// 生图等 PiDeck 本地落盘的 assistant 消息可能只有图片块、没有文本。
 						const images = this.extractImages(typed.content);
-						// SessionFileEditor 将持久化 extra 展开到 assistant 消息顶层，
-						// 因此历史生图标识位于 typed.api / typed.imageGen。
-						const extraRecord = typed;
-						const imageGen = extraRecord?.imageGen;
-						const imageGenMeta = imageGen && typeof imageGen === "object" ? (imageGen as Record<string, unknown>) : undefined;
-						// 兼容首批生图历史：旧记录只有 extra.api，没有 imageGen 元数据；
-						// 用前一条 user 消息恢复 prompt，避免旧图片失去复制/保存入口。
-						const isLegacyImageGen = extraRecord?.api === "openai-images";
-						const legacyPrompt = isLegacyImageGen
-							? rawMessages
-									.slice(0, index)
-									.reverse()
-									.find((candidate) => {
-										if (!candidate || typeof candidate !== "object") return false;
-										const role = (candidate as Record<string, unknown>).role;
-										return role === "user";
-									})
-							: undefined;
-						const prompt = legacyPrompt && typeof legacyPrompt === "object" ? this.extractText((legacyPrompt as Record<string, unknown>).content) : "";
-						const recoveredImageGen = imageGenMeta && typeof imageGenMeta.prompt === "string" ? imageGenMeta : isLegacyImageGen ? { status: "complete", prompt: prompt || this.deps.translate("session.imagePlaceholder") } : undefined;
-						const text = this.extractText(typed.content) || (recoveredImageGen ? this.deps.translate("session.imagePlaceholder") : "");
+						const text = this.extractText(typed.content);
 						// 无文本、无 thinking、无图片时才是真正的空消息，跳过。
 						if (!text.trim() && !thinking?.trim() && images.length === 0) return [];
 						// stopReason（provider 归一化）：历史 JSONL 已持久化，
@@ -145,7 +125,6 @@ export class AgentMessageProjector {
 								meta: {
 									...(currentEntryId ? { entryId: currentEntryId } : {}),
 									_piDeckMsgSeq: index,
-									...(recoveredImageGen && (recoveredImageGen.status === "complete" || recoveredImageGen.status === "generating" || recoveredImageGen.status === "error") ? { imageGen: recoveredImageGen } : {}),
 								},
 								...(thinking ? { thinking } : {}),
 								...(images.length > 0 ? { images } : {}),

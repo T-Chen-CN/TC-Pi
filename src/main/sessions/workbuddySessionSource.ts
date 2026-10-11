@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { normalizeImportedToolArguments } from "./importToolArguments";
 import { assertSourceWithinRoot } from "./importPathGuard";

@@ -3,7 +3,6 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { resolvePaneTerminal, terminalOwnerKey, shouldMountPaneTerminalDock } from "../../terminalDockState";
 import { settingsOpenAtom } from "../../atoms";
 import { claimSessionRuntimeUiResponseAtom, rollbackSessionRuntimeUiResponseAtom } from "../../atoms/session-atoms";
-import { recordAskEchoAtom } from "../../atoms/ask-echo-atoms";
 import { sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionRuntimeUiBySessionIdAtomFamily } from "../../atoms/session-selectors";
 import { projectByIdAtomFamily } from "../../atoms/project-atoms";
 import { useSessionRuntimeController } from "../../hooks/useSessionRuntimeController";
@@ -55,7 +54,6 @@ export const SessionRuntimeInjector = React.memo(function SessionRuntimeInjector
 	const currentSessionRuntimeUi = useAtomValue(sessionRuntimeUiBySessionIdAtomFamily(currentSessionId));
 	const claimSessionUiResponse = useSetAtom(claimSessionRuntimeUiResponseAtom);
 	const rollbackSessionUiResponse = useSetAtom(rollbackSessionRuntimeUiResponseAtom);
-	const setRecordAskEcho = useSetAtom(recordAskEchoAtom);
 	const runtimeRef = React.useRef(currentSessionRuntime);
 	runtimeRef.current = currentSessionRuntime;
 
@@ -155,11 +153,9 @@ export const SessionRuntimeInjector = React.memo(function SessionRuntimeInjector
 			claim: claimSessionUiResponse,
 			rollback: rollbackSessionUiResponse,
 			send: services.api.sessions.sendUiResponse,
-			// 应答成功后捕获回显（recordAskEchoAtom 内部按 backend 门控：pi 的回显由 _askCard 工具卡承担）
-			onAccepted: (request, response) => setRecordAskEcho({ sessionId: currentSessionId, request, response }),
 			onError: (error) => services.showToast(error instanceof Error ? error.message : String(error), 4000),
 		});
-	}, [claimSessionUiResponse, currentSessionId, currentSessionRuntime?.agentId, currentSessionRuntime?.runtimeGeneration, rollbackSessionUiResponse, setRecordAskEcho, services.api.sessions.sendUiResponse, services.showToast]);
+	}, [claimSessionUiResponse, currentSessionId, currentSessionRuntime?.agentId, currentSessionRuntime?.runtimeGeneration, rollbackSessionUiResponse, services.api.sessions.sendUiResponse, services.showToast]);
 
 	const runtime = useSessionRuntimeController({
 		sessionId: currentSessionId,

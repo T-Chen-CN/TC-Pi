@@ -42,16 +42,6 @@ test("pi 关闭 plan/goal 扩展：对应模式从菜单消失，仅保留普通
 	assert.deepEqual(result, ["normal"]);
 });
 
-test("imagegen 会话（backend=imagegen）：模式菜单为空，不走 LLM 模式", () => {
-	const result = [...computeVisibleModes({ isImageGen: true, planModeAvailable: true, goalModeAvailable: true })];
-	assert.deepEqual(result, []);
-});
-
-test("legacy 含生图消息的 pi 会话（isImageGen=true）：同样锁定为空菜单（防误切回 LLM）", () => {
-	const result = [...computeVisibleModes({ isImageGen: true, planModeAvailable: true, goalModeAvailable: true })];
-	assert.deepEqual(result, []);
-});
-
 // 2026-10 外移：模式选择器常驻底栏（不再藏「+」菜单），且受设置 → 外观 → 功能模块的
 // composerModes 隐藏控制；隐藏时特殊模式仍由退出×兑底，不锁死用户。
 test("模式选择器已常驻底栏并可被功能模块设置隐藏（源码形状）", () => {

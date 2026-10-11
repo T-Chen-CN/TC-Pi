@@ -301,17 +301,14 @@ test("host plugin sessions read saved active-branch history without a pi runtime
 		{ id: "last", type: "message", parentId: "first", timestamp: "2026-01-01T00:00:03Z", message: { role: "assistant", content: "chosen branch" } },
 	];
 	const catalogEntry = { id: "history", projectId: "project-a", filePath: path, environment: "native", title: "History", createdAt: 1, updatedAt: 2 };
-	const sessions = new HostPluginSessions({ listEntries: () => [catalogEntry, { ...catalogEntry, id: "foreign", projectId: "project-b" }, { ...catalogEntry, id: "dsh", backend: "dsh" }], get: (id) => (id === "history" ? catalogEntry : undefined) });
+	const sessions = new HostPluginSessions({ listEntries: () => [catalogEntry, { ...catalogEntry, id: "foreign", projectId: "project-b" }], get: (id) => (id === "history" ? catalogEntry : undefined) });
 	const context = { projectId: "project-a", locale: "en-US", theme: "dark" };
 	try {
 		await writeFile(path, entries.map(JSON.stringify).join("\n") + "\n");
 		assert.equal(sessions.list({ locale: "en-US", theme: "dark" }).sessions.length, 0);
 		assert.deepEqual(
 			Array.from(sessions.list(context).sessions, (item) => [item.id, item.readable]),
-			[
-				["dsh", false],
-				["history", true],
-			],
+			[["history", true]],
 		);
 		const page = await sessions.entries(context, "history");
 		assert.deepEqual(

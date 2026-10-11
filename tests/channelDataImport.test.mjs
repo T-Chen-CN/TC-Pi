@@ -39,7 +39,7 @@ function walkFiles(root) {
 	return out.sort();
 }
 
-test("planImportItems 按存在性过滤并展开 feishu glob", (t) => {
+test("planImportItems imports current data and excludes retired Feishu files", (t) => {
 	const root = makeTempDir(t, "pideck-import-plan-");
 	writeFileSync(join(root, "settings.json"), "0123456789", "utf8"); // 存在
 	// projects.json 不写（不存在 → 过滤掉）
@@ -50,8 +50,8 @@ test("planImportItems 按存在性过滤并展开 feishu glob", (t) => {
 
 	const rels = planImportItems(root).map((item) => item.relPath);
 	assert.ok(rels.includes("settings.json"));
-	assert.ok(rels.includes("pi-desktop/feishu-a.json"));
-	assert.ok(rels.includes("pi-desktop/feishu-b.json"));
+	assert.ok(!rels.includes("pi-desktop/feishu-a.json"));
+	assert.ok(!rels.includes("pi-desktop/feishu-b.json"));
 	assert.ok(!rels.includes("projects.json"));
 	assert.ok(!rels.includes("pi-desktop/feishu-notes.txt"));
 });

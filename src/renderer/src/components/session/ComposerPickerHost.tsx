@@ -20,13 +20,11 @@ export type ComposerPickerHostProps = {
 	onInsertTemplate: (template: PromptTemplateInfo) => void;
 	/** 一键插入模板全文（controller insertTemplateContent）：直接塞正文，不走斜线命令。 */
 	onInsertTemplateContent: (template: PromptTemplateInfo) => void;
-	/** 技能选择：把技能调用命令插入输入框（由 controller 的 insertSkillInvocation 提供）。
-	 *  插入的斜线形态由后端决定：pi 用 /skill:名称，DSH 用 /名称——保证与各自的
-	 *  技能命令解析一致，避免「从列表选了却调不动」（bare 斜杠在 pi 会被过滤）。 */
+
 	onInsertSkill: (name: string) => void;
 	/** 一键插入技能全文（controller insertSkillContent）：正文由选择器先读 SKILL.md。 */
 	onInsertSkillContent: (content: string) => void;
-	/** DSH 部署默认模型/思考档位（settings.yaml agent-default-model）：草稿期高亮与过滤用。 */
+
 	defaultModel?: { provider?: string; modelId?: string; modelName?: string };
 	defaultThinkingLevel?: string;
 	/** pi settings.modelThinkingLevels 快照（引导页预选默认的一部分）：按当前模型反查每模型默认档位。 */
@@ -70,7 +68,6 @@ export function ComposerPickerHost(props: ComposerPickerHostProps) {
 			return <ComposerSkillPicker backend={"pi"} projectId={preference.projectId} agentId={preference.agentId} onClose={props.onClose} onPick={props.onInsertSkill} onInsertContent={props.onInsertSkillContent} />;
 		}
 		if (props.picker === "model") {
-			// DSH 会话的模型归属 host（agent-default-model），不读 pi 的欢迎页偏好：
 			// 否则 localStorage 里的 pi 模型会被当成「当前模型」高亮，误导用户以为已选中。
 			// 草稿期用部署默认模型（settings.yaml agent-default-model）作当前值。
 			// 目录/收藏/隐藏状态由 controller 统一持有（快捷键循环共用同一份）。
@@ -88,12 +85,10 @@ export function ComposerPickerHost(props: ComposerPickerHostProps) {
 					favoriteModels={preference.favoriteModels}
 					onToggleFavorite={(provider, modelId) => void preference.toggleFavorite(provider, modelId)}
 					recentProviders={preference.recentProviders}
-					// 自定义顺序随会话后端：DSH 目录分组是 route 名，用 dshProviderOrder
 					providerOrder={preference.providerOrder}
 					hiddenProviders={preference.hiddenProviders}
 					hiddenModels={preference.hiddenModels}
 					onToggleHideModel={(provider, modelId) => void preference.toggleHideModel(provider, modelId)}
-					// 用量查询链路随会话后端：DSH 目录的 provider 是 route 名，配置/凭据走 dsh 链路
 					backend={"pi"}
 				/>
 			);

@@ -1,5 +1,5 @@
 import type { AppSettings } from "../../shared/types";
-import type { SessionProxyMode, SessionProxyOverride } from "../../shared/types/session";
+import type { SessionProxyMode } from "../../shared/types/session";
 
 /** 会话级 Pi 代理策略：模型/供应商名单与会话覆盖统一在 spawn 前解析。 */
 

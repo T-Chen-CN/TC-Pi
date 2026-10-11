@@ -17,7 +17,7 @@ export type SessionProcessEvent = {
 	thinkingLevel?: string;
 	customType?: string;
 	tokensBefore?: number;
-	/** 事件序号（DSH SessionEvent.seq）；账本按 seq 而不是墙钟排，对齐 dsh-web layout.ts。 */
+
 	seq?: number;
 	/** llm/retry：第几次重试（1-based）。 */
 	retry?: number;

@@ -1,11 +1,3 @@
-/**
- * SoundAlertService —— 主进程声音提醒服务。
- *
- * 职责：监听 AgentManager 的三类事件（完成 settled / 出错状态边沿 / 等待输入 ui-request），
- * 经 soundAlertTracker 去重冷却后，按设置（总开关/分事件开关/音量/音效引用）决定
- * 是否向主窗口推送 `sounds:play`。播放本身在渲染层（HTMLAudioElement），
- * 主进程只做「事件判定 + 设置门控」，与 PetStateBridge 的分工保持一致。
- */
 import { ipcChannels } from "../../shared/ipc";
 import type { SoundAlertKind } from "../../shared/types/soundAlert";
 import type { AgentManager } from "../pi/AgentManager";

@@ -6,7 +6,6 @@ import { isDisplayableSessionRecord } from "../utils/sessionRecordDisplay";
 import { sessionHistoryMutationOverlayByIdAtom, sessionIdsByProjectAtom, sessionRecordsAtom, sessionRuntimeByIdAtom, sessionRuntimeUiByIdAtom } from "./session-atoms";
 
 export function sessionRecordToSummary(session: SessionRecord): SessionSummary | undefined {
-	// DSH 会话没有 pi 会话文件（会话由 DSH host 持久化在 $DSH_HOME，catalog 只存映射记录），
 	// 生图会话无 pi 文件（历史独立存 ImageSessionStore）；两者无 filePath 也必须进侧栏列表。
 	// 空 filePath 在显示管线走 unkeyedSessions 分支
 	// （getSummaryKey 对空串归一化为 undefined），不会与其他会话折叠成一行；
@@ -29,7 +28,6 @@ export function sessionRecordToSummary(session: SessionRecord): SessionSummary |
 		messageCount: session.messageCount,
 		source: session.source,
 		backend: session.backend,
-		dshSessionId: session.dshSessionId,
 		wsl: session.environment === "wsl" || session.wsl || undefined,
 		codexSessionId: session.codexSessionId,
 		codexThreadSource: session.codexThreadSource,

@@ -11,7 +11,7 @@ import test from "node:test";
 const script = readFileSync("scripts/analyze-asar-waste.js", "utf8");
 
 test("waste-analysis roots keep every package the runtime actually requires", () => {
-	const requiredRoots = ["zod", "@modelcontextprotocol/sdk", "tar", "electron-updater", "minimatch", "smol-toml", "ignore", "proper-lockfile", "undici"];
+	const requiredRoots = ["tar", "electron-updater", "minimatch", "smol-toml", "ignore", "proper-lockfile"];
 	for (const name of requiredRoots) {
 		assert.ok(script.includes(`"${name}"`), `roots must include ${name}（漏了会被误报为可排除，照抄进 build.files 炸运行时）`);
 	}

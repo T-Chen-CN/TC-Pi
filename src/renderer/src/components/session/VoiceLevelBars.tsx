@@ -2,17 +2,6 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { smoothVoiceLevel } from "../../utils/voiceLevelMeter";
 
-/**
- * 电平驱动的录音波纹：柱高由真实麦克风电平决定，不说话就不动。
- *
- * 为什么不复用 `motion/loader.tsx` 的 bars 变体：那是 vendored 的 beui 组件，必须与
- * registry 保持逐字节一致（改了会被下次 CLI 安装连坐覆盖）；而它的 bars 是无限循环，
- * 本身也没有电平入口。几何在这里逐项对齐 bars（柱宽 size×0.16、间距 size×0.1、高 size），
- * 换成电平驱动后仍与同排按钮对齐。
- *
- * 动效写在 rAF 里直接改 transform，不走 React state：电平约 25fps 更新，若每帧 setState
- * 会让输入框整块子树跟着重渲染。
- */
 const BAR_SIZE_PX = 13;
 /** 每根柱对同一电平的响应系数：中间灵敏、两端略钝，起伏自然而不是一齐伸缩。 */
 const BAR_SHAPES = [0.5, 0.8, 1, 0.75, 0.55];

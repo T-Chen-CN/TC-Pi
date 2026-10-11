@@ -5,13 +5,6 @@ import { currentSessionIdAtom } from "../../atoms/session-atoms";
 import { sessionRecordByIdAtomFamily } from "../../atoms/session-selectors";
 import { RewindCheckpointList } from "../session/RewindCheckpointList";
 
-/**
- * 右侧抽屉「检查点」面板：展示当前会话在 refs/pi-checkpoints 下的文件快照，
- * 与底栏弹层共用 RewindCheckpointList（列表/diff/范围回退）。
- *
- * 能力边界：与底栏按钮同口径——仅 pi 后端（rewind 能力）展示列表；
- * dsh/imagegen 会话给出不支持提示；未打开会话给出引导空态。
- */
 export function RewindPanel() {
 	const sessionId = useAtomValue(currentSessionIdAtom);
 	const sessionRecord = useAtomValue(sessionRecordByIdAtomFamily(sessionId ?? ""));

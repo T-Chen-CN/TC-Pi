@@ -1,5 +1,5 @@
 import { Button } from "../components/ui-shadcn/button";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Plus, Check } from "lucide-react";
 import type { AuthFile, SettingsFile, ModelsFile } from "./configTypes";
 import { collectProviderOptions } from "./providerOptions";

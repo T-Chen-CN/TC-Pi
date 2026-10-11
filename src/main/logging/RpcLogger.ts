@@ -3,9 +3,9 @@ import type { ModelTraceRecord, ModelTraceRequestInput } from "../../shared/type
 import { readTextBounded } from "../fs/boundedTextRead";
 import { ModelTraceStore } from "./ModelTrace";
 import { app } from "electron";
-import { appendFile, mkdir, readFile, readdir, rename, stat, unlink } from "node:fs/promises";
+import { appendFile, mkdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { createGzip, createGunzip } from "node:zlib";
+import { createGzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 

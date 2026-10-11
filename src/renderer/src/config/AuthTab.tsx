@@ -1,6 +1,6 @@
 import { Button } from "../components/ui-shadcn/button";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, ChevronRight, Copy, ExternalLink, Eye, EyeOff, GripVertical, Trash2 } from "lucide-react";
+import { useCallback, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, ChevronRight, ExternalLink, Eye, EyeOff, GripVertical, Trash2 } from "lucide-react";
 import { t } from "../i18n";
 import type { AuthFile, ModelsFile } from "./configTypes";
 import { ConfigSelect, openDocsInSystemBrowser, SecretInput } from "./ConfigShared";

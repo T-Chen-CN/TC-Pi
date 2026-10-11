@@ -107,16 +107,6 @@ export type CompactUsageInput = {
 	contextWindow?: number | null;
 };
 
-/**
- * 把 runtime 上报收成「圆环/压缩门槛用」的占用百分比。
- * pi/dsh 偶发 percent=0 但 tokens 非 0（取整或尚未随 tokens 刷新）；
- * 圆环会按 tokens/window 重算，斜杠 /compact 必须用同一数字，否则会出现
- * 「圆环显示 40%、按钮可点，/compact 却提示太小」的分叉。
- * percent 缺失返回 null：草稿刚启动尚未上报，不在客户端拦截。
- * 不封顶 100：pi 按 tokens/contextWindow 直接计算（缓存超窗等场景可 >100%），
- * 其 CLI footer 也显示原始值；封顶会让「真实 112%」显示成 100%，与
- * ~used/window 原始数字及会话头部明细（用原始值）互相矛盾。
- */
 export function resolveCompactUsagePercent(state?: CompactUsageInput | null): number | null {
 	if (state?.contextPercent == null) return null;
 	let percent = state.contextPercent;
@@ -138,12 +128,6 @@ export function compactUiState(percent: number | null | undefined, compacting: b
 	};
 }
 
-/**
- * 把 pi/DSH/IPC 错误原文收成统一 kind。调用方再映射 i18n。
- *
- * 取消类不再返回「不提示」：手动压缩是用户主动点的，静默等于「点了没反应」
- * ——这正是一次真实排查的形态（billion-context-pi 取消 pi 压缩 + 静默映射）。
- */
 export function classifyCompactError(raw: string): CompactNoticeKind {
 	const lower = raw.trim().toLowerCase();
 	if (!lower) return "failed";

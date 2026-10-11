@@ -31,11 +31,6 @@ interface AutomationTaskEditorProps {
 /** Radix Select 禁止 value=""；空档位表示跟随项目/全局，用哨兵值落盘时再清掉。 */
 const THINKING_INHERIT = "inherit";
 
-/**
- * 定时任务可选的「工作模式」档位（顺序即展示顺序）。
- * 与输入框「+」菜单里的 composer 模式同义：普通=直接执行，计划=只读分析出计划，
- * 目标=围绕提示词自动连续推进。这里不含生图后端：AutomationTask.backend 已排除它。
- */
 const TASK_MODE_OPTIONS: Array<{
 	value: AutomationTaskMode;
 	/** 直接复用 composer 模式文案，定时任务与输入框「+」菜单的说法保持一致。 */

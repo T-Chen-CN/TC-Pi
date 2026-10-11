@@ -1,11 +1,6 @@
 import type { MainProcessTranslationKey } from "./i18n/mainProcessCopy";
 import { mainProcessT } from "./i18n/mainProcessCopy";
 
-/**
- * 工具卡展开区文案（PI / DSH 共用）：整理成「工具 / 状态 / 参数 / 结果」写入 meta.detailText。
- * 渲染层 getToolDetailText 优先读这段字；主进程投影时按当前 locale 烘焙，不随语言切换重算。
- */
-
 /** 单段 args/result/details 与整段 detailText 的首尾截断上限（与历史 PI 投影器同值）。 */
 export const TOOL_DETAIL_MAX_CHARS = 8000;
 
@@ -24,9 +19,6 @@ export function safeJson(value: unknown): string {
 	}
 }
 
-/**
- * 从 pi 风格 result.content[].text 抽出正文；纯字符串（DSH textFromBlocks）原样返回。
- */
 export function extractToolResultText(result: unknown): string {
 	if (typeof result === "string") return result;
 	if (!result || typeof result !== "object") return "";
@@ -73,7 +65,7 @@ export type PiToolTruncation = {
 export function extractPiToolTruncation(result: unknown): PiToolTruncation | undefined {
 	if (!result || typeof result !== "object") return undefined;
 	// 运行期/历史投影的 result 都把原始 details 挂在 result.details；无 details 包装时
-	// （DSH 平铺结果）退回顶层查找，保持单一口径。
+
 	const details = (result as { details?: unknown }).details;
 	const source: Record<string, unknown> = details && typeof details === "object" ? (details as Record<string, unknown>) : (result as Record<string, unknown>);
 	const truncation = source.truncation;

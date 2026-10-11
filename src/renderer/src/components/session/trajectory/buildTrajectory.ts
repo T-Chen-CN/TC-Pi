@@ -1,26 +1,5 @@
-/**
- * 将会话消息折叠成轨迹账本（turn + 3-lane 时间线）。
- *
- * 业务规则：
- * - 用户消息开启新 turn；其后的 assistant / thinking / tool 归入该 turn。
- * - system / error 不拆 turn，挂到当前 turn；若还没有 turn 则单独成 turn。
- * - 工具起止优先用 meta.startedAt + meta.durationMs（与 AgentManager 写入约定一致），
- *   不用 message.timestamp（update/end 会刷新，历史恢复后耗时不可还原）。
- * - in-flight（running / pending）不伪造 duration：endedAt 留空，时间列显示为进行中。
- * - 历史 assistant/thinking 往往只有一个 timestamp（结束时刻）。轮内用相邻锚点
- *   回推区间，避免账本只剩工具有耗时；用户/过程事件仍是时间点，不编造。
- * - JSONL / DSH 过程事件按墙钟落入最近 turn；轮内顺序对齐 dsh-web layout.ts：
- *   初始系统提示最先，其余按 seq，无 seq 退回墙钟。重试（llm/retry）是过程记录，
- *   不得因 timestamp=0 被插到轮首。
- * - 系统提示词 Pi 不落盘：可选的 extras.systemPrompt 仅作参考记录，不是当轮请求快照
- *   （有模型快照时 hook 层会用最近一次快照的真实 system 覆盖，见 useSessionTrajectorySource）。
- * - 模型请求快照（extras.modelTraces）按请求时刻落入所在用户轮：时间点记录，
- *   不伪造区间；检查器凭 modelTrace.traceId 回读完整请求体。
- */
-
 import type { ChatMessage } from "../../../../../shared/types";
 import type { SessionProcessEvent } from "../../../../../shared/types/trajectory";
-import { toolViewDetail, toolViewInput, toolViewOutput, toolViewTitle, type DshToolViewEnvelope } from "./dshToolView";
 import { compareTrajectoryRecords, seqOfMessage, sortTurnRecords, wallTime } from "./trajectoryOrder";
 
 export { compareTrajectoryRecords };
@@ -60,11 +39,11 @@ export type TrajectoryRecord = {
 	toolCallId?: string;
 	text?: string;
 	detail?: string;
-	/** dsh-web inputDetail：工具入参 / 用户正文。 */
+
 	inputDetail?: string;
-	/** dsh-web outputDetail：工具结果 / 助手正文。 */
+
 	outputDetail?: string;
-	/** 首条用户消息 = 本会话初始提示词（DSH 的 user 开轮语义）。 */
+
 	isInitialPrompt?: boolean;
 	processKind?: SessionProcessEvent["kind"];
 	cwd?: string;
@@ -72,13 +51,13 @@ export type TrajectoryRecord = {
 	modelId?: string;
 	thinkingLevel?: string;
 	customType?: string;
-	/** DSH SessionEvent.seq；账本按 seq 排序（dsh-web layoutEntryOrder）。 */
+
 	seq?: number;
 	/** llm/retry 或 pi auto_retry：第几次重试。 */
 	retry?: number;
 	maxRetries?: number;
 	retryDelayMs?: number;
-	/** 本条 assistant 消息的 token 用量（DSH adapter 上报，存 meta.usage；pi 无此字段）。 */
+
 	usage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number };
 	/** modelRequest 记录的快照指针：检查器凭它回读完整请求体并展示体积/截断标记。 */
 	modelTrace?: { traceId: string; agentId?: string; messageCount?: number; toolCount?: number; payloadBytes?: number; truncated?: boolean };
@@ -152,7 +131,6 @@ function isInFlightAssistant(message: ChatMessage): boolean {
 	return message.stopReason === "pending";
 }
 
-/** 从消息 meta.usage 提取 token 用量（DSH adapter 上报；无效/全零返回 undefined）。 */
 function usageOf(message: ChatMessage): TrajectoryRecord["usage"] | undefined {
 	const usage = message.meta?.usage;
 	if (!usage || typeof usage !== "object") return undefined;
@@ -335,7 +313,6 @@ function insertModelTraces(turns: TrajectoryTurn[], traces: TrajectoryModelTrace
 	}
 }
 
-/** 过程事件落轮：优先 seq（dsh-web 按 startSeq 挂 step），无 seq 再按墙钟。 */
 function turnIndexForProcess(turns: TrajectoryTurn[], event: SessionProcessEvent): number {
 	const seq = event.seq;
 	if (seq !== undefined) {
@@ -374,7 +351,7 @@ function insertProcessEvents(turns: TrajectoryTurn[], events: SessionProcessEven
 		const turn = turns[target];
 		const at = wallTime(event.timestamp) || turn.startedAt;
 		const record = processRecord({ ...event, timestamp: at }, turn.index);
-		// 先追加，收口时按 seq/墙钟统一排序（dsh-web layoutEntryOrder）。
+
 		turn.records.push(record);
 		if (record.startedAt > 0 && record.startedAt < turn.startedAt) turn.startedAt = record.startedAt;
 	}
@@ -389,7 +366,7 @@ export function buildTrajectory(messages: ChatMessage[], now = Date.now(), extra
 	let turnStartedAt = 0;
 	let turnId = "";
 	let sawUser = false;
-	// dsh-web 先按 seq 排再折叠；历史页/窗口拼接若乱序，按数组走会把后到的重试/助手拆到轮首。
+
 	const orderedMessages = [...messages].sort((left, right) => {
 		const leftSeq = seqOfMessage(left);
 		const rightSeq = seqOfMessage(right);
@@ -440,20 +417,13 @@ export function buildTrajectory(messages: ChatMessage[], now = Date.now(), extra
 			const inFlight = isInFlightTool(message);
 			const name = toolNameOf(message);
 			const endedAt = inFlight ? undefined : durationMs !== undefined ? startedAt + durationMs : wallTime(message.timestamp);
-			// DSH 工具视图（host ToolEventView，dsh-web 同数据源）：call/result 视图
-			// 提供命令/输出/退出码/diff 等更完整的信息，标题用卡片头（如 "Write foo.txt"）。
-			const meta = message.meta as { view?: DshToolViewEnvelope; resultView?: DshToolViewEnvelope; args?: unknown; [key: string]: unknown } | undefined;
-			const viewTitle = toolViewTitle(meta);
-			const viewDetail = toolViewDetail(meta);
-			const inputDetail = toolViewInput(meta);
-			const outputDetail = toolViewOutput(meta) ?? asString(message.meta?.detailText) ?? asString(message.meta?.result);
 			pushRecord(current, {
 				id: message.id,
 				kind: "tool",
 				lane: laneOf("tool"),
 				turnIndex: turns.length,
-				title: viewTitle ?? name,
-				summary: summarize(viewTitle ?? asString(message.meta?.detailText) ?? message.text ?? name),
+				title: name,
+				summary: summarize(asString(message.meta?.detailText) ?? message.text ?? name),
 				startedAt,
 				endedAt,
 				durationMs: inFlight ? undefined : durationMs,
@@ -461,9 +431,9 @@ export function buildTrajectory(messages: ChatMessage[], now = Date.now(), extra
 				toolName: name,
 				toolCallId: asString(message.meta?.toolCallId),
 				text: message.text,
-				detail: viewDetail ?? outputDetail ?? inputDetail,
-				inputDetail,
-				outputDetail,
+				detail: asString(message.meta?.detailText) ?? asString(message.meta?.result),
+				inputDetail: message.meta?.args === undefined ? undefined : JSON.stringify(message.meta.args, null, 2),
+				outputDetail: asString(message.meta?.detailText) ?? asString(message.meta?.result),
 				seq,
 			});
 			continue;
@@ -558,7 +528,6 @@ export function buildTrajectory(messages: ChatMessage[], now = Date.now(), extra
 		}
 	}
 
-	// 对齐 dsh-web layout.ts：轮内按 seq（无 seq 则墙钟）排，再回推耗时。
 	// 耗时回推依赖邻居顺序；排完后再 infer，避免重试/过程事件插在轮首后把 assistant 区间拉歪。
 	for (const turn of turns) sortTurnRecords(turn);
 	inferWorkDurations(turns);

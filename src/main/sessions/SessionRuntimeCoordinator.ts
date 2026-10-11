@@ -1725,9 +1725,8 @@ export class SessionRuntimeCoordinator {
 			if (!entry) {
 				throw new SessionRuntimeCommandError("SESSION_NOT_FOUND", `Session not found: ${sessionId}`);
 			}
-			if (entry.backend === "dsh" || entry.backend === "imagegen" || entry.backend === "acp") {
-				throw new SessionRuntimeCommandError("SESSION_COMMAND_FAILED", `backend "${entry.backend}" does not support persisted session message mutation`);
-			}
+
+			requireSupportedSessionRuntime(entry);
 			if (!entry.filePath) {
 				throw new SessionRuntimeCommandError("SESSION_COMMAND_FAILED", "Session not persisted");
 			}

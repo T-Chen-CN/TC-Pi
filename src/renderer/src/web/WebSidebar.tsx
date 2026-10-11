@@ -17,7 +17,6 @@ import { WebBrandLockup } from "./WebBrandLockup";
 import { WebBottomSheet } from "./WebBottomSheet";
 import { cn } from "@/lib/utils";
 import { sessionStatusDotClass } from "@/agentListDisplay";
-import { SessionBackendMark } from "@/components/session/SessionSourceBadge";
 import type { WebProject, WebRuntime, WebSession, WebState } from "./webTypes";
 
 const projectRowClass = "conversation relative w-full min-h-9 items-center gap-1.5 rounded-lg border border-transparent bg-background px-3 py-1 text-left text-body text-foreground shadow-none transition-[background-color,border-color] duration-200 hover:border-border-subtle hover:bg-muted/60 hover:text-foreground";
@@ -72,8 +71,7 @@ function SessionRows(props: { sessions: WebSession[]; runtimeFor: (sessionId: st
 									<strong className={cn("min-w-0 flex-1 truncate", runtime ? "font-medium" : "font-normal text-muted-foreground/90")}>{session.title || t("common.untitled")}</strong>
 									{/* P3：fork 徽标（克隆/回退产生的分支会话） */}
 									{session.forked ? <GitFork className="size-3 shrink-0 text-muted-foreground" aria-label={t("web.forkedBadge")} /> : null}
-									{/* 后端徽标（C18 同源）：dsh 会话显示鲸鱼 logo，pi 会话显示 pi logo */}
-									<SessionBackendMark backend={session.backend} className="size-4 shrink-0 rounded" />
+									{}
 								</div>
 							</div>
 						</button>

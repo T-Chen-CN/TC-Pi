@@ -22,7 +22,6 @@ export function RawTab(props: {
 	onChangeContent: (content: string) => void;
 	onSave: () => void;
 }) {
-	// 与 DSH joinConfigPath 一致：去尾斜杠后拼接文件名（平台路径，避免 /\ 混用）。
 	const rawFilePath = props.configDir ? `${props.configDir.replace(/[\\/]+$/, "")}/${props.fileName}` : "";
 	return (
 		<div className="config-raw-tab flex min-h-0 flex-1 flex-col gap-3">

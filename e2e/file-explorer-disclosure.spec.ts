@@ -44,4 +44,9 @@ test("file management expands inline and preserves the file tree and document pr
 	await expect(explorer.getByRole("button", { name: "刷新", exact: true })).toBeVisible();
 	await expect(editor).toContainText("disclosure preview");
 	expect(await widths()).toEqual(before);
+	// Closing the central document preserves the file tree and fixed conversation column.
+	await window.getByTestId("file-region").locator(".file-diff-header-actions").getByRole("button", { name: "关闭", exact: true }).click();
+	await expect(editor).toHaveCount(0);
+	await expect(explorer.getByText("sample.txt", { exact: true })).toBeVisible();
+	expect(await widths()).toEqual(before);
 });

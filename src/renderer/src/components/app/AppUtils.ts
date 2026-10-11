@@ -254,7 +254,6 @@ export function sameChatMessageForRender(previous: ChatMessage, next: ChatMessag
 				image.mimeType === nextImages[index]?.mimeType &&
 				// 历史生图图片只有 ref 引用（没有 data）：两个不同的 ref 也必须判为不等，
 				// 否则换图后复用旧引用会导致时间线不刷新。
-				image.ref === nextImages[index]?.ref &&
 				image.data === nextImages[index]?.data,
 		)
 	);
@@ -986,7 +985,6 @@ export function buildSuggestionItems(prompt: string, cursor: number, commands: P
 			.sort((a, b) => b.score - a.score)
 			.slice(0, 8)
 			.map((item) => ({
-				// key 用会话 id：DSH 会话没有文件路径，用 filePath 会与其它会话撞 key
 				key: item.session.id,
 				label: item.session.name ?? item.session.filePath,
 				description: item.session.preview,

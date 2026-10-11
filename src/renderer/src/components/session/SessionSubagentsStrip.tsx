@@ -12,16 +12,6 @@ import { ComposerWidgetFrame, useComposerWidgetCollapsed } from "./ComposerWidge
 import { MarkdownStream } from "./MarkdownStream";
 import { isFailureSubagentStatus, isSubagentRunLost, subagentIconKind, subagentStatusLabelSuffix } from "./subagentStatus";
 
-/**
- * composer 上方的「子代理」常驻条（移植自 dsh-web 的 agent 状态灯）。
- *
- * 形态：与输入框同宽同列的折叠卡（36px 高：图标 + 标题 + 运行中计数 + 状态灯 + chevron），
- * 点击展开子代理列表（运行中状态灯实时刷新）。两后端兼容：
- * - pi：useSessionSubagents 三源合并（record + 桥接 widget + 工具调用推导）；
- * - DSH：listDshSubagents 轮询拉取，运行中保持 3s 刷新，全空闲停表。
- * 无任何子代理时整体不渲染（「有那个显示那个」）。
- */
-
 /* ------------------------------------------------------------------ */
 /* 状态字形与徽标                                                       */
 /* ------------------------------------------------------------------ */
@@ -218,19 +208,6 @@ const PiSubagentEntryRow = (props: {
 };
 
 /* ------------------------------------------------------------------ */
-/* DSH 子代理                                                           */
-/* ------------------------------------------------------------------ */
-
-type DshSubagentEntry = {
-	id: string;
-	label?: string;
-	activity: "running" | "inactive";
-	hasChildren: boolean;
-	mode: "one-shot" | "continuable";
-	kind: "child" | "diagnostic";
-};
-
-/* ------------------------------------------------------------------ */
 /* 横栏本体                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -244,7 +221,6 @@ export function SessionSubagentsStrip(props: {
 
 	const { collapsed, toggleCollapsed } = useComposerWidgetCollapsed(`subagents:${props.sessionId}`, true);
 
-	// pi：三源合并；DSH：轮询。两条数据通道只取其一，渲染层不区分后端
 	const piSubs = useSessionSubagents(props.sessionId);
 	const entries = piSubs.entries;
 	const running = piSubs.entries.filter((e) => e.status === "running" || e.status === "queued").length;

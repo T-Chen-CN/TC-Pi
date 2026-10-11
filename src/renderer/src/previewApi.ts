@@ -1,7 +1,7 @@
 import type { PiDesktopApi } from "../../preload";
 import { SESSION_TAB_MAX_WIDTH_DEFAULT } from "../../shared/sessionTabWidth";
 import type { AppSettings, FileTreeNode, Project, SessionRecord, SessionSummary, TerminalDataEvent, TerminalExitEvent, TerminalTab } from "../../shared/types";
-import { createDefaultExternalEditorSettings, createDefaultSecurityConfig, createDefaultSoundAlertSettings, DEFAULT_PET_SCALE, DEFAULT_TOAST_DURATION_MS, emptyRemoteAccessState } from "../../shared/types";
+import { createDefaultExternalEditorSettings, createDefaultSecurityConfig, createDefaultSoundAlertSettings, DEFAULT_TOAST_DURATION_MS, emptyRemoteAccessState } from "../../shared/types";
 import type { ReplyActionRule } from "../../shared/types/replyActions";
 import type { ResourceImportKind } from "../../shared/types/resourceImport";
 import { DEFAULT_VOICE_TRANSCRIPTION_CONFIG } from "../../shared/voiceTranscriptionConfig";
@@ -93,7 +93,6 @@ let previewSettings: AppSettings = {
 	showNativeMenu: false,
 	sendShortcut: "enter-send",
 	defaultAgentBackend: "pi",
-	floatingBallShowRunningBadge: true,
 	theme: "system",
 	themeScheduleLightStart: "07:00",
 	themeScheduleDarkStart: "19:00",
@@ -121,7 +120,6 @@ let previewSettings: AppSettings = {
 	gitCommitMessageProvider: "",
 	gitCommitMessageModel: "",
 	gitExecutablePath: "",
-	dshRunnerNodePath: "",
 	closeToTray: true,
 	singleInstance: true,
 	enableNotifications: true,
@@ -131,8 +129,6 @@ let previewSettings: AppSettings = {
 	askNotificationEnabled: false,
 	// 人文关怀提醒开关：与主进程 SettingsStore 默认值保持一致（预览 mock 需覆盖 AppSettings 全部必填字段）
 	agentCountReminderEnabled: true,
-	// 旧字段读取兼容，与主进程设置形状保持一致。
-	announcementNotificationEnabled: true,
 	// toast 展示时长：与主进程 defaultSettings 一致
 	toastDurationMs: DEFAULT_TOAST_DURATION_MS,
 	// showThinking 由 pi agent 的 hideThinkingBlock 控制，运行时从主进程加载
@@ -171,26 +167,10 @@ let previewSettings: AppSettings = {
 	sessionTabMaxWidth: SESSION_TAB_MAX_WIDTH_DEFAULT,
 	maxEditorFileSizeMB: 5,
 	externalEditors: createDefaultExternalEditorSettings(),
-
-	// 桌面宠物默认关闭
-	petEnabled: false,
-	petId: "clawd",
-	petAlwaysOnTop: true,
-	petScale: DEFAULT_PET_SCALE,
-	petPatrolEnabled: true,
-	petPatrolPauseMin: 5,
-	// 悬浮球默认关闭
-	floatingBallEnabled: false,
-	floatingBallExpandTarget: "mini",
-	floatingBallAlwaysOnTop: true,
-	floatingBallSnapToEdge: true,
 	// 闲置 agent 自动释放（预览模式不真实释放，仅保持设置项可用）
 	idleAgentAutoRelease: true,
 	idleAgentKeepCount: 5,
 	idleAgentTimeoutMin: 60,
-	// CUA 默认关闭：预览壳与主进程 SettingsStore 默认保持一致
-	cuaEnabled: false,
-	cuaAutoApprove: true,
 	favoriteModels: [],
 	// 提供商与模型显示开关：与 SettingsStore 默认一致，预览壳默认全显示
 	hiddenProviders: [],
@@ -213,9 +193,6 @@ let previewSettings: AppSettings = {
 	enabledBuiltInExtensions: [],
 	// 与主进程 defaultSettings 保持一致（预览壳不真实播放，仅保持设置项形状完整）
 	soundAlert: createDefaultSoundAlertSettings(),
-	imageGenSize: "unset",
-	imageGenWatermark: false,
-	imageGenOutputFormat: "png",
 	autoDownloadUpdates: true,
 	// 与主进程 defaultSettings 保持一致：更新源默认 GitHub 官方，自定义镜像前缀留空
 	updateSource: "github",
@@ -1487,7 +1464,6 @@ export function createPreviewApi(): PiDesktopApi {
 			save: async () => {},
 			export: async () => false,
 		},
-		images: { readBlob: async () => null },
 		enhance: {
 			run: async () => ({ ok: false, errorKind: "sdk-unavailable", message: "preview mode" }),
 			cancel: async () => ({ ok: true }),

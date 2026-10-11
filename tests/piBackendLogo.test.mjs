@@ -74,17 +74,6 @@ test("pi 会话来源徽标复用同一设置，避免另一份旧 SVG 不跟随
 	assert.match(renderLogo(SessionSourceBadge, { source: "pi" }, store), /viewBox="140 140 520 520"/u);
 });
 
-test("切换 pi logo 风格不改变 DSH 或其他会话来源品牌", () => {
-	const store = createStore();
-	const cases = [[DshLogo, {}], ...["codex", "claude", "qoder", "opencode", "zcode", "workbuddy", "cursor"].map((source) => [SessionSourceBadge, { source }])];
-	for (const [component, props] of cases) {
-		store.set(logoStyleAtom, "classic");
-		const classic = renderLogo(component, props, store);
-		store.set(logoStyleAtom, "pi-tui");
-		assert.equal(renderLogo(component, props, store), classic);
-	}
-});
-
 test("单一 pi 后端的输入框不显示 Harness 选择或锁定标识", () => {
 	const source = readFileSync("src/renderer/src/components/session/ComposerComponents.tsx", "utf8");
 	assert.doesNotMatch(source, /ComposerBackendPicker|AcpToolControl|backendLockedHint|backendLockedNotice|<PiLogo\b|<DshLogo\b/u);

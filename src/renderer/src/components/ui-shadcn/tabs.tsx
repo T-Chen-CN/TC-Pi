@@ -1,14 +1,6 @@
 import { Tabs as TabsPrimitive } from "radix-ui";
 import { cn } from "../../lib/utils";
 
-/**
- * shadcn Tabs 组件（基于 radix-ui 聚合包）。
- *
- * variant 说明：
- * - default（默认）：分段条容器（bg-muted p-1 圆角）+ 白底高亮 trigger，适合页面/分组级切换；
- * - line：无容器下划线式（底部横线 + 选中下划线描边），适合内容区内部的次级页面切换，
- *   避免与上层 segmented 重复（如配置管理内 Pi/DSH，上层已是「系统设置/配置管理」分段条）。
- */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
 	return <TabsPrimitive.Root data-slot="tabs" className={cn("flex flex-col gap-2", className)} {...props} />;
 }

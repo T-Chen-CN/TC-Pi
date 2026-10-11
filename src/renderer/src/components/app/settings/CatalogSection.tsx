@@ -7,7 +7,7 @@ import { Button } from "../../ui-shadcn/button";
 import { SettingsSection } from "./SettingsStorageTab";
 import type { CatalogCheckResult, CatalogUpdateFailCode, CatalogUpdateResult, CatalogUpdateStatus } from "../../../../../shared/types/catalog";
 import type { UpdateSourceId } from "../../../../../shared/types/settings";
-import { normalizeCustomMirrorHost, UPDATE_SOURCE_MIRRORS } from "../../../../../shared/updateSources";
+import { UPDATE_SOURCE_MIRRORS } from "../../../../../shared/updateSources";
 
 type BusyKind = "check" | "update" | "restore" | "restore-prev" | null;
 

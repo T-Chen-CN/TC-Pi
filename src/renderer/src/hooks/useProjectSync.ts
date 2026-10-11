@@ -30,7 +30,7 @@ type UseProjectSyncInput = {
 		projects: { list: () => Promise<Project[]> };
 		git: { worktreeList: (projectId: string) => Promise<WorktreeEntry[]>; branches: (projectId: string) => Promise<{ current: string | null; branches: string[] }> };
 		settings?: {
-			get: () => Promise<{ dshAutoImportSessions?: boolean }>;
+			get: () => Promise<unknown>;
 		};
 		sessions: {
 			listCatalog: (projectId: string, options?: { scan?: boolean }) => Promise<SessionRecord[]>;
@@ -263,7 +263,7 @@ export function useProjectSync(input: UseProjectSyncInput) {
 					// 场景：非 silent 刷新（loading）进行中，catalog-refreshed 推送的静默
 					// 拉取覆盖了 request 序号——原请求的 finally 因 isCurrentRequest=false
 					// 不再清理 loading（也不 set ready），这里补上，否则侧栏「加载中」
-					// （project-session-loading）永远转。典型触发：重命名 DSH 会话
+
 					// （onTitleChanged → catalog 更新 → catalog-refreshed 推送）。
 					setCatalogLoadStateGuarded({ projectId, state: { status: "ready" } });
 				})

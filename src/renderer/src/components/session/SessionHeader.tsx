@@ -125,7 +125,3 @@ export function SessionHeader(props: SessionHeaderProps) {
 		</div>
 	);
 }
-
-/**
- * DSH 工具按钮（G5/G6：目标 / 子代理面板入口）；仅运行时已激活（有 agentId）时可用。
- */

@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 import type { Getter, Setter } from "jotai";
 import { atomFamily, selectAtom } from "jotai/utils";
-import type { AgentBackend, AgentRuntimeState, AgentStatus, AgentUiBatchQuestion, AgentUiRequest, ChatMessage, SessionHistoryUnavailableReason, SessionMessagePage, SessionRecord, SessionRuntimeEvent, SessionRuntimeInfo } from "../../../shared/types";
+import type { AgentBackend, AgentRuntimeState, AgentStatus, AgentUiBatchQuestion, AgentUiRequest, ChatMessage, SessionMessagePage, SessionRecord, SessionRuntimeEvent, SessionRuntimeInfo } from "../../../shared/types";
 import { mergeAgentRuntimeState } from "../utils/agentRuntimeState";
 import { findLastUserMessageIndex, shouldRefreshOutlineForRuntimeUpsert } from "./outlineRevision";
 import { releaseSessionOutlineProjection } from "./outlineProjectionCache";
@@ -69,11 +69,6 @@ export type StreamingThinkingEntry = {
 export type SessionLoadState = {
 	status: "idle" | "loading" | "ready" | "error";
 	error?: string;
-	/**
-	 * 结构化不可用原因（与 status:"error" 配合）：区分「读盘真的失败」与
-	 * 「历史暂时读不了但用户可恢复」。当前只有 DSH host 被手动停止一种。
-	 */
-	reason?: SessionHistoryUnavailableReason;
 };
 
 export type SessionMessageCacheEntry = {
@@ -160,8 +155,6 @@ export type SessionRuntimeUiState = {
 };
 
 export const sessionRecordsAtom = atom<Record<string, SessionRecord>>({});
-/** IDs detached from an in-memory runtime; rejects late catalog refreshes for them. */
-export const discardedTransientSessionIdsAtom = atom<Set<string>>(new Set<string>());
 export const sessionIdsByProjectAtom = atom<Record<string, string[]>>({});
 export const currentSessionIdAtom = atom<string | undefined>(undefined);
 /** 会话 Tab 栏（浏览器式多 Tab）：按打开顺序排列的会话 id 列表。
@@ -483,10 +476,7 @@ export const replaceSessionRuntimesAtom = atom(null, (get, set, runtimes: Sessio
 });
 
 export const replaceProjectSessionsAtom = atom(null, (get, set, input: { projectId: string; sessions: SessionRecord[] }) => {
-	const discardedTransientIds = get(discardedTransientSessionIdsAtom);
-	// A close can race a catalog scan that started before the runtime detached.
-	// Do not let that stale response resurrect a no-session row in the sidebar.
-	const sessions = input.sessions.filter((session) => !session.noSession || !discardedTransientIds.has(session.id));
+	const sessions = input.sessions;
 	const previousIds = get(sessionIdsByProjectAtom)[input.projectId] ?? [];
 	// 轮询刷新绝大多数轮次内容未变；此时保持 atom 引用稳定，避免整棵侧栏重渲染。
 	if (sameProjectSessionList(previousIds, get(sessionRecordsAtom), sessions)) return;
@@ -514,11 +504,6 @@ export const replaceProjectSessionsAtom = atom(null, (get, set, input: { project
 });
 
 export const upsertSessionAtom = atom(null, (get, set, session: SessionRecord) => {
-	if (session.noSession && get(discardedTransientSessionIdsAtom).has(session.id)) {
-		const nextDiscarded = new Set(get(discardedTransientSessionIdsAtom));
-		nextDiscarded.delete(session.id);
-		set(discardedTransientSessionIdsAtom, nextDiscarded);
-	}
 	set(sessionRecordsAtom, {
 		...get(sessionRecordsAtom),
 		[session.id]: session,
@@ -1214,14 +1199,6 @@ export const applySessionRuntimeEventAtom = atom(null, (get, set, event: Session
 		if (event.runtimeGeneration < currentRuntime.runtimeGeneration || (currentRuntime.agentId && currentRuntime.agentId !== event.agentId)) {
 			return;
 		}
-		// Anonymous records only exist while their --no-session runtime exists.
-		// Remove every renderer cache at detach so a future catalog refresh cannot
-		// leave a closed anonymous row selectable in the sidebar.
-		if (get(sessionRecordsAtom)[event.sessionId]?.noSession) {
-			set(discardedTransientSessionIdsAtom, new Set(get(discardedTransientSessionIdsAtom)).add(event.sessionId));
-			set(removeSessionStateAtom, event.sessionId);
-			return;
-		}
 		const nextUiById = { ...get(sessionRuntimeUiByIdAtom) };
 		delete nextUiById[event.sessionId];
 		set(sessionRuntimeUiByIdAtom, nextUiById);
@@ -1287,7 +1264,7 @@ export const applySessionRuntimeEventAtom = atom(null, (get, set, event: Session
 				createdAt: typeof payload.createdAt === "number" ? payload.createdAt : nextRuntime.createdAt,
 				compactionCount: typeof payload.compactionCount === "number" ? payload.compactionCount : nextRuntime.compactionCount,
 				noSession: payload.noSession === true || nextRuntime.noSession,
-				backend: payload.backend === "dsh" ? "dsh" : (nextRuntime.backend ?? "pi"),
+				backend: nextRuntime.backend ?? "pi",
 			};
 		}
 	} else if (event.sourceChannel === "agents:runtime-state" && payload?.state) {

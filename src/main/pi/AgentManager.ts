@@ -274,7 +274,7 @@ export class AgentManager {
 	 */
 	/** 本地事件监听器，用于主进程内部订阅。 */
 	private readonly localEventListeners = new Set<(agentId: string, event: unknown) => void>();
-	/** 状态变更监听器（用于 PetStateBridge 等主进程内部模块订阅 AgentTab[] 聚合状态） */
+
 	private readonly stateListeners = new Set<(tabs: AgentTab[]) => void>();
 	/** 主进程内部观察所有 renderer 输出，用于增量桥接 session-addressed 事件。 */
 	private readonly outputListeners = new Set<(channel: string, payload: unknown) => void>();
@@ -382,7 +382,7 @@ export class AgentManager {
 	private readonly abortedDuringAsk = new Set<string>();
 	/** 扩展 UI 请求闸（提问分发/ANSI 净化/pending 跟踪/超时兜底）：见 extensionUiGate.ts（Wave 4B 迁出）。 */
 	private readonly uiGate: ExtensionUiGate;
-	/** 成功空闲（settled）回调：供 PetStateBridge 等主进程内部模块订阅，携带完成 Agent 身份。 */
+
 	private readonly settledListeners = new Set<(info: { agentId: string; title: string }) => void>();
 	/** 项目信任闸（trust.json 决策/弹窗/超时）：见 projectTrustGate.ts（Wave 4C 迁出）。 */
 	private readonly projectTrust: ProjectTrustGate;
@@ -854,12 +854,6 @@ export class AgentManager {
 	/** 已 toast 过的「第三方 MCP 接管」扩展 source（本次运行内去重，见 notifyMcpThirdPartyTakeover）。 */
 	private readonly mcpThirdPartyNoticesSent = new Set<string>();
 
-	/**
-	 * 第三方接管型 MCP 扩展提醒（计划 M3）：pi 0.99 内置 MCP 后，pi-mcp-adapter 等
-	 * 注册 /mcp 的扩展会整体顶掉内置 MCP——会话里配置的 mcp.json 不被读取，属「静默能力
-	 * 缺失」。双通道：① 首个 run 落时间线系统诊断；② sticky 全局 toast（带 MCP 页导航）。
-	 * 仅 pi >= 0.99 提醒（旧版内置 MCP 不存在，adapter 反而是必需品）；DSH 无 pi 扩展不涉及。
-	 */
 	private async notifyMcpThirdPartyTakeover(agentId: string, piVersion: string | null): Promise<void> {
 		if (!this.listThirdPartyMcpExtensions) return;
 		if (!piVersionAtLeast(piVersion, "0.99.0")) return;
@@ -3827,7 +3821,6 @@ export class AgentManager {
 		return () => this.outputListeners.delete(listener);
 	}
 
-	/** 注册状态变更监听器（供 PetStateBridge 等主进程内部模块使用）；每次 emitState 后同步回调最新 AgentTab[] */
 	addStateListener(listener: (tabs: AgentTab[]) => void): () => void {
 		this.stateListeners.add(listener);
 		return () => {
@@ -3835,11 +3828,6 @@ export class AgentManager {
 		};
 	}
 
-	/**
-	 * 注册「Agent 成功空闲」监听器（供 PetStateBridge 等主进程内部模块使用）。
-	 * 仅在 agent_settled 成功路径或 get_state 兜底确认无工作后触发，
-	 * abort / 自动重试 / 压缩 / agent_end 都不会触发 —— 这些都不是可靠的完成点。
-	 */
 	onAgentSettled(listener: (info: { agentId: string; title: string }) => void): () => void {
 		this.settledListeners.add(listener);
 		return () => {
@@ -5566,7 +5554,7 @@ export class AgentManager {
 		this.liveStream.clearTextChannel(agentId);
 		this.emitState();
 		void this.emitRuntimeState(agentId);
-		// 兜底确认无工作也算成功空闲：与 agent_settled 一样通知完成（PetStateBridge 侧有去重冷却）。
+
 		this.notifyAgentSettled(agentId, runtime.tab.title);
 	}
 
@@ -5863,7 +5851,7 @@ export class AgentManager {
 	private emitState() {
 		const tabs = this.list();
 		this.emit(ipcChannels.agentsState, tabs);
-		// 同步通知主进程内部状态订阅者（PetStateBridge），使宠物窗能拿到聚合状态。
+
 		// 设计文档原拟用 ipcMain.on("agents:state") 桥接是错的：webContents.send 是
 		// 主进程→渲染层单向通道，ipcMain 收不到主进程自己发出的消息，故改用本钩子。
 		this.notifyStateListeners(tabs);

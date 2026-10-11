@@ -4,7 +4,7 @@ import { useAtomValue } from "jotai";
 import { t, type TranslationKey } from "../../i18n";
 import { sessionRuntimeBySessionIdAtomFamily } from "../../atoms/session-selectors";
 import { desktopApi } from "../../desktopApi";
-import { requireSessionCommand, sessionCommandFailureToast, toSessionRuntimeTarget } from "../../utils/sessionCommands";
+import { requireSessionCommand, sessionCommandFailureToast } from "../../utils/sessionCommands";
 import { formatRelativeTime, formatAbsoluteTime } from "../../utils/relativeTime";
 import { parseDiffStatSummary, type DiffStatSummary } from "../../utils/rewindDiffStat";
 import { showNotice } from "../../utils/notice";

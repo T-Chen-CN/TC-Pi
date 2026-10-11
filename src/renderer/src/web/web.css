@@ -1,21 +1,6 @@
-/**
- * web.css — Web 端专用布局覆盖 + dsh-web 视觉语言（S6.2）。
- *
- * 风格来源：官方 `@deepseek-ai/dsh-web-frontend` dist 的设计 token（用户授权
- * 「直接抄」）：alias 语义变量名（bg-layer/border-l/label/state/interactive/
- * button/markdown）与亮色值逐字取自 dist CSS；暗色值取同一设计语言的近黑分层
- * （官方暗色值由主题插件运行时注入，dist 内不可静态提取，此处为等价推导值）。
- *
- * 实现方式：在 `:root` 覆盖 foundation 的 `--color-*` 语义变量（web 页独立入口，
- * 只影响本页），全部既有 Tailwind utility 自动换肤；结构精修限定 `.web-app`
- * 作用域，不影响桌面端。
- *
- * 基础布局在 WebChatApp 用 flex 完成（侧栏 + 主区），
- * 这里只补移动端（≤760px）断点：聊天作为主画面，项目树改为可关闭抽屉，
- * 与旧 A1/A2 的 760px 断点语义保持一致。
- */
 
-/* ── dsh-web 设计 token（浅色：官方 dist 原值）────────────────────────── */
+
+
 :root {
   /* 官方字体栈（--dsw-font-family / --ds-font-family-code） */
   --font-family-base:
@@ -71,7 +56,7 @@
   --color-code-text: #d1d5db;
 }
 
-/* 暗色：dsh 设计语言的近黑分层（等价推导值，与导出 HTML / 官方暗色观感一致） */
+
 :root[data-theme="dark"] {
   --color-bg-app: #0d0f14;        /* layer-1 */
   --color-bg-sidebar: #131620;    /* layer-2 */
@@ -112,7 +97,7 @@
   --color-code-text: #d1d5db;
 }
 
-/* ── dsh-web 结构精修（仅 Web 页）─────────────────────────────────────── */
+
 
 /* 侧栏：layer-2 表面 + 细边框；会话行 hover 用 interactive hover 面 */
 .web-app .chat-list-pane {
@@ -132,14 +117,14 @@
   border-color: transparent;
 }
 
-/* 头部：细底边框 + 半透明毛玻璃（dsh-web 的浮层头部观感） */
+
 .web-app .web-header {
   background: color-mix(in srgb, var(--color-bg-app) 86%, transparent);
   backdrop-filter: blur(10px);
   border-bottom-color: var(--color-border-subtle);
 }
 
-/* 时间线消息列：dsh-web 的内容列宽（大屏居中限宽） */
+
 .web-app .message-timeline .message-list {
   max-width: 860px;
   margin: 0 auto;
@@ -162,7 +147,7 @@
   color: var(--color-text-secondary);
 }
 
-/* 用户气泡：dsh-web 风格（layer-2 面 + 细边框 + 14px 圆角） */
+
 .web-app .user-turn .rounded-\[14px\] {
   background: var(--color-bg-muted);
   border-color: var(--color-border-subtle);
@@ -174,7 +159,7 @@
   color: var(--color-text-primary);
 }
 
-/* Composer：浮起容器（layer-2 面 + 细边框 + 聚焦品牌环），dsh-web 输入区观感 */
+
 .web-app .composer {
   background: var(--color-bg-app);
 }
@@ -191,7 +176,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-info) 18%, transparent);
 }
 
-/* 滚动条（--dsh-scrollbar-* 语义：细滚动条 + 低调 thumb） */
+
 .web-app ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

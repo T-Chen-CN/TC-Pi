@@ -117,7 +117,6 @@ const RpcLogRow = memo(function RpcLogRow(props: { log: RpcLogEntry; expanded: b
 	let detail: ReactNode = null;
 	if (expanded) {
 		if (trace?.kind === "request") {
-			// 结构化轨迹视图（dsh-web Trajectory 式：指标行 + 系统提示词 + 完整消息流 + 工具定义）；
 			// 解析失败（截断/畸形）时组件内部自动退回原始 JSON 兑底。
 			if (tracePayload !== undefined) detail = <ModelTraceDetail payloadJson={tracePayload} summary={trace} />;
 			else if (traceView?.status === "missing") detail = <div className="rpc-log-detail-note">{t("rpc.modelTraceMissing")}</div>;

@@ -1,13 +1,5 @@
 import type { ThinkingLevelMap } from "./modelSpecs";
 
-/**
- * `/models` 拉取结果（Pi 配置页与 DSH 自定义模型共用）。
- *
- * 容量字段只在 listing 或 pi-ai 内置目录给出时出现；未命中则省略，
- * 由用户手填，不再写入 128k/8k 这类猜的默认值。
- * reasoning / input / thinkingLevelMap 可由端点 /models 实报，
- * 也可由 pi-ai 目录补全；两者都缺时由渲染层自适应模板兜底开放思考档位。
- */
 export type FetchedModel = {
 	id: string;
 	name?: string;

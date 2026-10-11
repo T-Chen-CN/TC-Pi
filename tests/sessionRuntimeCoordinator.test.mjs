@@ -1523,7 +1523,7 @@ test("catalog message mutation refuses DSH sessions", async () => {
 	const result = await coordinator.deleteCatalogMessage("session-1", "message-1");
 	assert.equal(result.ok, false);
 	assert.equal(result.error.code, "SESSION_COMMAND_FAILED");
-	assert.match(result.error.debugDetails, /dsh/);
+	assert.match(result.error.debugDetails, /only supports the pi backend/);
 	assert.equal(harness.calls.mutatePersisted.length, 0);
 });
 

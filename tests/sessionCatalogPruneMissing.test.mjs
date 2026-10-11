@@ -121,25 +121,6 @@ test("never prunes wsl entries (UNC existsSync is unreliable when the distro is 
 	}
 });
 
-test("never prunes dsh backend entries (files live under $DSH_HOME)", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-prune-dsh-"));
-	const catalogFile = join(dir, "sessions.json");
-	try {
-		const seed = {
-			version: 1,
-			sessions: [seedEntry({ id: "dsh-entry", backend: "dsh", dshSessionId: "host-1", filePath: join(dir, "missing-dsh.jsonl") })],
-		};
-		await writeFile(catalogFile, JSON.stringify(seed), "utf8");
-		const catalog = new SessionCatalog(catalogFile);
-		await catalog.load();
-		await catalog.mergeScanned("project-1", []);
-		assert.equal(catalog.listEntries().length, 1, "dsh entry must survive regardless of file presence");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
 test("does not touch entries owned by other projects during this project's scan", async () => {
 	const { SessionCatalog } = loadCatalog();
 	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-prune-scope-"));

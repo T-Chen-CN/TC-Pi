@@ -190,10 +190,6 @@ export type SystemIpcDeps = {
 	 * 返回值直接喂给各 manager.configureWsl，形状必须是 WslEnvironment。
 	 */
 	resolveWslEnvironment?: (distro: string, user: string, logger: { warn: (msg: string, detail: unknown) => void }) => Promise<import("../wsl/WslPaths").WslEnvironment>;
-	/** React to settings changes for pet system */
-	reactToPetSettings?: (prev: AppSettings, next: AppSettings) => Promise<void>;
-	/** React to CUA enable/disable changes (start/stop the in-process MCP host). */
-	reactToCuaSettings?: (prev: AppSettings, next: AppSettings) => Promise<void>;
 	/** Session scanner WSL config */
 	configureSessionScannerWsl?: (env: import("../wsl/WslPaths").WslEnvironment) => Promise<void>;
 	clearSessionScannerWsl?: () => void;
@@ -326,8 +322,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		installAppUpdate,
 		openExternalUrl: doOpenExternalUrl,
 		resolveWslEnvironment,
-		reactToPetSettings,
-		reactToCuaSettings,
 		configureSessionScannerWsl,
 		clearSessionScannerWsl,
 		refreshTrayContextMenu,
@@ -1485,14 +1479,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			});
 		}
 		// 设置变更审计已下沉到 SettingsStore.update 内部统一留痕（覆盖所有直写路径），此处不重复记录
-
-		if (typeof reactToPetSettings === "function") {
-			await reactToPetSettings(prevSettings, settings);
-		}
 		// CUA 开关：开启时启动进程内 MCP 端点并写入 pi 的 mcp.json，关闭时停端点并注销。
-		if ("cuaEnabled" in patch && typeof reactToCuaSettings === "function") {
-			await reactToCuaSettings(prevSettings, settings);
-		}
 		if ("desktopProxyEnabled" in patch || "desktopProxyUrl" in patch || "desktopProxyBypass" in patch) {
 			if (applyDesktopProxy) await applyDesktopProxy(settings);
 		}

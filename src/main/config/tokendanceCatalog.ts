@@ -1,14 +1,3 @@
-/**
- * TokenDance（词元跳动）内置模型目录：live fetch + userData 缓存。
- *
- * 设计要点：
- * - TokenDance /gateway/v1/models 是**公开免鉴权**的 OpenAI 风格模型列表（实测 200），
- *   所以未配置 Key 也能拉取展示；缓存落在 PiDeck userData（独立于 pi 配置文件，
- *   参考 imagegen.json 先例，不写 ~/.pi/agent）。
- * - 缓存带 TTL（默认 6h），拉取失败时回退旧缓存（断网仍可展示已发现目录）。
- * - 合并规则是纯函数：模型列表已含 tokendance 组（用户已把目录写入 pi models.json
- *   或 pi catalog 自带）时不重复注入，保持「PiDeck 展示 = pi 运行时」不分裂。
- */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AvailableModel } from "../../shared/types";

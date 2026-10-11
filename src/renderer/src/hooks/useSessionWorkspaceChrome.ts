@@ -4,7 +4,7 @@ import { projectSessionTabs, mergeProjectSessionTabs, projectSplitLayout } from 
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { currentSessionIdAtom, sessionRecordByIdAtomFamily, sessionRecordsAtom, sessionTabIdsAtom } from "../atoms";
 import { cycleSessionTab, openPermanentSessionTab, openPreviewSessionTab, reorderSessionTabs, togglePinSessionTab, type SessionTabOpenMode } from "../utils/sessionTabs";
-import { buildSplitLayoutFromDrop, edgeToOrientation, insertRootPaneFromDrop, nestSplitPaneFromDrop, replaceSplitPaneFromDrop, resolveSplitAfterClose, resolveSplitHostSessionId, splitLayoutSessionIds, type SessionSplitDropTarget, type SessionSplitLayout } from "../utils/sessionSplitEdge";
+import { buildSplitLayoutFromDrop, edgeToOrientation, insertRootPaneFromDrop, nestSplitPaneFromDrop, replaceSplitPaneFromDrop, resolveSplitAfterClose, resolveSplitHostSessionId, splitLayoutSessionIds, type SessionSplitDropTarget } from "../utils/sessionSplitEdge";
 import { desktopApi } from "../desktopApi";
 import type { FocusTargetPayload } from "../../../shared/types";
 
@@ -136,7 +136,6 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 		});
 	}, [sessionRecords, setAllSessionTabIds, setPreviewSessionTabId, setSplitLayout]);
 
-	// 主进程「跳转目标」推送（系统通知点击 / 桌面宠物点击 / 文件夹右键打开项目）：
 	// - sessionId：解析 record 后交给 App 注入的 focus handler 切换焦点。冷启动点击通知时
 	//   catalog 可能尚未加载完，小间隔重试（最长约 3 秒）直到能解析到会话记录，避免首帧竞态丢目标。
 	// - projectId：右键打开已收录目录，直接选中项目（引导页）。

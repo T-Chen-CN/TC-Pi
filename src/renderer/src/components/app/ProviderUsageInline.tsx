@@ -1,24 +1,3 @@
-/**
- * Provider 用量徽章（学 cc-switch UsageFooter inline / TierBadge）。
- *
- * 两种形态：
- * - variant="row"：模型选择器分组行内的单段彩色数值（取档位最严重的一段示警）；
- *   无数据时不渲染——选择器行空间紧张，开关与明细留在卡片与展开区。
- * - variant="card"：配置页卡片头部的徽章（模型页/认证页/DSH 模型页共用）。
- *   **只在「已启用」时渲染**（未启用不占位：开关在右侧「用量查询」弹窗里，
- *   徽章只负责展示数据；状态表未回来时也不渲染，避免闪一下再消失）：
- *     · 已启用·查询中 → 「查询中…」+ 转圈
- *     · 已启用·有数据 → 相对更新时间 + 各档数值段 + 刷新
- *     · 已启用·失败 → 「查询失败」（hover 看原因）+ 刷新
- *
- * backend（"pi" | "dsh"）决定查询/缓存走哪条链路：
- * - pi：配置 ~/.pi/agent/usage-probes.json；
- * - dsh：配置 $DSH_HOME/.pideck/usage-probes.json + DSH 凭据库；
- * 缓存 key 归一化为 `dsh:<provider>`，与 pi 侧同名 provider（如 deepseek）互不串缓存。
- *
- * 颜色规则与三处详情面板共用 providerUsageDisplay 的 tone：≥90% 红 / ≥70% 橙 /
- * 其余绿；余额不足 10% 橙、≤0 红。
- */
 import { Fragment } from "react";
 import { Clock, RefreshCw } from "lucide-react";
 import type { UsageProbeBackend } from "../../../../shared/types/providerUsage";

@@ -5,8 +5,6 @@ import { classifyCompactError, compactOwnerReason, compactRoutedCommand, type Co
 import { resolveEnhanceTargetModel } from "../../../shared/enhanceModelPreference";
 import { FILE_TREE_ABSOLUTE_MAX_DEPTH } from "../../../shared/fileTree";
 import { formatBytes } from "../../../shared/formatBytes";
-import { findImageGenProvider } from "../../../shared/imageGenConfig";
-import { DEFAULT_IMAGE_GEN_OUTPUT_FORMAT, DEFAULT_IMAGE_GEN_SIZE, DEFAULT_IMAGE_GEN_WATERMARK, parseImageGenOutputFormat, parseImageGenSize, parseImageGenWatermark } from "../../../shared/imageGenParams";
 import type { AgentBackend, ComposerAgentMode, FileTreeNode, ImageContent, PiCommand, ResolvedLaunchDefaults, SessionRuntimeTarget, SessionSummary } from "../../../shared/types";
 import {
 	busySendDeliveryAtom,
@@ -304,7 +302,6 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	// 真实会话（record 短暂未就绪）不受 localStorage 残留影响。
 	const isGuideBootstrapSession = sessionId === GUIDE_BOOTSTRAP_SESSION_ID;
 	const [guideBackendOverride] = useState<AgentBackend | undefined>(() => (isGuideBootstrapSession ? readWelcomeBackendPreference() : undefined));
-	const hasImageGenHistory = (messageCache?.messages ?? []).some((message) => Boolean(message.meta?.imageGen));
 	const mode: ComposerAgentMode = deriveComposerAgentMode({ backend: "pi", localMode });
 	// 引导页虚拟会话（无 record）：预取主进程解析的启动默认（与 createDraft 缺省
 	// 同一解析器 launchDefaults），让底栏/选择器在用户从未设置欢迎页偏好时也能
@@ -433,8 +430,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	const setMode = useCallback(
 		(nextMode: ComposerAgentMode) => {
 			// 生图历史是独立消息协议，普通/计划/目标模式的命令语义不适用；
-			// 同一会话一旦产生生图记录（或本身是 imagegen 后端），必须保持生图模式，避免误发普通请求。
-			if ((hasImageGenHistory || record?.backend === "imagegen") && nextMode !== "imagegen") return;
+
 			// 本地 atom 仍写入 goal，让选择器立刻切到目标模式；首条用户消息再 /goal 创建。
 
 			// pi：切回普通立刻发 /goal pause，不要等下一条无标记消息才停。
@@ -453,7 +449,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 			}
 			setModeAtom({ sessionId, mode: nextMode });
 		},
-		[hasImageGenHistory, mode, runtime?.agentId, sessionId, setModeAtom],
+		[mode, runtime?.agentId, sessionId, setModeAtom],
 	);
 
 	const loadTemplates = useCallback(async () => {
@@ -695,7 +691,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	}, [sessionQuotes]);
 	const draftResourceCommands = draftResourceCommandsForProject(draftResourceCommandSnapshot, effectiveProjectId);
 	const standbyPreviewCommands = standbyPreviewCommandsForProject(standbyPreviewCommandSnapshot, effectiveProjectId);
-	const suggestionCommands = selectComposerSuggestionCommands(false, Boolean(runtime?.agentId), commands, draftResourceCommands, standbyPreviewCommands);
+	const suggestionCommands = selectComposerSuggestionCommands(Boolean(runtime?.agentId), commands, draftResourceCommands, standbyPreviewCommands);
 	const suggestionItems = useMemo(() => (suggestionsOpen ? buildSuggestionItems(draft, cursor, suggestionCommands, flatFiles, projectSessions) : []), [cursor, draft, flatFiles, projectSessions, suggestionCommands, suggestionsOpen]);
 
 	// @ 引用向下钻取：随输入懒加载子目录（maxDepth 0 只拉一层，与文件抽屉同语义）。

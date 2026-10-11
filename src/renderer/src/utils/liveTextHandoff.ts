@@ -1,9 +1,3 @@
-/**
- * live 正文与 History 交接（pi / DSH 共用）。
- *
- * done 与 messages 跨通道可能乱序：空 done 不能抹掉已出的字；
- * History 还没本轮助手正文时 live 槽必须暂留，避免空白等待。
- */
 export function resolveStreamingTextUpdate(previous: string, incoming: string, done: boolean, reset = false): string {
 	// 新一轮 reset 必须丢掉上一轮残留；普通 done+空 text 才保留上一帧。
 	if (reset) return incoming;

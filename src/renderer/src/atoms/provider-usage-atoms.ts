@@ -74,13 +74,6 @@ export const invalidateProviderUsageAtom = atom(null, (_get, set, provider: stri
 	});
 });
 
-/**
- * provider(cacheKey) → 用量查询状态（生效开关/是否已配置/是否内置识别/模板/间隔）。
- *
- * key 与用量缓存同规则：pi 链路就是 provider 名，dsh 链路是 `dsh:<provider>`
- * （usageCacheKey），因此 pi/dsh 同名供应商互不覆盖。缺失 = 尚未加载（徽章按「开」处理，
- * 与历史行为一致：无状态信息时不主动阻塞查询）。
- */
 const providerUsageStatesAtom = atom<Record<string, UsageProbeProviderState>>({});
 
 /** 按 provider 的只读选择器：某条状态更新只重渲染订阅它的卡片。 */

@@ -9,14 +9,14 @@ import test from "node:test";
 const settingsStore = readFileSync("src/main/settings/SettingsStore.ts", "utf8");
 const mainIndex = readFileSync("src/main/index.ts", "utf8");
 
-test("boot preferences share one settings snapshot instead of three reads", () => {
+test("boot preferences share one settings snapshot instead of repeated reads", () => {
 	assert.match(settingsStore, /export function readBootPreferences\(\) \{/, "readBootPreferences 应存在");
-	for (const name of ["readElectronChromiumSandboxPreference", "readSingleInstancePreference", "readPetEnabledPreference"]) {
+	for (const name of ["readElectronChromiumSandboxPreference", "readSingleInstancePreference"]) {
 		// helper 必须接受可选共享快照，且默认值兜底仍指向独立读取（启动后调用方语义不变）
 		assert.match(settingsStore, new RegExp(`export function ${name}\\(settings: Partial<AppSettings> = readDesktopSettingsSync\\(\\)\\): boolean`), `${name} 应接受可选共享快照`);
 	}
 	// index.ts 不得再直接调用三个独立 helper（否则合并读取被旁路）
-	assert.doesNotMatch(mainIndex, /readElectronChromiumSandboxPreference\(\)|readSingleInstancePreference\(\)|readPetEnabledPreference\(\)/);
+	assert.doesNotMatch(mainIndex, /readElectronChromiumSandboxPreference\(\)|readSingleInstancePreference\(\)/);
 	assert.match(mainIndex, /const bootPreferences = readBootPreferences\(\)/);
 	// 共享快照必须在 userData setPath 之后读取：dev 模式下 settings.json 位置已被覆盖，
 	// 读早了会误读正式版 settings（宠物开关/Linux 显示后端决策依赖这一点）。

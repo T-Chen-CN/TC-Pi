@@ -1,3 +1,4 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, open, readFile, unlink } from "node:fs/promises";
@@ -61,17 +62,7 @@ export type SessionCatalogEntry = {
 	model?: SessionModelPreference;
 	thinkingLevel?: string;
 	piSessionId?: string;
-	/** DSH 会话身份（DSH host 的 sessionId）；backend=dsh 时由 DshAgentManager 创建/attach 维护。 */
-	dshSessionId?: string;
-	/** ACP 会话身份（agent 侧 sessionId）；backend=acp 时由 AcpAgentManager attach 回写，重启后 session/load 恢复。 */
-	acpSessionId?: string;
-	/** DSH 权限预设（read-only/workspace-write/danger-full-access）：草稿期预选，激活时应用。 */
-	permissionPreset?: string;
-	/** DSH agent 预设（会话「模式」）：草稿期预选；激活新建时随 sessions.create 应用，attach 时从 host 回写。 */
-	agentPreset?: string;
-	/** ACP 工具预选（AcpToolConfig.id）：backend=acp 草稿期选哪个 CLI；激活时由 AcpAgentManager 消费。 */
-	acpToolId?: string;
-	/** 会话级代理覆盖（缺省 = 跟随全局）。DSH 会话的设置在 host 启动时被聚合应用。 */
+
 	proxy?: SessionProxyOverride;
 	/**
 	 * 手动导入钉住的项目归属（外置目录导入）：置位后自动扫描不得把该会话改回原目录对应的项目。
@@ -87,8 +78,6 @@ export type SessionCatalogEntry = {
 type SessionCatalogFile = {
 	version: 1;
 	sessions: SessionCatalogEntry[];
-	/** 用户主动删除过的 DSH host 会话。host 目录可能还在，自动同步不得再导入。 */
-	dismissedDshSessionIds?: string[];
 };
 
 type SessionCatalogContext = {
@@ -286,9 +275,8 @@ function isMissingFileError(error: unknown): boolean {
 
 export function canAttachRuntimeMetadata(entry: SessionCatalogEntry | undefined, tab: Partial<AgentTab>): boolean {
 	if (!entry || !tab.sessionPath) return false;
-	// DSH 的 sessionPath 是 host zstd 日志，不是 pi JSONL。走文件配对会把 zstd
+
 	// 写进 filePath，渲染层当成有历史去读，空会话输入时整页抽成「正在加载历史」。
-	if (entry.backend === "dsh" || tab.backend === "dsh") return false;
 	if (entry.status === "draft" && !entry.filePath) return true;
 	if (!entry.filePath) return false;
 	const environment = tab.sessionEnvironment ?? entry.environment;
@@ -314,8 +302,6 @@ export function canAttachRuntimeMetadata(entry: SessionCatalogEntry | undefined,
 
 export class SessionCatalog {
 	private entries: SessionCatalogEntry[] = [];
-	/** 侧栏删除过的 DSH host 会话：刷新/自动导入跳过；手动导入会清掉墓碑。 */
-	private dismissedDshSessionIds = new Set<string>();
 	private loaded = false;
 	private writeQueue: Promise<void> = Promise.resolve();
 	private skipNextBackup = false;
@@ -350,18 +336,15 @@ export class SessionCatalog {
 		try {
 			const snapshot = await this.readCatalogFile(this.filePath);
 			this.entries = snapshot.entries;
-			this.dismissedDshSessionIds = snapshot.dismissedDshSessionIds;
 		} catch (error) {
 			primaryError = error;
 			try {
 				const snapshot = await this.readCatalogFile(this.backupFilePath());
 				this.entries = snapshot.entries;
-				this.dismissedDshSessionIds = snapshot.dismissedDshSessionIds;
 				this.skipNextBackup = true;
 			} catch (backupError) {
 				if (isMissingFileError(primaryError) && isMissingFileError(backupError)) {
 					this.entries = [];
-					this.dismissedDshSessionIds = new Set();
 				} else {
 					// catalog 主文件与备份同时损坏是数据丢失信号，必须留 error 级日志供审计。
 					// 不再向上抛：打包启动链会 await load()，抛错会让 whenReady 中断、窗口永不出现。
@@ -370,22 +353,14 @@ export class SessionCatalog {
 						backup: backupError instanceof Error ? backupError.message : String(backupError),
 					});
 					this.entries = [];
-					this.dismissedDshSessionIds = new Set();
 				}
 			}
 		}
 		// Draft 只代表当前进程中的“尚未发送”编辑面：没有用户消息就没有
-		// 可恢复的 Pi session。重启时清掉它们（仅限 pi 后端），避免空 Agent 在
-		// 历史列表中永久残留。
-		// 例外：DSH 会话的草稿必须保留。DSH 的 host 会话数据由 $DSH_HOME 持久化，
-		// catalog 只是 id 映射；即使“创建后激活链路未走完”（attachRuntime 未把
-		// status 置 active），重启后用户仍应在侧栏看到并重新激活它。若在此清掉，
-		// host 侧会话会变成孤儿且无法从侧栏访问。带 dshSessionId 的异常中间态同样保留。
-		// ACP 同理（StaleDraftReaper 的 acp 豁免、Coordinator 激活失败兑底的
-		// draft+acpSessionId 中间态都依赖该保留语义，清单除即 agent 侧孤儿化）。
-		const staleDrafts = this.entries.filter((entry) => entry.status === "draft" && entry.backend !== "dsh" && entry.backend !== "acp");
+		// 可恢复的 Pi session。重启时清掉草稿，避免空 Agent 留在历史列表。
+		const staleDrafts = this.entries.filter((entry) => entry.status === "draft");
 		if (staleDrafts.length > 0) {
-			this.entries = this.entries.filter((entry) => entry.status !== "draft" || entry.backend === "dsh" || entry.backend === "acp");
+			this.entries = this.entries.filter((entry) => entry.status !== "draft");
 			try {
 				await this.writeSnapshot(this.entries);
 			} catch {
@@ -436,57 +411,6 @@ export class SessionCatalog {
 			}
 		}
 
-		// 兼容旧数据：DSH 会话曾只按文件分支 attach（filePath/piSessionId 落盘，
-		// dshSessionId 缺失）；读取旧记录时保留实际后端身份。加载时把 backend=dsh 且缺 dshSessionId 的
-		// 记录用 piSessionId（当时存的就是 host 会话 id）补齐。
-		const migratedDsh = this.entries.some((entry) => entry.backend === "dsh" && !entry.dshSessionId && entry.piSessionId);
-		if (migratedDsh) {
-			for (const entry of this.entries) {
-				if (entry.backend === "dsh" && !entry.dshSessionId && entry.piSessionId) {
-					entry.dshSessionId = entry.piSessionId;
-				}
-			}
-			try {
-				await this.writeSnapshot(this.entries);
-			} catch {
-				// 迁移是 best-effort；内存已生效，下一次启动仍会重试。
-			}
-		}
-
-		// 兼容旧数据：早期版本把 DSH 会话当 pi 会话 attach（filePath=host zstd 文件、
-		// piSessionId=host 会话 id 落盘）。pi 侧逻辑会把 zstd 文件当 pi 会话文件
-		// 处理（启动 pi exited code=1、导出/删除误判等）。dsh 条目只保留 dshSessionId，
-		// filePath/piSessionId 一律清除（dshSessionId 已在上方迁移补齐）。
-		const pollutedDsh = this.entries.some((entry) => entry.backend === "dsh" && (Boolean(entry.filePath) || Boolean(entry.piSessionId)));
-		if (pollutedDsh) {
-			for (const entry of this.entries) {
-				if (entry.backend !== "dsh") continue;
-				delete entry.filePath;
-				delete entry.piSessionId;
-				entry.originKey = undefined;
-			}
-			try {
-				await this.writeSnapshot(this.entries);
-			} catch {
-				// 迁移是 best-effort；内存已生效，下一次启动仍会重试。
-			}
-		}
-		// 兼容旧数据：ACP 会话曾被 pi 分支 attach（filePath/piSessionId 落盘）时同理污染；
-		// ACP 历史在 agent 侧，PiDeck 无本地会话文件，一律清除。
-		const pollutedAcp = this.entries.some((entry) => entry.backend === "acp" && (Boolean(entry.filePath) || Boolean(entry.piSessionId)));
-		if (pollutedAcp) {
-			for (const entry of this.entries) {
-				if (entry.backend !== "acp") continue;
-				delete entry.filePath;
-				delete entry.piSessionId;
-				entry.originKey = undefined;
-			}
-			try {
-				await this.writeSnapshot(this.entries);
-			} catch {
-				// 迁移是 best-effort；内存已生效，下一次启动仍会重试。
-			}
-		}
 		this.loaded = true;
 		if (this.skipNextBackup) {
 			// 备份自愈补写也是 best-effort：磁盘满/只读时失败只意味着下次启动重试，
@@ -511,26 +435,6 @@ export class SessionCatalog {
 		this.assertLoaded();
 		const entry = this.entries.find((candidate) => candidate.id === id);
 		return entry ? cloneEntry(entry) : undefined;
-	}
-
-	/** 侧栏删除过的 DSH host 会话。自动同步跳过；手动导入会清掉。 */
-	listDismissedDshSessionIds(): Set<string> {
-		this.assertLoaded();
-		return new Set(this.dismissedDshSessionIds);
-	}
-
-	/** 删除 DSH 映射时记下墓碑，避免 host 目录还在时刷新又把会话导回来。 */
-	async rememberDismissedDshSession(dshSessionId: string): Promise<void> {
-		this.assertLoaded();
-		const id = dshSessionId.trim();
-		if (!id) return;
-		await this.enqueueMutation((entries) => {
-			if (this.dismissedDshSessionIds.has(id)) {
-				return { value: undefined, changed: false };
-			}
-			this.dismissedDshSessionIds.add(id);
-			return { value: undefined, changed: true };
-		});
 	}
 
 	getRecord(id: string): SessionRecord | undefined {
@@ -638,7 +542,6 @@ export class SessionCatalog {
 		backend?: AgentBackend;
 		model?: SessionModelPreference;
 		thinkingLevel?: string;
-		permissionPreset?: string;
 		/**
 		 * Fresh drafts remain eligible for their first PiDeck automatic or JSONL title,
 		 * even when the provisional UI label is not literally "Untitled". Callers that
@@ -646,85 +549,30 @@ export class SessionCatalog {
 		 * titleOrigin: "manual".
 		 */
 		titleOrigin?: SessionTitleOrigin;
-		/** DSH agent 预设（会话「模式」）草稿期预选；外部会话导入时来自 host 会话 header。 */
-		agentPreset?: string;
-		/** ACP 工具预选（AcpToolConfig.id）：backend=acp 草稿期选哪个 CLI。 */
-		acpToolId?: string;
-		/** 外部（dsh-web 等）会话导入：host 会话已存在，条目直接置 active（重启不清理）。 */
-		dshSessionId?: string;
-		/**
-		 * DSH 外部会话的真实活跃时间（磁盘日志文件 mtime）。自动同步每轮全量重导，
-		 * 不带这个就用 Date.now()，会话每次重启被顶到启动时刻、永远排在 pi 会话上面。
-		 * 语义与 pi 会话一致（扫描器用文件 mtime 当 updatedAt）。
-		 */
+
 		updatedAt?: number;
-		/** 纠正归属时保留已有真实标题；占位名（cwd 末段）由调用方决定是否覆盖。 */
-		keepExistingTitle?: boolean;
-		/**
-		 * 手动找回（配置页导入 / 归档恢复）才清删除墓碑。
-		 * 自动同步禁止带这个：否则删映射的同时刷新还在跑，createDraft 会把墓碑清掉再写回侧栏。
-		 */
-		restoreDismissed?: boolean;
 	}): Promise<SessionRecord> {
+		requireSupportedBackend(input.backend);
 		this.assertLoaded();
 		const entry = await this.enqueueMutation((entries) => {
 			const now = Date.now();
-			// 幂等去重：DSH 外部会话按 host 会话 id 唯一映射。同一 dshSessionId 重复
-			// 导入（自动同步与手动导入并发、配置页重复点击、host-ready 重放）时
-			// 不再新建条目，只更新标题/项目归属——否则侧栏出现两条同 host 会话记录，
-			// 且删除其一后另一条仍可加载同一 host 数据（「重复导入」用户问题）。
-			if (input.dshSessionId) {
-				const dismissed = this.dismissedDshSessionIds.has(input.dshSessionId);
-				const existing = entries.find((candidate) => candidate.dshSessionId === input.dshSessionId);
-				// 用户已删映射、host 目录还在：自动同步不得再建条目。手动找回才允许。
-				if (dismissed && !input.restoreDismissed && !existing) {
-					throw new Error("DISMISSED_DSH_SESSION");
-				}
-				const forgotten = input.restoreDismissed ? this.dismissedDshSessionIds.delete(input.dshSessionId) : false;
-				if (existing) {
-					const nextTitle = input.keepExistingTitle ? existing.title : input.title;
-					const agentPresetChanged = input.agentPreset !== undefined && existing.agentPreset !== input.agentPreset;
-					const changed =
-						forgotten ||
-						existing.projectId !== input.projectId ||
-						existing.title !== nextTitle ||
-						existing.backend !== input.backend ||
-						agentPresetChanged ||
-						existing.status !== "active" ||
-						// mtime 变化也落盘：修正历史被顶高的 updatedAt，否则排序永远错
-						existing.updatedAt !== (input.updatedAt ?? now);
-					existing.projectId = input.projectId;
-					existing.title = nextTitle;
-					existing.backend = input.backend;
-					existing.status = "active";
-					// 外部会话 header 携带的 preset 变化（host 会话 header 是权威）随导入同步
-					if (input.agentPreset !== undefined) existing.agentPreset = input.agentPreset;
-					// 排序语义：用磁盘日志文件 mtime（真实活跃时间），不再顶到导入时刻
-					existing.updatedAt = input.updatedAt ?? now;
-					return { value: cloneEntry(existing), changed };
-				}
-			}
 			const nextEntry: SessionCatalogEntry = {
 				id: randomUUID(),
 				projectId: input.projectId,
 				title: input.title,
-				// 导入已有 host 会话（带 dshSessionId）标题已由 host 确认；纯草稿留一次领取机会。
-				titleLocked: (input.titleOrigin ?? (input.dshSessionId ? "manual" : undefined)) !== undefined,
-				titleOrigin: input.titleOrigin ?? (input.dshSessionId ? "manual" : undefined),
+
+				titleLocked: input.titleOrigin !== undefined,
+				titleOrigin: input.titleOrigin,
 				source: input.source ?? "pi",
 				environment: input.environment,
 				backend: input.backend,
 				wslDistro: input.environment === "wsl" ? this.identityContext.wslDistro : undefined,
 				wslUser: input.environment === "wsl" ? this.identityContext.wslUser : undefined,
-				// 带 dshSessionId = 导入已有 host 会话（数据在 $DSH_HOME），
+
 				// 不是「尚未发送」的草稿：置 active，重启清理/重新打开都按真实会话处理。
-				status: input.dshSessionId ? "active" : "draft",
+				status: "draft",
 				model: cloneModelPreference(input.model),
 				thinkingLevel: input.thinkingLevel,
-				permissionPreset: input.permissionPreset,
-				agentPreset: input.agentPreset,
-				acpToolId: input.acpToolId,
-				dshSessionId: input.dshSessionId,
 				createdAt: now,
 				// 外部会话导入带 mtime（真实活跃时间）；pi 草稿没有该字段，仍用当前时刻
 				updatedAt: input.updatedAt ?? now,
@@ -740,21 +588,15 @@ export class SessionCatalog {
 		patch: Partial<Pick<SessionCatalogEntry, "title" | "backend" | "updatedAt">> & {
 			model?: SessionModelPreference | null;
 			thinkingLevel?: string | null;
-			permissionPreset?: string | null;
-			/** DSH agent 预设（会话「模式」）：草稿期预选；null = 清除预选。 */
-			agentPreset?: string | null;
-			/** ACP 工具预选（AcpToolConfig.id）：草稿期切换；null = 清除预选。 */
-			acpToolId?: string | null;
-			/** ACP 会话身份：激活回写/清理（null = 清空）。 */
-			acpSessionId?: string | null;
 			proxy?: SessionProxyOverride | null;
-			/** 切到生图后端时甩开 pi 会话文件引用（null = 清空）。 */
+
 			filePath?: string | null;
 			piSessionId?: string | null;
 			/** fork 标记：仅显式 true 时置位（fork 身份元数据；(fork) 后缀已物理写入标题）。 */
 			forked?: boolean | null;
 		},
 	): Promise<SessionRecord> {
+		requireSupportedBackend(patch.backend);
 		this.assertLoaded();
 		const entry = await this.enqueueMutation((entries) => {
 			const nextEntry = this.requireEntry(entries, id);
@@ -764,10 +606,6 @@ export class SessionCatalog {
 			}
 			if (patch.model !== undefined) nextEntry.model = cloneModelPreference(patch.model ?? undefined);
 			if (patch.thinkingLevel !== undefined) nextEntry.thinkingLevel = patch.thinkingLevel ?? undefined;
-			if (patch.permissionPreset !== undefined) nextEntry.permissionPreset = patch.permissionPreset ?? undefined;
-			if (patch.agentPreset !== undefined) nextEntry.agentPreset = patch.agentPreset ?? undefined;
-			if (patch.acpToolId !== undefined) nextEntry.acpToolId = patch.acpToolId ?? undefined;
-			if (patch.acpSessionId !== undefined) nextEntry.acpSessionId = patch.acpSessionId ?? undefined;
 			if (patch.backend !== undefined) nextEntry.backend = patch.backend;
 			if (patch.filePath !== undefined) nextEntry.filePath = patch.filePath ?? undefined;
 			if (patch.piSessionId !== undefined) nextEntry.piSessionId = patch.piSessionId ?? undefined;
@@ -815,20 +653,7 @@ export class SessionCatalog {
 		return this.recordFromEntry(entry);
 	}
 
-	async attachRuntime(input: {
-		sessionId: string;
-		filePath?: string;
-		piSessionId?: string;
-		dshSessionId?: string;
-		/** ACP 会话身份：backend=acp 激活后回写，重启恢复用。 */
-		acpSessionId?: string;
-		/** DSH agent 预设（会话「模式」）：attach/新建后 host 回写（host 会话 header 是权威）。 */
-		agentPreset?: string;
-		/** 真正开聊后再把 DSH 草稿抬成 active；预热只绑 host id，不抬。 */
-		promoteToActive?: boolean;
-		/** 归档恢复等手动找回才清删除墓碑；激活/fork 回写不得把用户删过的 id 解禁。 */
-		restoreDismissed?: boolean;
-	}): Promise<SessionCatalogEntry> {
+	async attachRuntime(input: { sessionId: string; filePath?: string; piSessionId?: string }): Promise<SessionCatalogEntry> {
 		this.assertLoaded();
 		return this.enqueueMutation((entries) => {
 			const entry = this.requireEntry(entries, input.sessionId);
@@ -838,9 +663,6 @@ export class SessionCatalog {
 			const before = {
 				filePath: entry.filePath,
 				piSessionId: entry.piSessionId,
-				dshSessionId: entry.dshSessionId,
-				acpSessionId: entry.acpSessionId,
-				agentPreset: entry.agentPreset,
 				status: entry.status,
 				originKey: entry.originKey,
 				createdAt: entry.createdAt,
@@ -851,37 +673,10 @@ export class SessionCatalog {
 			// pi 可能上报相对 cwd 的 sessionFile：写入 catalog 前归一化为绝对路径，
 			// 否则与扫描器绝对路径 originKey 不一致，同一文件会出现两条记录。
 			const filePath = input.filePath && this.resolveFilePath ? this.resolveFilePath(entry.projectId, input.filePath, entry.environment) : input.filePath;
-			// DSH 的 sessionPath 是 host zstd，不是 pi JSONL；写进 filePath 会让渲染层
-			// 把空会话当成有磁盘历史（起始页 / 骨架来回抽）。ACP 同理：历史在 agent 侧，
+
 			// PiDeck 无本地会话文件。
-			if (filePath && entry.backend !== "dsh" && entry.backend !== "acp") entry.filePath = filePath;
+			if (filePath) entry.filePath = filePath;
 			if (input.piSessionId) entry.piSessionId = input.piSessionId;
-			if (input.acpSessionId) entry.acpSessionId = input.acpSessionId;
-			let restoredDismissed = false;
-			if (input.dshSessionId) {
-				entry.dshSessionId = input.dshSessionId;
-				// 只有明确找回才清墓碑。激活回写同一 host id 时如果清掉，
-				// 用户删映射后迟到的 attach 会让下次自动同步再导回来。
-				if (input.restoreDismissed && this.dismissedDshSessionIds.has(input.dshSessionId)) {
-					// 墓碑集合随 writeSnapshot 落盘：delete 已发生在回调内，必须计入
-					// changed，否则 changed:false 时内存已删但快照不落盘，重启后墓碑复活。
-					restoredDismissed = true;
-					this.dismissedDshSessionIds.delete(input.dshSessionId);
-				}
-			}
-			// attach/新建时 host 回写的实际 preset（草稿预选可能被 host 修正为部署默认）
-			if (input.agentPreset !== undefined) entry.agentPreset = input.agentPreset;
-			// DSH 预热/激活也会 attach host id，但此时还没有用户消息。
-			// 不能把草稿抬成 active：渲染层会把「active + dshSessionId」当成有历史，
-			// 输入一半整页换成「正在加载历史」骨架。导入路径 createDraft({dshSessionId})
-			// 已经是 active；真正开聊后由 prompt dispatch 再 promoteToActive。
-			if (input.promoteToActive && input.dshSessionId && !entry.filePath && entry.status === "draft") {
-				entry.status = "active";
-			}
-			// ACP 同语义：无本地文件，真正开聊（prompt dispatch）后才抬 active。
-			if (input.promoteToActive && input.acpSessionId && entry.status === "draft") {
-				entry.status = "active";
-			}
 			let mergedDuplicate = false;
 			if (entry.filePath) {
 				const pathUnchanged = Boolean(before.filePath && canonicalizeSessionPath(before.filePath, entry.environment) === canonicalizeSessionPath(entry.filePath, entry.environment));
@@ -902,13 +697,9 @@ export class SessionCatalog {
 			}
 			// 快照对比逐字段判定真实变化；路径按 canonical 形态比较，隔离分隔符/大小写差异。
 			const touched =
-				restoredDismissed ||
 				mergedDuplicate ||
 				canonicalizeSessionPath(before.filePath ?? "", entry.environment) !== canonicalizeSessionPath(entry.filePath ?? "", entry.environment) ||
 				before.piSessionId !== entry.piSessionId ||
-				before.dshSessionId !== entry.dshSessionId ||
-				before.acpSessionId !== entry.acpSessionId ||
-				before.agentPreset !== entry.agentPreset ||
 				before.status !== entry.status ||
 				before.originKey !== entry.originKey ||
 				before.createdAt !== entry.createdAt ||
@@ -959,10 +750,6 @@ export class SessionCatalog {
 		return persistedRemoved;
 	}
 
-	/**
-	 * 删除侧栏项目时清掉该项目下全部 catalog 映射（含 DSH 导入）。
-	 * host 会话文件仍在 $DSH_HOME，但不再自动挂回侧栏；用户手动导入才会再出现。
-	 */
 	async removeByProjectId(projectId: string): Promise<number> {
 		this.assertLoaded();
 		return this.enqueueMutation((entries) => {
@@ -1006,7 +793,7 @@ export class SessionCatalog {
 		// 外部删除清理（在入锁前完成磁盘探测）：mergeScanned 历史上只增改不删，
 		// pi 会话文件被外部删除（pi 回收站、用户手工 rm、脚本清理）后条目会永远
 		// 残留在侧栏。安全闸（缺一不可）：
-		// - 仅本项目 + source=pi + backend≠dsh：dsh 会话文件由 $DSH_HOME 托管；
+
 		// - environment=native：WSL 条目跳过——发行版未运行时 UNC existsSync 恒
 		//   false，会把正常会话误删；
 		// - 必须真实 existsSync 缺失（而非「不在本轮 summaries 里」），部分扫描/
@@ -1020,7 +807,7 @@ export class SessionCatalog {
 		const externallyMissingIds = new Set<string>();
 		for (const entry of this.entries) {
 			if (entry.projectId !== projectId) continue;
-			if (entry.source !== "pi" || entry.backend === "dsh") continue;
+			if (entry.source !== "pi") continue;
 			if (entry.environment !== "native") continue;
 			if (!entry.filePath) continue;
 			// 活跃运行时的文件可能尚未落盘：pi 首条消息才创建 jsonl，预热激活后空闲
@@ -1339,11 +1126,6 @@ export class SessionCatalog {
 			status: entry.status,
 			model: entry.model ? { ...entry.model } : undefined,
 			thinkingLevel: entry.thinkingLevel,
-			permissionPreset: entry.permissionPreset,
-			agentPreset: entry.agentPreset,
-			acpToolId: entry.acpToolId,
-			dshSessionId: entry.dshSessionId,
-			acpSessionId: entry.acpSessionId,
 			proxy: entry.proxy ? { ...entry.proxy } : undefined,
 			createdAt: entry.createdAt,
 			updatedAt: summary?.updatedAt ?? entry.updatedAt,
@@ -1446,7 +1228,6 @@ export class SessionCatalog {
 
 	private async readCatalogFile(filePath: string): Promise<{
 		entries: SessionCatalogEntry[];
-		dismissedDshSessionIds: Set<string>;
 	}> {
 		const parsed = JSON.parse(await readFile(filePath, "utf8")) as Partial<SessionCatalogFile>;
 		if (!Array.isArray(parsed.sessions)) {
@@ -1456,10 +1237,8 @@ export class SessionCatalog {
 		if (entries.length !== parsed.sessions.length) {
 			throw new Error(`Session catalog contains invalid records: ${filePath}`);
 		}
-		const dismissed = Array.isArray(parsed.dismissedDshSessionIds) ? parsed.dismissedDshSessionIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0) : [];
 		return {
-			entries: entries.map(cloneEntry),
-			dismissedDshSessionIds: new Set(dismissed),
+			entries: entries.filter((entry) => (entry.backend === undefined || entry.backend === "pi") && entry.noSession !== true).map(cloneEntry),
 		};
 	}
 
@@ -1467,8 +1246,6 @@ export class SessionCatalog {
 		const snapshot: SessionCatalogFile = {
 			version: 1,
 			sessions: entries.map(cloneEntry),
-			// 旧 catalog 没有该字段；空数组也写出，重启后删除墓碑不丢。
-			dismissedDshSessionIds: [...this.dismissedDshSessionIds],
 		};
 		await mkdir(dirname(this.filePath), { recursive: true });
 		const nonce = randomUUID();

@@ -22,7 +22,6 @@ import { estimateJumpExpandTurns, resolveJumpPendingAction } from "../components
 import { countUserTurns, TIMELINE_MOUNTED_TURN_LIMIT, TIMELINE_SCROLLED_TURN_LIMIT, TIMELINE_WINDOW_EXPAND_STEP } from "../components/session/timeline/turnRenderWindow";
 import { desktopApi } from "../desktopApi";
 import { t } from "../i18n";
-import { sessionHistoryUnavailableState } from "../utils/sessionHistoryAvailability";
 import { resolveAutoExpandThreshold } from "./timeline/autoExpandThreshold";
 import { browsePinScrollTop, followBrowsePinAfterUserScroll, shouldCompensateBrowsePin, type BrowsePin } from "./timeline/browsePin";
 import { beginProgrammaticScroll, clearProgrammaticScroll, createProgrammaticScrollGuard, finishProgrammaticScrollFrame, isProgrammaticScrollActive } from "./timeline/programmaticScrollGuard";
@@ -43,8 +42,7 @@ const TURN_WINDOW_AUTO_EXPAND_COOLDOWN_MS = 300;
 const TURN_WINDOW_EXPAND_BATCH_TURNS = 2;
 
 let nextLoadSequence = 0;
-/** 新建空会话的跨挂载粘性：切 Tab 时 ChatSessionPane/hook 会销毁重建，useRef 粘性会丢失导致切回闪骨架。
- *  模块级 Set 跨实例保持：某会话一旦被判定为空，则在出现第一条消息前始终视为空，即使预热写入 filePath/dshSessionId 也不翻回。 */
+
 const stickyEmptySessionIds = new Set<string>();
 /** sticky 空会话集上限（LRU 裁剪）：会话从 catalog 删除后条目无人清理，
  *  桌面进程长运行下无界增长；与 latestLoadBySession 同构，超限删最早插入键。 */
@@ -181,18 +179,15 @@ export function isUserFacingSessionStart(sendStatus: string | undefined): boolea
 	return sendStatus === "activating";
 }
 
-/** catalog 已确认无磁盘历史：空草稿、从未落文件的 pi 会话、尚无 host id 的新 DSH。
- * 预热会写 filePath / dshSessionId，但草稿在真正开聊前仍算空——见控制器 sticky。 */
-export function isKnownEmptySessionRecord(record: Pick<SessionRecord, "status" | "filePath" | "messageCount" | "backend" | "dshSessionId"> | undefined): boolean {
+export function isKnownEmptySessionRecord(record: Pick<SessionRecord, "status" | "filePath" | "messageCount" | "backend"> | undefined): boolean {
 	if (!record) return false;
 	if (record.status === "draft") return true;
 	if ((record.messageCount ?? 0) > 0) return false;
 	if (record.filePath) return false;
-	if (record.backend === "dsh" && record.dshSessionId) return false;
-	// imagegen 会话历史独立存 ImageSessionStore，不体现在 filePath/messageCount：
+
 	// 已 promote 为 active 的生图会话不能判为空，否则重启后打开会跳过历史加载显示空引导页。
 	// 新建生图草稿仍为 draft，已在上面 return true，不受影响。
-	if (record.backend === "imagegen") return false;
+
 	return true;
 }
 
@@ -334,7 +329,7 @@ export type SessionTimelineController = {
 	 * SessionView 用它在历史会话加载期仍挂底部 composer，避免 1 面板 Group 吃到 2 值布局缓存。
 	 */
 	isSurfaceLoading: boolean;
-	/** 本栏粘住的空会话：预热写 filePath/dshSessionId 后仍不闪历史骨架。 */
+
 	knownEmpty: boolean;
 	/**
 	 * 强制从磁盘重载本会话时间线（编辑/删除/重发改 JSONL 后）。
@@ -469,7 +464,7 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 	const sessionRecord = useAtomValue(sessionRecordByIdAtomFamily(options.sessionId ?? ""));
 	const knownEmptyFromRecord = isKnownEmptySessionRecord(sessionRecord);
 	// 空会话粘性（跨挂载）：新建会话输入一半切走再切回时，hook 实例已销毁重建，
-	// 旧的 useRef 粘性会丢失。若此时预热已写入 filePath/dshSessionId，knownEmptyFromRecord
+
 	// 仍为 true（draft 始终 true），但对非 draft 的匿名/活跃空会话也需保持起始页，
 	// 避免切回时变骨架、输入框从居中跳到底部（用户反馈）。
 	const stickySessionId = options.sessionId;
@@ -515,14 +510,9 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 			.readRecordMessagePage(sessionId, undefined, DISK_INITIAL_TURN_PAGE_SIZE)
 			.then((page: SessionMessagePage) => {
 				if (latestLoadBySession.get(sessionId) !== sequence) return;
-				// DSH host 被手动停止：历史暂时读不了——不是空历史、也不是会话文件失效。
+
 				// 必须进专态而不是写空缓存，写缓存会把它显示成空会话 + 起始页，
 				// 用户看到「这个会话没了」而真实原因是运行时被自己停了（2026-09 反馈）。
-				const unavailable = sessionHistoryUnavailableState(page);
-				if (unavailable) {
-					setLoadState({ sessionId, state: unavailable });
-					return;
-				}
 				cacheMessages({
 					sessionId,
 					messages: page.messages,
@@ -555,11 +545,6 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 			if (latestLoadBySession.get(sessionId) !== sequence) return;
 			// 与首屏同源：手动停止态下重试仍不会成功，保持专态
 			//（否则「重试」会把错误态洗成空会话，又回到用户看到的错误方向）。
-			const unavailable = sessionHistoryUnavailableState(page);
-			if (unavailable) {
-				setLoadState({ sessionId, state: unavailable });
-				return;
-			}
 			cacheMessages({
 				sessionId,
 				messages: page.messages,
@@ -596,10 +581,7 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 	// 内存预算由主进程 12 轮缓存 + 回底临时历史清理承担，渲染层不再有第二道条数窗口。
 	const visibleMessages = combinedMessages;
 	const [isLoadingMessagePage, setIsLoadingMessagePage] = useState(false);
-	/**
-	 * 「加载更多对话」失败态：IPC 抛错（DSH host 不可用 / 会话文件失效）原先没人接，
-	 * finally 只复位 loading，表现为「点了没反应」。这里留原始文案给时间线出错误行。
-	 */
+
 	const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 	// This snapshot is intentionally read during render. In the reused solo pane,
 	// waiting for a passive effect would let MessageScroller commit the previous
@@ -1014,7 +996,7 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 	useLayoutEffect(() => {
 		const baseline = sendMessageBaselineRef.current;
 		sendMessageBaselineRef.current = { ownerKey, messageId: sendMessageId };
-		// 恢复/首帧只记录基线；role 判定覆盖 UUID、DSH 和最快同帧抵达的 assistant。
+
 		if (!baseline || baseline.ownerKey !== ownerKey || restorePhase !== "complete" || !sendMessageId || baseline.messageId === sendMessageId) return;
 		const timeline = timelineRef.current;
 		if (!timeline) return;
@@ -1073,10 +1055,6 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 						if (latestLoadBySession.get(sessionId) !== sequence) return;
 						// 旧后端历史不可用时保留已加载内容，出可辨识的失败行（静默丢弃这一页
 						// 会让「加载更多」看起来没反应），下次点击仍可重试。
-						if (sessionHistoryUnavailableState(page)) {
-							setLoadMoreError(t("app.legacyBackendReadOnly"));
-							return;
-						}
 						if (prependMessagePage({ sessionId, before, expectedRevision, page })) {
 							// 历史消息页最多只开放一个 3 轮 cohort；数据页可能按消息数返回很多轮，
 							// 不能再固定 +10 把 DOM 一次性解锁，剩余已加载数据交给本地扩窗。
@@ -1134,10 +1112,6 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 					.then((page: SessionMessagePage) => {
 						if (latestLoadBySession.get(sessionId) !== sequence) return;
 						// 与 disk 翻页同一语义：历史不可用时不把空页当新历史，出失败行
-						if (sessionHistoryUnavailableState(page)) {
-							setLoadMoreError(t("app.legacyBackendReadOnly"));
-							return;
-						}
 						if (prependHistoryPage({ sessionId, expectedRevision, before, page })) {
 							// runtime history 页与 DOM 使用同一 3 轮 cohort；缓存命中和文件回退
 							// 都只开放实际带回的轮数，避免数据 +3、窗口却 +10。

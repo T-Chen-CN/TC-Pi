@@ -46,7 +46,7 @@ export type UsageLogReaderOptions = {
 	highWaterMark?: number;
 	/** 单次读取字节上限：防御日志失控导致的全量读 OOM（超限截读并标记 truncated） */
 	maxBytes?: number;
-	/** 行解析器（默认 pi-tracker 数组行；dsh-bill 传入对象行解析） */
+
 	parseLine?: UsageLineParser;
 };
 

@@ -82,7 +82,7 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 							className="size-7 rounded-full text-text-tertiary"
 							aria-label={t("sessionGoal.Pause")}
 							title={t("sessionGoal.Pause")}
-							disabled={busy || false}
+							disabled={busy}
 							onClick={() => {
 								void runAction("pause");
 							}}
@@ -98,7 +98,7 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 							className="size-7 rounded-full text-text-tertiary"
 							aria-label={t("sessionGoal.Resume")}
 							title={t("sessionGoal.Resume")}
-							disabled={busy || false}
+							disabled={busy}
 							onClick={() => {
 								void runAction("resume");
 							}}
@@ -112,7 +112,7 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 						className="size-7 rounded-full text-text-tertiary hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
 						aria-label={t("sessionGoal.Clear")}
 						title={t("sessionGoal.Clear")}
-						disabled={busy || false}
+						disabled={busy}
 						onClick={() => {
 							setConfirmClear(true);
 						}}

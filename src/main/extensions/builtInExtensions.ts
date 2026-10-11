@@ -136,16 +136,6 @@ export function resolveBuiltInExtensionsDir(roots: BuiltInExtensionPathRoots): s
 }
 
 /**
- * 扩展运行时依赖的 vendored node_modules 源目录（供覆盖层复制，见 builtInExtensionsUpdater）。
- *
- * 打包态：extraResources 把 `node_modules/<pkg>` 复制到 `extensions/node_modules/<pkg>`；
- * 开发态：直接用仓库顶层 node_modules（extensionPackagingDeps.test.mjs 保证它有这些包）。
- */
-export function resolveVendorNodeModulesDir(roots: BuiltInExtensionPathRoots): string {
-	return roots.isDev ? join(roots.appPath, "node_modules") : join(roots.resourcesPath, "extensions", "node_modules");
-}
-
-/**
  * 解析单个内置扩展在本机磁盘上的绝对路径。
  * 覆盖层（热更新）优先 → 开发态 appPath/resources/extensions → 打包态 resourcesPath/extensions。
  */

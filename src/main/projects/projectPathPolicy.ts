@@ -1,11 +1,3 @@
-/**
- * 项目路径策略（纯函数）：判断自动导入是否应按会话 cwd 注册侧栏项目。
- *
- * 背景：删除「目录不存在」的项目后，启动时 DSH 外部会话同步仍会按 header.cwd
- * 调用 ProjectStore.add()，把已删的临时目录（尤其是 e2e 的 pideck-mockpi-*）
- * 连同会话一起加回侧栏。
- */
-
 /** 项目显示名最大长度：超出拒绝，避免恶意/误输入撑爆侧栏。 */
 export const PROJECT_DISPLAY_NAME_MAX_LENGTH = 120;
 

@@ -94,12 +94,6 @@ test("package.json unpacks node-pty so packaged terminal can load pty.node", () 
 	assert.ok(unpack.includes("node_modules/node-pty/**"), "asarUnpack must list node-pty; otherwise terminal:ensure fails in the installed app (#154)");
 });
 
-test("package.json unpacks sharp native packages for every dependency depth", () => {
-	const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-	const unpack = pkg.build?.asarUnpack ?? [];
-	assert.ok(unpack.includes("node_modules/**/@img/sharp-*/**"), "asarUnpack must cover nested sharp libvips packages; versioned .so files need a real disk path on Linux");
-});
-
 /**
  * 交叉打包回归（issue #201）：在 x64 构建机上打 arm64 包时，
  * 必须按 electron-builder 传的 context.arch 过滤 prebuild，

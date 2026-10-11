@@ -1,5 +1,5 @@
 import { app, shell } from "electron";
-import { appendFile, mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { AppLogEntry, AppLogLevel, AppLogPage, AppLogQuery } from "../../shared/types";
 import { readTextBounded } from "../fs/boundedTextRead";

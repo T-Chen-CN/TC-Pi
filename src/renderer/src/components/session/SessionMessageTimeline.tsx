@@ -6,13 +6,11 @@ import type { ComponentProps, ReactNode, Ref, RefObject } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, ImageContent } from "../../../../shared/types";
 import { liveTextStreamingBySessionAtom, liveThinkingIdBySessionIdAtomFamily, liveThinkingStreamingBySessionAtom, sessionMessageCacheBySessionIdAtomFamily, sessionMessageLoadStateAtom, sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionSendStateByIdAtom } from "../../atoms";
-import { askEchoBySessionIdAtomFamily } from "../../atoms/ask-echo-atoms";
 import { canLoadSessionTimelineMore, deriveSessionSurfaceRuntime, type SessionTimelineController } from "../../hooks/useSessionTimelineController";
 import { useTimelineSelection } from "../../hooks/useTimelineSelection";
 import { t } from "../../i18n";
 import { resolveFreshTailIds } from "../../lib/pinTurnScroll";
 import { cn } from "../../lib/utils";
-import { injectAskEchoMessage } from "../../utils/askUi";
 import { writeClipboardImage } from "../../utils/clipboard";
 import { showNotice } from "../../utils/notice";
 import { isLiveRuntimeStatus } from "../../utils/sessionCommands";
@@ -139,7 +137,7 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 		// 读取结果未到达 → 钉骨架屏；有条目（即使空）＝读取已返回，空会话起始页合法。
 		// 不依赖 catalog messageCount（摘要缺失时兑底为 0，不可靠）。
 		Boolean(surfaceCachedEntry),
-		// 用 controller 的 sticky：预热回写 filePath/dshSessionId 后仍不闪历史骨架。
+
 		controller.knownEmpty,
 	);
 	const isConversationLoading = modernSurfaceState.isLoading;
@@ -340,31 +338,13 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 		return groups;
 	}, [runtimeHistoryMessages, isTurnRunning]);
 	// The window segment follows the same turn-level activity rule as history.
-	// DSH 已作答回显内联注入：应答时记录的锚点（最后一条消息 id）即提问阻塞的
-	// 工具调用位置，把回显合成为 ask_question 工具消息插在其后，走 pi _askCard
-	// 同一分组/渲染路径。只在派生层注入——DSH 历史由 host 全量折叠投影，任何写
-	// 进缓存的合成消息都会被下次投影冲掉。runtime 换代即作废；锚点被压缩/重投影
-	// 改写找不到时不注入（错位的回显比没有更糟）。
-	const askEchoEntry = useAtomValue(askEchoBySessionIdAtomFamily(sessionId));
-	const askEchoPlacement = useMemo(() => {
-		if (!askEchoEntry) return undefined;
-		if (runtime?.agentId !== askEchoEntry.agentId || runtime.runtimeGeneration !== askEchoEntry.runtimeGeneration) return undefined;
-		return {
-			echo: askEchoEntry.echo,
-			agentId: askEchoEntry.agentId,
-			...(askEchoEntry.anchorMessageId ? { anchorMessageId: askEchoEntry.anchorMessageId } : {}),
-			answeredAt: askEchoEntry.answeredAt,
-		};
-	}, [askEchoEntry, runtime?.agentId, runtime?.runtimeGeneration]);
-	const echoedWindowMessages = useMemo(() => injectAskEchoMessage(controller.messages, askEchoPlacement), [controller.messages, askEchoPlacement]);
-	const echoedPaginatedMessages = useMemo(() => injectAskEchoMessage(paginatedMessages, askEchoPlacement), [paginatedMessages, askEchoPlacement]);
-	const groupedWindowRuns = useMemo(() => groupToolMessages(echoedWindowMessages, { agentBusy: isTurnRunning }), [echoedWindowMessages, isTurnRunning]);
+	const groupedWindowRuns = useMemo(() => groupToolMessages(controller.messages, { agentBusy: isTurnRunning }), [controller.messages, isTurnRunning]);
 	const renderedRuns = useMemo(() => {
 		if (groupedHistoryRuns) {
 			return [...groupedHistoryRuns, ...groupedWindowRuns];
 		}
-		return groupToolMessages(echoedPaginatedMessages, { agentBusy: isTurnRunning });
-	}, [groupedHistoryRuns, groupedWindowRuns, echoedPaginatedMessages, isTurnRunning]);
+		return groupToolMessages(paginatedMessages, { agentBusy: isTurnRunning });
+	}, [groupedHistoryRuns, groupedWindowRuns, paginatedMessages, isTurnRunning]);
 	// 阶段0补强：对未变化的 run 复用旧对象引用，历史 run 的 memo 比较退化为 O(1)
 	const prevRenderedRunsRef = useRef<RenderMessage[] | undefined>(undefined);
 	const reconciledRuns = useMemo(() => {
@@ -533,11 +513,10 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 		};
 	}, [displayRuns, followingForTurnWindow, pinBrowseRow, turnWindowActive, turnWindowTurns]);
 	// 文件修改由 SessionView 提取最近一轮并放在 composer 上方；时间线只负责渲染消息。
-	// 时间线里已有用户图片才解析模型目录：原生看图时气泡不能显示视觉桥「转换中」。
+
 	const hasUserImages = useMemo(() => activeMessages.some((message) => message.role === "user" && Boolean(message.images?.length)), [activeMessages]);
 	// 生图轮的 user 消息（紧随其后带 imageGen meta 的 assistant 占位/结果）：参考图直接进
-	// 供应商 image 参数，不走 LLM 视觉桥——必须禁用视觉桥 UI，否则参考图气泡会被误显示
-	// 「转换中/视觉桥已查看」。普通带图消息（下一跳是非 imageGen assistant）不受影响；
+
 	// 该判定对重启恢复的历史消息同样成立（落盘的 assistant 带 imageGen meta）。
 	const imageGenUserMessageIds = useMemo(() => {
 		const ids = new Set<string>();
@@ -818,7 +797,6 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 									key={item.id}
 									run={item}
 									sessionId={sessionId}
-									// 行头署名与后端一致：DSH 会话的回复标 dsh，而非 pi
 									backend={session?.backend ?? "pi"}
 									fresh={freshMessageIds.has(item.id)}
 									topFresh={topFreshIds.has(item.id)}
@@ -892,7 +870,7 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 							if (meta?.type === "customMessage") {
 								return shouldRenderNotifyCard(message) ? <NotifyMessageCard key={message.id} message={message} /> : null;
 							}
-							// 压缩摘要卡片已按产品决策下线（与 dsh 后端行为对齐）：
+
 							// 压缩进行态由 RespondingIndicator「正在压缩」承担，压缩完成后
 							// 时间线直接呈现保留消息。pi 投影出的 compaction system 消息
 							// 仍会进入时间线数据（主进程继续维护），这里仅不渲染。

@@ -1,15 +1,3 @@
-/**
- * TokenDancePanel — Pi 配置管理「模型」页的 TokenDance 入口卡片。
- *
- * 与 PiDeck 的关系边界（用户确认的方案）：
- * - 不做任何内置/展示层注入：模型不存在于配置时，会话模型列表也不会出现；
- * - 卡片提供「一键配置」：用户点击 → 同意弹窗 → 授权 → 自动拿到 API Key → 写入
- *   pi models.json（与 DSH 模型目录），之后一切走既有链路；
- * - API Key 获取与配置写入合并成**一个操作**（见 TokenDanceSetupDialog）：主进程起本地
- *   回环端口接收授权回调，用户只需在浏览器点一次「授权」，不需要复制粘贴任何东西；
- *   自动接收不可用时才降级到「粘贴授权码 / 直接粘贴 Key」手动路径。
- * - 侵入性最低：只在配置页显示；不启动弹通知，用户不打开配置页则完全无感知。
- */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, ExternalLink, KeyRound, Loader2, PlugZap, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 import { t } from "../i18n";
@@ -32,7 +20,7 @@ export type TokendanceInstallOutcome = {
 export type TokenDancePanelProps = {
 	/** models.json 是否已含 tokendance provider（决定「一键配置」or「已配置」状态）。 */
 	configured: boolean;
-	/** 安装成功后的回调（父级刷新 Pi 模型数据 + DSH 配置页）。 */
+
 	onInstalled: (outcome: TokendanceInstallOutcome) => void;
 };
 

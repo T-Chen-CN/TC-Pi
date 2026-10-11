@@ -86,7 +86,7 @@ export class ExtensionUiGate {
 				method,
 				title: "",
 				// 扩展的 notify 消息常带终端颜色转义（如 billion-context-pi 的更新通知
-				// `\x1B[32m✔ ACP auto-updated ...\x1B[0m`），toast 不是终端，直接透传会显示乱码转义符，
+
 				// 在进程边界统一清洗后再交给渲染层。
 				message: stripBridgeAnsi(String(typed.message ?? "")),
 				notifyType: typed.notifyType,

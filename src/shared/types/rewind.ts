@@ -1,16 +1,3 @@
-/**
- * rewind 能力共享契约（P1：checkpoint 文件快照）。
- *
- * 设计决策：参考 pi-rewind 扩展（MIT）的 checkpoint 模型，但把「文件回退」做成
- * 主进程 GitService 域的纯 git 能力（不依赖 pi 进程），从而天然跨后端——
- * dsh 会话跑在同一个仓库里，checkpoint 照常可用；也避免 PiDeck 无法程序化
- * 驱动 pi 扩展命令的通道缺失问题（RPC 类型表里没有「执行扩展命令」）。
- *
- * 本文件只放跨进程契约类型 + 边界校验纯函数，禁止引入运行时依赖。
- * 完整元数据（含 git 树 SHA）保留在 src/main/rewind/checkpointCore.ts 内部，
- * 只有面向 IPC/UI 的摘要形态下沉到这里。
- */
-
 /** checkpoint 触发来源（与 pi-rewind 对齐，保证两端创建的 ref 互相可读）。 */
 export type RewindCheckpointTrigger = "turn" | "tool" | "resume" | "before-restore";
 

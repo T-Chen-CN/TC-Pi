@@ -1,13 +1,3 @@
-/**
- * pi-ai 内置模型目录索引（替代 resources/model-specs.db）。
- *
- * 构建期由 scripts/generate-pi-ai-catalog.mjs 从 pi-ai provider JSON 提取 artifact；
- * 运行时只读 resources/pi-ai-catalog*.json，不实例化 Provider、不拉 AWS/OpenAI SDK，
- * 也不依赖 node_modules 中的 pi-ai 版本。匹配规则对齐 dsh-web 的「catalog 有就用」，
- * 并对中转站做跨 provider 的 id 精确匹配（含大小写、路径尾段），
- * 不做 contains 模糊匹配——命不中就空着，避免短前缀误填。
- */
-
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -29,8 +19,7 @@ export type PiAiCatalogEntry = FetchedModel & {
 	provider?: string;
 	/** 官方模型类型；缺省视为 chat（pi-ai 的 `type?: "chat"` 语义）。 */
 	type?: PiAiModelType;
-	/** pi-ai 内置 provider 的 API 协议（如 "openai-completions"）与默认端点；
-	 *  迁移反向（pi→DSH）时用来补全内置 provider 的 profile。仅在 catalog 条目提供时存在。 */
+
 	api?: string;
 	baseUrl?: string;
 };
@@ -47,7 +36,7 @@ export type PiAiCatalogIndex = {
 	byId: Map<string, PiAiCatalogEntry[]>;
 	/** 小写 id → 同上 */
 	byIdLower: Map<string, PiAiCatalogEntry[]>;
-	/** provider → id → 条目（dsh catalogModels(provider) 的精确路径） */
+
 	byProviderId: Map<string, Map<string, PiAiCatalogEntry>>;
 };
 
@@ -241,11 +230,6 @@ function artifactPathsIn(resourceDir: string): PiAiCatalogArtifactPaths | undefi
 	return existsSync(catalogPath) && existsSync(manifestPath) ? { catalogPath, manifestPath } : undefined;
 }
 
-/**
- * 解析内置（打包 resources / 项目 resources）artifact 路径；不含覆盖层。
- * 打包态直接读 process.resourcesPath；开发态从 out/main 或 cwd 向上定位项目 resources。
- * 不再扫描 node_modules，保证主进程 catalog 与 DSH 的 pi-ai runtime 依赖完全隔离。
- */
 export function resolveBuiltinPiAiCatalogArtifactPaths(): PiAiCatalogArtifactPaths | undefined {
 	const packagedResources = typeof process.resourcesPath === "string" ? process.resourcesPath : "";
 	if (packagedResources) {

@@ -29,7 +29,6 @@ const api = (
 	}
 ).piDesktop;
 
-/** 等级图标：按统一保护强度语义取（utils/permissionLevelIcon，#214 与 DSH 权限预设同源） */
 function levelIcon(level: SecurityLevelConfig) {
 	if (level.id === "off") return permissionStrengthIcon("relaxed");
 	if (level.id === "strict") return permissionStrengthIcon("strict");

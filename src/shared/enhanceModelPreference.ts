@@ -22,7 +22,7 @@ export function resolveEnhanceTargetModel(input: {
 	recordModel?: EnhanceModelSource;
 	/** 引导页点选偏好（localStorage 残留，可能指向已删模型——主进程会报 model-not-found）。 */
 	welcomeModel?: EnhanceModelSource;
-	/** 兜底：DSH 部署默认 / 主进程解析的启动默认。 */
+
 	fallback?: EnhanceModelSource;
 }): EnhanceModelSelection | null {
 	for (const candidate of [input.configured, input.recordModel, input.welcomeModel, input.fallback]) {

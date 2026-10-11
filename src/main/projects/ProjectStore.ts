@@ -10,7 +10,6 @@ const CHAT_PROJECT_ID = "builtin-chat";
 const CHAT_PROJECT_NAME = "Chat";
 
 export class ProjectStore {
-	/** DSH 外部会话兑底项目稳定 id（无 cwd/未匹配目录的会话归属；见 ensureExternalSessionsProject）。 */
 	private static readonly EXTERNAL_PROJECT_ID = "builtin-external";
 	private readonly filePath = join(app.getPath("userData"), "projects.json");
 	private readonly chatPathFile = join(app.getPath("userData"), "chat-path.json");
@@ -235,11 +234,6 @@ export class ProjectStore {
 		return [...this.dismissedPaths];
 	}
 
-	/**
-	 * 丢掉 e2e/临时隔离目录项目（如 %TEMP%/pideck-mockpi-*）。
-	 * 这些路径本就不该进入开发者本机侧栏；启动时清掉并记入已移除名单，
-	 * 避免 DSH 自动导入按 cwd 再注册。返回被删项目 id。
-	 */
 	dropEphemeralProjects(): string[] {
 		const removedIds: string[] = [];
 		const kept: Project[] = [];
@@ -361,11 +355,6 @@ export class ProjectStore {
 		return this.projects.find((project) => this.sameProjectPath(project.path, normalizedPath)) ?? null;
 	}
 
-	/**
-	 * DSH 外部会话兑底项目（稳定 id，幂等）：给「没有 cwd / cwd 未注册项目」的
-	 * 外部会话一个确定归属，而不是随机挂到第一个非 chat 项目（用户不可预期）。
-	 * 目录落在 userData/external-sessions（随应用数据存在，不会被标记 missing）。
-	 */
 	async ensureExternalSessionsProject(name: string): Promise<Project> {
 		const existing = this.projects.find((project) => project.id === ProjectStore.EXTERNAL_PROJECT_ID);
 		if (existing) {

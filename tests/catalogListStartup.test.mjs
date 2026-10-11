@@ -24,7 +24,6 @@ test("cached catalog branch is sorted by recency and filters dead file links", (
 	// 同口径排序（updatedAt desc），并在返回前滤掉文件已消失的非 WSL/dsh 记录。
 	const handler = sessionIpc.slice(sessionIpc.indexOf("ipcChannels.sessionsCatalogList"), sessionIpc.indexOf("ipcChannels.sessionsCatalogCreateDraft"));
 	assert.match(handler, /\.sort\(\s*\(left,\s*right\)\s*=>\s*right\.updatedAt\s*-\s*left\.updatedAt\s*\)/);
-	assert.match(handler, /record\.backend\s*===\s*"dsh"/);
 	assert.match(handler, /existsSync\(record\.filePath\)/);
 	assert.match(handler, /startsWith\("\\\\\\\\"\)/);
 });

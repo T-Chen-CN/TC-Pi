@@ -9,7 +9,7 @@
  */
 import type { UIMessage } from "ai";
 import type { AvailableModel, AgentBackend, ChatMessage, SessionCommandResult, SessionFileChange, SessionLaunchPreferences, SessionMessagePage, SessionRuntimeTarget, SessionTargetedValue, SessionTodoSnapshot, UpdateSessionRecordInput } from "../../../shared/types";
-import type { CommitEntry, GitBranchInfo, GitResourceGroups, ImageContent, PiExtensionSummary, PiSkillLocation, PiSkillSummary, PiSubagentEntry, YaoPromptCategory } from "../../../shared/types";
+import type { CommitEntry, GitBranchInfo, GitResourceGroups, ImageContent, PiExtensionSummary, PiSkillLocation, PiSkillSummary, PiSubagentEntry } from "../../../shared/types";
 import type { AgentUiResponse } from "../../../shared/types";
 import type { WebContextUsage, WebFileNodeLite, WebState } from "./webTypes";
 
@@ -308,27 +308,6 @@ export function prepareResend(sessionId: string, target: SessionRuntimeTarget, m
 export async function fetchRuntimeContextUsage(sessionId: string, target: SessionRuntimeTarget): Promise<WebContextUsage> {
 	const usage = await callRuntimeCommand<WebContextUsage>(sessionId, target, "state");
 	return usage ?? {};
-}
-
-/** P2：提示词库搜索（中文提示词精选）。 */
-export async function fetchPrompts(search?: string, category?: string, page = 1, pageSize = 20): Promise<{ categories: YaoPromptCategory[]; prompts: Array<{ slug: string; title: string; category: string; subcategory: string; tags: string[]; description: string }>; total?: number }> {
-	const params = new URLSearchParams();
-	if (search) params.set("search", search);
-	if (category) params.set("category", category);
-	params.set("page", String(page));
-	params.set("pageSize", String(pageSize));
-	const res = await apiFetch(`/api/prompts?${params.toString()}`);
-	if (!res.ok) throw new Error(`prompts ${res.status}`);
-	return (await res.json()) as { categories: YaoPromptCategory[]; prompts: Array<{ slug: string; title: string; category: string; subcategory: string; tags: string[]; description: string }>; total?: number };
-}
-
-/** P2：提示词正文（插入 composer 用）。 */
-export async function fetchPromptContent(slug: string, category: string): Promise<string> {
-	const params = new URLSearchParams({ category });
-	const res = await apiFetch(`/api/prompts/${encodeURIComponent(slug)}?${params.toString()}`);
-	if (!res.ok) throw new Error(`prompt detail ${res.status}`);
-	const payload = (await res.json()) as { detail?: { promptContent?: string } };
-	return payload.detail?.promptContent ?? "";
 }
 
 /** P3：git 状态（非 git 仓库返回 {repo:false}）。 */

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readSettingsObject, readStringArray } from "../resourceWhitelist";
+import { readStringArray } from "../resourceWhitelist";
 
 /**
  * 「谁在管这个会话的上下文窗口」——手动压缩要不要、能不能发 pi 的 compact RPC。

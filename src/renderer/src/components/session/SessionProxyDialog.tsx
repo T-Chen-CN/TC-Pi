@@ -1,22 +1,5 @@
 import { isSupportedBackend } from "../../../../shared/productFeatures";
-/**
- * 会话代理设置弹框（侧栏会话右键菜单 → 会话代理）
- *
- * 单会话开关模型（用户确认的方案）：每会话三选一
- * - follow：跟随全局代理设置（缺省）；
- * - on：强制启用代理，URL 复用全局 piProxyUrl（全局开关关闭时也生效）；
- * - off：强制直连（全局开着代理时本会话也不走）。
- * 持久化到 SessionRecord.proxy（catalog 可选字段，重启保留；旧数据缺省 follow）。
- *
- * 生效边界（与主进程链路一致，展示给用户避免误解）：
- * - pi 会话：代理注入在子进程 spawn env 里，**只有新建进程才会重新读取**。因此本弹框
- *   保存后若该会话正在运行，会**自动重启其 pi 进程**让代理立即生效——用户不必再手动
- *   「停止 → 启动」两步（本弹框存在的核心价值之一）。
- * - DSH 会话：DSH 是单一共享 host（无 per-session 通道），设置聚合到 host fork env
- *   （off 优先于 on），需 host 重启后生效；host 的 LLM 请求经 globalThis.fetch（undici），
- *   PiDeck 同时注入 NODE_USE_ENV_PROXY=1 使其真正读取代理环境变量（Node 22.21+ 行为）。
- *   **不能按会话重启 host**——那会杀掉所有 DSH 会话，所以这里只提示、不自动重启。
- */
+
 import { useEffect, useState } from "react";
 import { Check, Globe, PlugZap, Unplug } from "lucide-react";
 import { useAtomValue, useSetAtom, useStore } from "jotai";

@@ -100,7 +100,7 @@ export function registerProjectsIpc({ projectStore, settingsStore, gitService, w
 		const removed = projectStore.get(id);
 		const childIds = removed ? projectStore.listWorktreeChildren(removed.id).map((child) => child.id) : [];
 		await projectStore.remove(id);
-		// 侧栏项目删了，catalog 映射也必须走：否则启动 DSH 自动导入按 cwd 再把项目/会话加回来。
+
 		if (sessionCatalog) {
 			for (const projectId of [id, ...childIds]) {
 				await sessionCatalog.removeByProjectId(projectId).catch(() => 0);

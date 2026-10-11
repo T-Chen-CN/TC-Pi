@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAtomValue } from "jotai";
 import type { AppSettings, MirrorHealthResult, UpdateSourceId } from "../../../../../shared/types/settings";
-import { ATOMGIT_HOST, UPDATE_SOURCE_MIRRORS, buildCustomSourceFeedUrl, normalizeCustomMirrorHost } from "../../../../../shared/updateSources";
+import { ATOMGIT_HOST, UPDATE_SOURCE_MIRRORS, buildCustomSourceFeedUrl } from "../../../../../shared/updateSources";
 import { desktopApi } from "../../../desktopApi";
 import { t } from "../../../i18n";
 import { updateChannelInfoAtom } from "../../../atoms/channelSwitchAtoms";

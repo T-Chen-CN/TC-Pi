@@ -1,6 +1,6 @@
 import { memo, useState, type ReactNode } from "react";
 import { Brain, Check, ChevronDown, ChevronRight, CircleCheck, CircleX, FileText, Folder, Globe2, Loader2, MessageCircle, Network, Scissors, Search, Square, SquarePen, Terminal, Wrench } from "lucide-react";
-import { countTextLines, getToolEditDiff, getToolFilePath, parseToolArgs, type ToolGroupItem } from "../app/AppUtils";
+import { parseToolArgs, type ToolGroupItem } from "../app/AppUtils";
 import { t } from "../../i18n";
 import { formatAskTitle } from "../../utils/askUi";
 import { Badge } from "../ui-shadcn/badge";
@@ -16,7 +16,7 @@ import { ToolResult, ToolResultOutput } from "../agents/tool-result";
 import { FileDiff } from "../agents/file-diff";
 import { desktopApi } from "../../desktopApi";
 import { copyTextWithCopiedNotice } from "../../utils/clipboardNotice";
-import { formatDuration, getToolDetailText, getToolDiffTarget, getToolExitCode, getToolLiveStartTimestamp, getToolName, getToolStatus, fileChangeToDiffLines } from "./TimelineFormat";
+import { formatDuration, getToolDetailText, getToolDiffTarget, getToolLiveStartTimestamp, getToolName, getToolStatus, fileChangeToDiffLines } from "./TimelineFormat";
 import { BridgeGuiSlot } from "../bridge/BridgeSlot";
 import { useInsideProcessGroupBody } from "./turn/processGroupScrollContext";
 

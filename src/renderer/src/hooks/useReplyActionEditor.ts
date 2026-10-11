@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { MAX_REPLY_ACTION_RULES } from "../../../shared/replyActions";
 import type { ReplyActionRule } from "../../../shared/types/replyActions";
 import { t } from "../i18n";

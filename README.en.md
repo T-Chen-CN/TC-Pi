@@ -24,7 +24,7 @@ The file-first layout consists of the file sidebar, central preview/editor, pers
 
 This version removes DSH, ACP, standalone image generation, online resource stores and the Chinese prompt database, Feishu bots, desktop pets, the vision bridge, floating windows, and Windows CUA. The previous sidebar announcement and feedback entries are also removed.
 
-Older settings and backend identifiers remain readable without converting retired sessions to pi. Existing image attachments and historical message content retain read-only compatibility. User files are not cleaned up.
+Only current Pi sessions are loaded. Retired backend history adapters and image reference protocols have been removed; user files on disk are not deleted.
 
 ## Local development
 

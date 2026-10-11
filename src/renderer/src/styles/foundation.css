@@ -208,8 +208,7 @@
   --shadow-popover: 0 4px 6px -1px rgba(9, 9, 11, 0.1), 0 2px 4px -2px rgba(9, 9, 11, 0.1);
   --shadow-modal: 0 10px 15px -3px rgba(9, 9, 11, 0.1), 0 4px 6px -4px rgba(9, 9, 11, 0.1);
   --shadow-composer: 0 1px 2px 0 rgba(9, 9, 11, 0.05);
-  /* 输入框默认浮起阴影（参考 dsh-web composer 的 shadow-lv2）：比 shadow-composer 更柔和的
-     双层扩散，让输入卡片与消息区拉开层级；focus 时叠加 focus-ring 使用。 */
+
   --shadow-composer-lifted: 0 2px 12px rgba(9, 9, 11, 0.06), 0 1px 3px rgba(9, 9, 11, 0.04);
   --shadow-drawer: -4px 0 12px rgba(9, 9, 11, 0.06);
   /* 尺寸档阴影（sm/md/lg/xl/2xl）：浅色值对齐 Tailwind 默认刻度（迁移时视觉零变化），
@@ -1927,7 +1926,7 @@ select:focus-visible {
 .avatar-status-idle .avatar-status-indicator { background: var(--color-info); }
 .agent-avatar-mark { display: grid; place-items: center; }
 
-/* 项目行不再有选中态：dsh-web 只给叶子会话灰底，父容器不跟着重色。 */
+
 .chat-project .project-avatar {
   color: var(--color-accent);
 }
@@ -3184,35 +3183,4 @@ select:focus-visible {
   to {
     opacity: 1;
   }
-}
-
-.mini-overlay-mode .shell-panel-list,
-.mini-overlay-mode .shell-panel-drawer,
-.mini-overlay-mode .splitter {
-  display: none !important;
-}
-.mini-overlay-mode .shell-panel-chat {
-  flex: 1 1 100% !important;
-  min-width: 0 !important;
-}
-.mini-overlay-mode .custom-titlebar-enabled .titlebar,
-.mini-overlay-mode .app-statusbar {
-  display: none !important;
-}
-.mini-overlay-mode .chat-pane {
-  border-radius: 0;
-}
-/* 浮窗模式：精简输入底栏——隐藏安全等级/DSH 权限、快捷消息、分支展示与语音输入，
-   保留模型 chip（见下方截断规则）。锚点是组件上的语义 class（composer-bar-btn.*），
-   旧版曾用 .composer-hints/.branch-badge 等不存在的类名，从未生效（2027-02 重写）。 */
-.mini-overlay-root .composer-bar-btn.security,
-.mini-overlay-root .composer-bar-btn.quick-messages,
-.mini-overlay-root .composer-bar-btn.branch,
-.mini-overlay-root .composer-bar-branch,
-.mini-overlay-root .composer-voice-controls {
-  display: none !important;
-}
-/* 模型 chip：浮窗宽度有限，长模型名必须截断避免挤掉发送键（全局 max-w-[52ch] 过宽） */
-.mini-overlay-root .composer-bar-btn.model-thinking {
-  max-width: 18ch;
 }

@@ -8,7 +8,7 @@
  * - tool-invocation part → 工具卡片（复用桌面 tool-card 视觉）
  * - 流式期间底部显示响应指示器；出错显示诊断卡
  */
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, ArrowDown, Brain, Check, ChevronDown, ChevronRight, ChevronUp, Copy, ListTree, MessagesSquare, Pencil, RefreshCw, Share2, Trash2, Wrench, X } from "lucide-react";
 import type { UIMessage } from "ai";
 import { Button } from "@/components/ui-shadcn/button";
@@ -298,8 +298,6 @@ function ActionButton(props: { label: string; onClick: () => void; danger?: bool
 	);
 }
 
-/** 思考折叠卡片（复用桌面 ThinkingBlock 视觉：Brain + 耗时/标题 + 同行预览）。
- * 默认永远单行；流式时预览尾部跟随，不自动撑开正文（对齐 dsh-web ReasoningRow）。 */
 export const WebThinkingBlock = memo(function WebThinkingBlock(props: {
 	text: string;
 	/** 思考是否仍在流式：折叠预览尾部跟随，不驱动自动展开 */

@@ -8,8 +8,6 @@ export { COMPOSER_MIN_HEIGHT };
 // 输入栏在时间线列内的高度上限：再高就让独立卡内部滚动，不吃掉对话区。
 export const COMPOSER_MAX_HEIGHT = 480;
 
-/** 输入正文区封顶高度（px），对齐 dsh-web `--dsh-composer-text-max-height`。
- *  超过后 ProseMirror 内部滚动，不再把输入卡/面板无限撑高。 */
 export const COMPOSER_TEXT_MAX_HEIGHT = 336;
 
 /**

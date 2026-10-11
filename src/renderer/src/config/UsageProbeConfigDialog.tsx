@@ -127,7 +127,7 @@ export function UsageProbeConfigDialog(props: {
 	// 「让 AI 帮我查」：把提示词写进当前会话的 composer 草稿（无活动会话则回退剪贴板）。
 	const currentSessionId = useAtomValue(currentSessionIdAtom);
 	const setDraft = useSetAtom(setSessionDraftAtom);
-	// 缓存 key：与 useProviderUsage.usageCacheKey 同规则（DSH 链路 dsh: 前缀 + 官方
+
 	// DeepSeek 名归一），保证弹窗「测试成功」写进的缓存与卡片/选择器/圆球的查询共用一份。
 	const cacheKey = usageCacheKey(props.provider, props.backend ?? "pi");
 

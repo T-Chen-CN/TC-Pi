@@ -4,7 +4,7 @@
 import { ipcMain } from "electron";
 import { ipcChannels } from "../../shared/ipc";
 import type { UpdateChannel } from "../../shared/types/app";
-import type { DataEnvMode, ImportPreviewResult, ImportProgress, ImportStartResult } from "../../shared/types/dataEnv";
+import type { ImportPreviewResult, ImportProgress, ImportStartResult } from "../../shared/types/dataEnv";
 import { estimateImportBytes, planImportItems, runImport, ImportCancelledError } from "../dataEnv/channelDataImport";
 import { applyDataEnvChoice, getDataEnvInfo } from "../dataEnv/dataEnvService";
 import { getAppLogger } from "../logging/sharedLogger";

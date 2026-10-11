@@ -235,8 +235,6 @@ export function ComposerSkillPicker(props: {
 							{t("app.skillPickerLoading")}
 						</div>
 					) : error ? (
-						/* 加载失败给出原因详情（skill.list 会抛真实错误）：通用文案走 i18n，
-						   原始错误信息只作内部详情展示，辅助排查（如 pi 技能目录损坏/DSH wire 失败）。 */
 						<div className="flex flex-col items-center gap-1.5 px-4 py-6 text-caption">
 							<span className="font-medium text-foreground">{t("app.skillPickerLoadFailed")}</span>
 							<span className="text-muted-foreground">{t("app.skillPickerLoadFailedNote")}</span>

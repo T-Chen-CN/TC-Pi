@@ -6,7 +6,7 @@ import type { AppSettings, PiInstallation, PiInstallationSource, PiInstallStatus
 import type { MainProcessTranslationKey } from "../../shared/i18n/mainProcessCopy";
 import { compareVersions } from "../utils/versionCompare";
 // 只依赖纯路径模块（零 Electron / 零副作用）：PiLocator 会在裸 Node 沙箱里被加载，
-// 引入便携 Node 安装器会把 DSH 运行时依赖一并拖进来，把检测链路弄重。
+
 import { piRuntimeNodeBinDir, piRuntimePiBinDir } from "./piRuntimePaths";
 import { WSL_PI_NEGATIVE_CACHE_TTL_MS, WSL_PI_PROBE_TIMEOUT_MS, buildWslCommandMarker, buildWslPiExecArgs, buildWslPiProbeScript, isWslInteropPath, parseWslCommandMarker, parseWslPiProbeOutput, type WslPiProbeResult } from "../wsl/wslPiProbe";
 import { decodeWslOutput } from "../wsl/wslExe";
@@ -573,7 +573,7 @@ export class PiLocator {
 
 	private applyPiProxyEnv(env: NodeJS.ProcessEnv, settings?: PiProxySettings) {
 		// 代理 env 的组装规则（含为什么必须带 NODE_USE_ENV_PROXY）集中在
-		// sessionProxyPolicy.buildPiProxyEnvPatch，与 DSH host 共用同一套语义，避免两处漂移。
+
 		const patch = buildPiProxyEnvPatch(settings);
 		return patch ? { ...env, ...patch } : env;
 	}

@@ -1,12 +1,3 @@
-/**
- * 模型请求轨迹详情：把 pi 发给供应商的完整请求体结构化展示（替代原始 JSON dump）。
- * 形态对齐 dsh-web Trajectory 的检查器：指标行 + 系统提示词区 + 完整消息流（含工具
- * 调用/结果/思考块）+ 工具定义区，原始 JSON 保留一键切换兜底。
- *
- * 数据来源：RPC 日志「模型」行展开时按 traceId 回读的 payloadJson（双方言解析见
- * utils/modelTraceParse）；摘要指标（model/provider/bytes/duration）来自条目 data，
- * 不重复解析。
- */
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Copy, FileJson, ImageIcon, Sparkles, Wrench } from "lucide-react";
 import { t } from "../../i18n";

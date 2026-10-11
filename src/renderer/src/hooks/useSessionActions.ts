@@ -4,24 +4,13 @@ import type { AgentBackend, ArchivedPiSession, Project, SessionLaunchPreferences
 import { isSameSessionPath } from "../agentListDisplay";
 import { t } from "../i18n";
 
-/**
- * 新建会话默认后端（C21 统一真相源）：缺省为 pi（经典后端，2026-12 兼容期
- * 从 dsh 回调）。用户可在设置「默认 Agent 后端」中切换为 dsh；运行时值由
- * useSessionActions 的 options.defaultBackend 注入（App 从 settings 读取）。
- * 引导页/侧栏「+」都经这里或显式传值，避免后端默认值分裂（F2）。
- */
 export const DEFAULT_AGENT_BACKEND: AgentBackend = "pi";
 
 /** 归档 toast 略加长：路径提示比短句更长，2200ms 不够读完。 */
 export const ARCHIVED_SESSION_TOAST_MS = 4500;
 
-/**
- * 归档成功提示按后端分流。
- * pi/jsonl 会话恢复入口在项目右键「会话管理」→「已归档」；
- * DSH 会话不进该弹窗，要去「配置管理」DSH 页的「归档区」。
- */
 export function archivedSessionToastMessage(session: { backend?: AgentBackend }): string {
-	return session.backend === "dsh" ? t("app.sessionArchivedDsh") : t("app.sessionArchived");
+	return t("app.sessionArchived");
 }
 
 export type RefreshProjectSessions = (projectId: string, silent?: boolean) => Promise<SessionSummary[] | SessionRecord[] | undefined>;
@@ -147,7 +136,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 			return;
 		}
 		dismissSessionTree(session);
-		// DSH 删除会记墓碑：刷新/自动导入不再把同一 host 会话导回侧栏。
+
 		showToast(t("app.sessionDeleted"), 3200);
 		const projectId = sessionsProjectId ?? activeProjectId;
 		// 删除结果已经应用到本地；保留对账但不让其它会话再次进入 loading 布局。
@@ -247,7 +236,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 			if (options.prepareProjectSelection && !(await options.prepareProjectSelection(projectId))) return undefined;
 			const session = await api.sessions.createDraft({
 				projectId,
-				title: backend === "dsh" ? `${project.name} DSH` : `${project.name} agent`,
+				title: `${project.name} agent`,
 				backend,
 				...preferences,
 			});

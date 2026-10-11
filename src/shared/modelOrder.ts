@@ -12,11 +12,6 @@
  * 纯函数、无依赖（shared 层约束）。
  */
 
-/**
- * 参与排序的最小行结构。
- * 字段故意放宽成 unknown：DSH 模型行（DshModelLike）与网络响应都是弱类型袋，
- * 这里自行收窄，避免调用方为了过类型检查而 as 强转。
- */
 export type ModelSortRow = {
 	id?: unknown;
 	name?: unknown;

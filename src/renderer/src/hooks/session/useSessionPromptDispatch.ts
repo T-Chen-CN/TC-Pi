@@ -5,7 +5,7 @@ import { desktopApi as api } from "../../desktopApi";
 import { buildComposerPromptSubmission } from "../../composerBehavior";
 import { resolveBusySendDelivery } from "../../../../shared/busySendDelivery";
 import { PromptDeliveryUnknownError } from "../../utils/promptErrors";
-import { busySendDeliveryAtom, bumpNewTurnCollapseTickAtom, currentSessionRuntimeAtom, sessionDraftByIdAtom, sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily } from "../../atoms";
+import { busySendDeliveryAtom, bumpNewTurnCollapseTickAtom, currentSessionRuntimeAtom, sessionDraftByIdAtom, sessionRecordByIdAtomFamily } from "../../atoms";
 import type { ImageContent, ComposerAgentMode } from "../../../../shared/types";
 
 export interface SessionPromptDispatchDeps {

@@ -56,9 +56,8 @@ test("buildTurnDisplay keeps strict order and splits interim/final answers", () 
 	assert.match(buildSource, /msg-thinking-/);
 	// 空文本消息仍产出 interim 挂载点（Live 通道骨架）——但带图（生图结果）或生图占位（meta.imageGen）不降级，走最终回答
 	assert.match(buildSource, /interim-answer/);
-	assert.match(buildSource, /if \(!text && !hasImages && !hasImageGen\) \{/);
+	assert.match(buildSource, /if \(!text && !hasImages\) \{/);
 	assert.match(buildSource, /const hasImages = Boolean\(item\.message\.images\?\.length\)/);
-	assert.match(buildSource, /const hasImageGen = Boolean\(item\.message\.meta\?\.imageGen\)/);
 	// 工具步骤始终进序列（不依赖 showThinking）
 	assert.match(buildSource, /tool-entry/);
 	// 思考步骤：已有 thinking-group 始终保留；消息自带 thinking 受 showThinking 控制

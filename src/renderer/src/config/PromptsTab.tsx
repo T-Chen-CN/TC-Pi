@@ -3,7 +3,7 @@ import { Switch } from "../components/ui-shadcn/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui-shadcn/table";
 import { showNotice } from "../utils/notice";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Loader2, Check, FileEdit, FileText, Pencil, ShoppingBag, Trash2, X } from "lucide-react";
+import { Loader2, Check, FileEdit, FileText, Pencil, Trash2, X } from "lucide-react";
 import type { PiPromptTemplateListResult, PiPromptTemplateSummary, ProjectResourceOverrides } from "../../../shared/types";
 import { t } from "../i18n";
 import { CodeMirrorEditor } from "../components/app/CodeMirrorEditor";

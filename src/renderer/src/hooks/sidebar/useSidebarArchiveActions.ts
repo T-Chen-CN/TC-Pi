@@ -20,10 +20,6 @@ export interface SidebarArchiveActionsDeps {
 	getSessionRecords: (projectId: string) => { parentSessionPath?: string | null }[];
 }
 
-/**
- * 侧栏会话归档/删除族：常规删除、归档/恢复（pi 文件归档 + DSH host 目录归档）、
- * 归档区列表与永久删除。会话管理弹窗与侧栏会话菜单共用这一套动作。
- */
 export function useSidebarArchiveActions({ activeProjectId, showToast, overlays, refreshProjectSessions, dismissSessionTree, getSessionRecords }: SidebarArchiveActionsDeps) {
 	async function deleteSidebarSession(projectId: string, session: SessionSummary) {
 		try {
@@ -47,7 +43,6 @@ export function useSidebarArchiveActions({ activeProjectId, showToast, overlays,
 		await refreshProjectSessions(projectId, true);
 	}
 
-	/** 归档会话：从列表移除但不销毁文件；toast 按后端告知恢复入口（pi 走会话管理，DSH 走配置页归档区） */
 	async function archiveSidebarSession(projectId: string, session: SessionSummary) {
 		await api.sessions.archiveRecord(session.id);
 		dismissSessionTree(session, projectId);

@@ -24,7 +24,7 @@ if (!fs.existsSync(asarPath)) {
 }
 
 // 当前发行版主进程依赖：与 package.json 同源，避免继续要求已删除的后端闭包。
-const MUST_KEEP = ["@electron-toolkit/utils", "@modelcontextprotocol/sdk", "electron-updater", "ignore", "minimatch", "node-pty", "proper-lockfile", "smol-toml", "sql.js", "tar", "undici", "zod"];
+const MUST_KEEP = ["@electron-toolkit/utils", "electron-updater", "ignore", "minimatch", "node-pty", "proper-lockfile", "smol-toml", "sql.js", "tar"];
 
 // 已知冗余（已打进 out/renderer）：抽样式验证排除规则确实生效
 const SHOULD_BE_GONE = ["date-fns", "recharts", "shiki", "framer-motion", "@reduxjs/toolkit", "@tiptap/core", "prosemirror-view", "pngjs", "linkifyjs"];

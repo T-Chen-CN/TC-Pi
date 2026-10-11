@@ -31,7 +31,7 @@ export function useGlobalAgentListeners(callbacks: GlobalAgentListenerCallbacks 
 			.catch(() => undefined);
 		const offProjects = desktopApi.projects.onChanged(() => {
 			// 主进程部分广播只表示 store 清单变化，未必携带实时 missing 标记。
-			// 统一回读 projects:list，避免 DSH 自动导入等事件把已检测出的失效目录覆盖成“正常”。
+
 			void desktopApi.projects
 				.list()
 				.then((projects) => {

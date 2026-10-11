@@ -913,12 +913,10 @@ export class WebServiceManager {
 		}
 	}
 
-	/** 按 sessionId 找活跃 runtime 的 agentId（DSH 工具面板路由；无 runtime 返回 undefined）。 */
 	private runtimeAgentIdForSession(sessionId: string): string | undefined {
 		return this.deps.listSessionRuntimes().find((runtime) => runtime.sessionId === sessionId)?.agentId;
 	}
 
-	/** 按 sessionId 构造 runtime target（DSH goal 路由用；无 runtime 返回 undefined）。 */
 	private runtimeTargetForSession(sessionId: string): SessionRuntimeTarget | undefined {
 		const runtime = this.deps.listSessionRuntimes().find((item) => item.sessionId === sessionId);
 		if (!runtime) return undefined;

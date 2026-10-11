@@ -19,7 +19,6 @@ import { WELCOME_MODEL_KEY, WELCOME_THINKING_KEY } from "../utils/chatSessionBoo
 type PendingCycle = "model" | "thinking";
 
 export type SessionPreferenceController = {
-	/** 会话后端（DSH 的目录/档位来自 host catalog）：选择器与循环共用 */
 	/** 模型目录（capability cache 数据源） */
 	models: AvailableModel[];
 	report: ModelListReport | null;
@@ -35,7 +34,7 @@ export type SessionPreferenceController = {
 	/** 收藏 / 最近 / 隐藏供应商 / 隐藏模型：选择器展示 + 循环候选 */
 	favoriteModels: string[];
 	recentProviders: string[];
-	/** 供应商自定义顺序（模型页排序结果）：选择器严格按此展示分组，DSH 与 Pi 分开。 */
+
 	providerOrder: string[];
 	hiddenProviders: string[];
 	hiddenModels: string[];
@@ -79,7 +78,7 @@ export function useSessionPreferenceController(options: {
 	pickerOpen: boolean;
 	/** 思考选择器是否打开（决定要不要向运行中 Agent 校验精确档位） */
 	thinkingPickerOpen: boolean;
-	/** DSH 部署默认模型（草稿期高亮） */
+
 	defaultModel?: { provider?: string; modelId?: string; modelName?: string };
 	defaultThinkingLevel?: string;
 	/** pi settings.modelThinkingLevels 快照：引导页按当前模型反查每模型默认档位用。 */
@@ -203,10 +202,6 @@ export function useSessionPreferenceController(options: {
 		offerRestart: offerModelRestart,
 	});
 
-	/**
-	 * 后端明确返回 busy 时才排队模型切换；支持运行中选择的 Pi/DSH 会直接在当前 runtime
-	 * 入口应用，已发出的请求继续使用原配置，后续 step 使用新配置。
-	 */
 	async function pickModelWhileBusy(handle: SessionRuntimeTarget, model: AvailableModel) {
 		try {
 			const listed = requireSessionCommand(await desktopApi.sessions.listRuntimeModels(handle));
@@ -225,10 +220,9 @@ export function useSessionPreferenceController(options: {
 
 	async function applyModel(model: AvailableModel) {
 		// 欢迎页/未启动 Agent（无 record）：把选择存本地偏好，点「启动 Agent」创建会话时应用。
-		// 后端各自独立存储（issue #253）：DSH 目录的 provider 是 host route 名（不在
+
 		// models.json），写进 pi 的 WELCOME_MODEL_KEY 会被 launchDefaults 的存在性校验整条
-		// 丢弃；pi 的 models.json 模型写进 DSH 偏好也会被 host catalog 拒绝。历史上 DSH 态
-		// 直接 return（不写任何存储），点选因此完全丢失——用户表现为「切到 DSH 后模型换不了」。
+
 		if (!record) {
 			try {
 				localStorage.setItem(WELCOME_MODEL_KEY, JSON.stringify(selectedModelPreference(model)));
@@ -268,7 +262,7 @@ export function useSessionPreferenceController(options: {
 				offerModelRestart(handle, model);
 				return;
 			}
-			// 附带 debugDetails：DSH selectModel 拒绝（如 reasoningEffort 不被模型支持）时
+
 			// 把真实原因展示给用户，而不是只看到泛化的「会话操作失败，请重试。」
 			showNotice(sessionCommandFailureToast(error), 4000);
 		}
@@ -331,7 +325,6 @@ export function useSessionPreferenceController(options: {
 			}
 			onApplied();
 		} catch (error) {
-			// 附带 debugDetails：DSH setThinking 的 selectModel 被 host 拒绝（如当前模型
 			// 不支持该档位）时，把真实原因展示给用户，而不是只看到「会话操作失败，请重试。」
 			showNotice(sessionCommandFailureToast(error), 4000);
 		}

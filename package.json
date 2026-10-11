@@ -104,7 +104,6 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "electron-updater": "^6.8.9",
     "ignore": "^5.3.2",
     "minimatch": "^10.2.5",
@@ -112,9 +111,7 @@
     "proper-lockfile": "^4.1.2",
     "smol-toml": "^1.8.0",
     "sql.js": "^1.14.1",
-    "tar": "^7.5.15",
-    "undici": "^6.28.0",
-    "zod": "^3.25.76"
+    "tar": "^7.5.15"
   },
   "build": {
     "appId": "com.ayuayue.pi-desktop",
@@ -133,9 +130,7 @@
     "npmRebuild": false,
     "asarUnpack": [
       "node_modules/sql.js/dist/*.wasm",
-      "node_modules/node-pty/**",
-      "node_modules/**/@img/sharp-*/**",
-      "node_modules/node-addon-require-builtin-win32-x64-msvc/**"
+      "node_modules/node-pty/**"
     ],
     "directories": {
       "output": "release",
@@ -179,10 +174,6 @@
         "filter": [
           "*.ts"
         ]
-      },
-      {
-        "from": "node_modules/undici",
-        "to": "extensions/node_modules/undici"
       },
       {
         "from": "resources/quick-messages.default.json",

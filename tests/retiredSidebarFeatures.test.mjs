@@ -16,8 +16,8 @@ test("application startup has no announcement service, polling, or feedback over
 	}
 });
 
-test("settings keep the old announcement preference readable without an interactive control", () => {
-	assert.match(read("src/shared/types/settings.ts"), /announcementNotificationEnabled\??\s*:\s*boolean/);
+test("settings have no retired announcement preference or control", () => {
+	assert.doesNotMatch(read("src/shared/types/settings.ts"), /announcementNotificationEnabled\??\s*:\s*boolean/);
 	for (const path of ["src/renderer/src/components/app/settings/NotificationTab.tsx", "src/renderer/src/utils/settingsFieldAnchors.ts", "src/renderer/src/components/app/settings/unsavedChangesSummary.ts"]) {
 		assert.doesNotMatch(read(path), /announcementNotification|notification-announcement/, path);
 	}

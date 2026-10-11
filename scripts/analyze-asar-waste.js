@@ -42,14 +42,10 @@ const roots = [
 	"node-pty",
 	"sql.js",
 	"@electron-toolkit/utils",
-
-	"undici",
 	// out/main 静态 require 的运行时库（2026-10 实测 grep 逐一验证；漏任何一个都会被误报
 	// 为可排除，照抄进 build.files 会运行时 MODULE_NOT_FOUND：
 	// zod+@modelcontextprotocol/sdk = MCP 默认关闭但 require 链存在；tar/smol-toml/
 	// minimatch/ignore = Pi 扩展运行时解析；electron-updater = 自动更新）。
-	"zod",
-	"@modelcontextprotocol/sdk",
 	"tar",
 	"electron-updater",
 	"minimatch",

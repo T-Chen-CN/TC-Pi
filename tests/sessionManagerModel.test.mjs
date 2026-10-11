@@ -60,13 +60,6 @@ const {
 	archivedDshWorkspaceLabel,
 } = loadModule();
 
-test("isManagerSessionSummary: DSH 有 host id 才收录；草稿不收录", () => {
-	assert.equal(isManagerSessionSummary(summary({ filePath: "a.jsonl", backend: "pi" })), true);
-	assert.equal(isManagerSessionSummary(summary({ filePath: "", backend: "pi" })), false);
-	assert.equal(isManagerSessionSummary(summary({ backend: "dsh", dshSessionId: "session-x" })), true);
-	assert.equal(isManagerSessionSummary(summary({ backend: "dsh" })), false);
-});
-
 test("sessionManagerRowKey: 用稳定记录 id，空 filePath 的 DSH 行不冲突", () => {
 	assert.equal(sessionManagerRowKey(summary({ id: "uuid-1", filePath: "" })), "uuid-1");
 	assert.equal(sessionManagerRowKey(summary({ id: "uuid-2", filePath: "b.jsonl" })), "uuid-2");

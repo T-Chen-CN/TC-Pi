@@ -136,7 +136,6 @@ test("isDefaultAgentTitle treats draft placeholder titles as default so first pr
 		true,
 	);
 	assert.equal(isDefaultAgentTitle(`${project.name} agent`, project, translateTitle), true);
-	assert.equal(isDefaultAgentTitle(`${project.name} DSH`, project, translateTitle), true);
 	assert.equal(isDefaultAgentTitle("帮我看看这个报错", project, translateTitle), false);
 	// pi 未 set_session_name 时 sessionName 是 JSONL 文件名：必须当占位，才能用首条消息自动改名。
 	assert.equal(looksLikePiSessionFileStem("2026-08-08T10-47-19-239Z_abc"), true);
@@ -172,7 +171,6 @@ test("only PiDeck automatic titles can write runtime names back to the catalog",
 	// auto-title marker 已随扩展 UI 闸迁入 extensionUiGate.ts（Wave 4B）；消费判定仍在 AgentManager。
 	const uiGateModule = readFileSync("src/main/pi/extensionUiGate.ts", "utf8");
 	assert.match(utils, /session\.newTitle/);
-	assert.match(utils, /session\.dshUntitled/);
 	assert.match(agentManager, /setAutomaticTitleChangedHandler\(/);
 	assert.match(uiGateModule, /pendingAutomaticTitles/);
 	assert.match(agentManager, /uiGate\.takeAutomaticTitle\(agentId\)/);

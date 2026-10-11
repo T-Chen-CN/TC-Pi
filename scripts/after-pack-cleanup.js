@@ -13,7 +13,6 @@ const path = require("node:path");
 const asar = require("@electron/asar");
 const { dirSize, rmDir } = require("./after-pack-file-utils");
 const { assertNodePtyRuntimeArtifact, cleanNodePtyCompileTimeDirectories } = require("./after-pack-node-pty");
-const { patchSharpIndexCjs } = require("./patch-sharp-index");
 
 /** 要保留的语言包列表（小写，无 .pak 后缀） */
 const KEEP_LOCALES = new Set(["en-us", "zh-cn", "zh-tw"]);
@@ -351,25 +350,7 @@ exports.default = async function (context) {
 			}
 		}
 
-		// --- 3b3. sharp 原生绑定 realpath 补丁（asar 内副本）---
-		// electron-builder 的 asarUnpack 是影子目录机制：asar 内保留完整副本，asar.unpacked 为镜像。
-		// require('@img/sharp-win32-x64/sharp.node') 解析命中 asar 内副本（虚拟路径），
-		// Electron dlopen 补丁会把 .node 复制到 %TEMP% 再加载，同目录 libvips DLL 不跟随 →
-		// ERR_DLOPEN_FAILED（DSH host 启动即退）。补丁改为 realpath 到 asar.unpacked 真实路径后再 require。
-		let sharpIndexPatched = false;
-		const extractSharpIndex = path.join(extractDir, "node_modules", "@img", "sharp-win32-x64", "index.cjs");
-		if (fs.existsSync(extractSharpIndex)) {
-			const original = fs.readFileSync(extractSharpIndex, "utf8");
-			const patched = patchSharpIndexCjs(original);
-			if (patched !== original) {
-				fs.writeFileSync(extractSharpIndex, patched);
-				sharpIndexPatched = true;
-				console.log(`[afterPack] sharp index.cjs（asar 内）: 已打 resourcesPath 补丁`);
-			}
-		}
-
-		// --- 3c. 重新打包 asar（保留 electron-builder 的 unpacked 标记）---
-		if (totalRemoved > 0 || sharpIndexPatched) {
+		if (totalRemoved > 0) {
 			const tmpAsar = asarPath + ".tmp";
 			await packAsarPreservingUnpacked(extractDir, tmpAsar, unpackedPatterns);
 			const oldSize = fs.statSync(asarPath).size;
@@ -463,24 +444,7 @@ exports.default = async function (context) {
 		}
 	}
 
-	// ====================================
-	// 6. sharp 原生绑定 realpath 补丁（asar.unpacked 镜像）
-	//    与 3b3 同理（asar 内副本在 repack 前已打补丁）；这里对 unpacked 镜像也打一份，
-	//    保证无论 require 解析命中哪份都走真实磁盘路径（幂等，重复打包安全）。
-	// ====================================
-	const sharpImgDir = path.join(appOutDir, "resources", "app.asar.unpacked", "node_modules", "@img", "sharp-win32-x64");
-	const sharpIndexCjs = path.join(sharpImgDir, "index.cjs");
-	if (fs.existsSync(sharpIndexCjs)) {
-		const original = fs.readFileSync(sharpIndexCjs, "utf8");
-		const patched = patchSharpIndexCjs(original);
-		if (patched !== original) {
-			fs.writeFileSync(sharpIndexCjs, patched);
-			console.log(`[afterPack] sharp index.cjs: 已打 resourcesPath 补丁`);
-		}
-	}
-
-	// Electron 只有看到 leaf entry 的 unpacked 标记才会把 require() 映射到磁盘镜像。
-	// 合成测试夹具可显式关闭；真实 electron-builder context 永远走这条硬门禁。
+	// Verify the unpacked native terminal artifact after repacking.
 	if (context.verifyNodePtyRuntime !== false && fs.existsSync(asarPath)) {
 		const artifact = assertNodePtyRuntimeArtifact(asarPath, CURRENT_PLATFORM);
 		console.log(`[afterPack] node-pty runtime: 已验证 ${artifact.relativePath}`);

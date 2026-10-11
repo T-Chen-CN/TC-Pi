@@ -49,20 +49,6 @@ function loadMeterHelpers() {
 	});
 }
 
-test("formatTokens follows the dsh StatsLine compaction", () => {
-	const { formatTokens } = loadMeterHelpers();
-	assert.equal(formatTokens(0), "0");
-	assert.equal(formatTokens(999), "999");
-	assert.equal(formatTokens(1000), "1K");
-	assert.equal(formatTokens(1234), "1.2K");
-	// dsh 语义：≥100 直接取整（123.4K → 123K），不保留小数
-	assert.equal(formatTokens(123400), "123K");
-	assert.equal(formatTokens(999500), "1000K");
-	assert.equal(formatTokens(1_000_000), "1M");
-	assert.equal(formatTokens(128_000_000), "128M");
-	assert.equal(formatTokens(12_400_000), "12.4M");
-});
-
 test("contextOccupancy keeps raw percent and recomputes zero percent from tokens", () => {
 	const { contextOccupancy } = loadMeterHelpers();
 	const occ = (state) => contextOccupancy(state);
@@ -104,45 +90,6 @@ test("formatPercent keeps sub-percent precision for small context usage", () => 
 	assert.equal(formatPercent(100), "100");
 });
 
-test("meter ring follows the dsh geometry: 14px viewBox, r=5.5, 2px stroke, top-start fill", () => {
-	const source = meterSource();
-	// 几何常量与 svg 结构（dsh ContextMeter 逐字节移植）
-	assert.match(source, /const RADIUS = 5\.5/);
-	assert.match(source, /CIRCUMFERENCE = 2 \* Math\.PI \* RADIUS/);
-	assert.match(source, /viewBox="0 0 14 14" width="14" height="14"/);
-	// 格式化会给模板内的算术补括号，断言只锁「percent/100 与 CIRCUMFERENCE 两段」的语义。
-	assert.match(source, /strokeDasharray=\{`\$\{[\s\S]{0,12}CIRCUMFERENCE \* percent[\s\S]{0,12}\} \$\{CIRCUMFERENCE\}`\}/);
-	assert.match(source, /transform="rotate\(-90 7 7\)"/);
-	// 28px 圆形点击区（与附件按钮同族）+ 无 capacity 时渲染 0% 占位环常驻
-	assert.match(source, /size-7 flex-none place-items-center rounded-full/);
-	assert.match(source, /const percent = context\?\.percent \?\? 0;/);
-	assert.match(source, /t\("sessionContext\.unavailable"\)/);
-	// 打开期间挂 document 监听（外点/Escape 关闭）
-	assert.match(source, /addEventListener\("pointerdown", onPointerDown\)/);
-	assert.match(source, /addEventListener\("keydown", onKeyDown\)/);
-});
-
-test("contextSegments prefers host breakdown and falls back to estimate split", () => {
-	const { contextSegments } = loadMeterHelpers();
-	const seg = (state) => {
-		const result = contextSegments(state);
-		if (result === null) return null;
-		return result.kind === "breakdown" ? `breakdown:${result.system}:${result.tools}:${result.conversation}` : `estimate:${result.conversation}:${result.systemTools}`;
-	};
-	// host contextBreakdown 投影（dsh）：系统/工具/对话三段直接可用，0 也是有效值
-	assert.equal(seg({ contextSystemTokens: 2400, contextToolsTokens: 1800, contextMessageTokens: 57600 }), "breakdown:2400:1800:57600");
-	assert.equal(seg({ contextSystemTokens: 0, contextToolsTokens: 0, contextMessageTokens: 0 }), "breakdown:0:0:0");
-	// 无投影（pi）：对话 = 消息估算 token，系统+工具 = 反推余量
-	assert.equal(seg({ contextTokens: 128000, contextMessageTokens: 57600 }), "estimate:57600:70400");
-	// 估算超过总量时对话封顶，系统+工具为 0（不出现负数）
-	assert.equal(seg({ contextTokens: 1000, contextMessageTokens: 5000 }), "estimate:1000:0");
-	// 缺任一字段 = 无估算（渲染单段条）
-	assert.equal(seg(undefined), null);
-	assert.equal(seg({ contextTokens: 128000 }), null);
-	assert.equal(seg({ contextMessageTokens: 100 }), null);
-	assert.equal(seg({ contextTokens: 0, contextMessageTokens: 100 }), null);
-});
-
 test("meter panel shows the localized reading and ~used/window figures", () => {
 	const source = meterSource();
 	// 面板 320px：style.width 与定位回退共用 PANEL_WIDTH，避免首帧 offsetWidth=0 时按旧 264 错位
@@ -156,30 +103,6 @@ test("meter panel shows the localized reading and ~used/window figures", () => {
 	assert.match(source, /h-1 overflow-hidden rounded-full bg-muted/);
 	assert.match(source, /width: `\$\{percent\}%`/);
 	assert.match(source, /data-testid="session-context-meter"/);
-});
-
-test("panel adds dsh-style segments legend when message estimate exists", () => {
-	const source = meterSource();
-	// 三段（host breakdown）与两段（估算）图例共用色：对话蓝、工具紫、系统蓝灰
-	assert.match(source, /COLOR_CONVERSATION = "var\(--color-context-conversation, #2563eb\)"/);
-	assert.match(source, /COLOR_SYSTEM_TOOLS = "var\(--color-context-system-tools, rgb\(167, 139, 250\)\)"/);
-	assert.match(source, /COLOR_TOOLS = "var\(--color-context-tools, rgb\(167, 139, 250\)\)"/);
-	assert.match(source, /COLOR_SYSTEM = "var\(--color-context-system, #94a3b8\)"/);
-	// host breakdown 三段条：宽度 = percent × 份额 / breakdownTotal（dsh-web 同宽算法）
-	assert.match(source, /breakdownSegments/);
-	assert.match(source, /percent \* part\.tokens\) \/ breakdownTotal/);
-	// 估算两段条：宽度按占 contextWindow 比例（与单段总占用条同一容器；
-	// context 可能为 null（占位环）时 ?? 1 兜底，避免除零）
-	assert.match(source, /segments\.conversation \/ \(context\?\.contextWindow \?\? 1\)/);
-	assert.match(source, /segments\.systemTools \/ \(context\?\.contextWindow \?\? 1\)/);
-	// 图例行：swatch + 文案 + 右侧 ~tokens（dsh rows 形态）
-	assert.match(source, /t\("sessionContext\.conversation"\)/);
-	assert.match(source, /t\("sessionContext\.systemTools"\)/);
-	assert.match(source, /t\("sessionContext\.system"\)/);
-	assert.match(source, /t\("sessionContext\.tools"\)/);
-	assert.match(source, /size-2 flex-none rounded-\[2px\]/);
-	assert.match(source, /~\{formatTokens\(segments\.conversation\)\}/);
-	assert.match(source, /~\{formatTokens\(segments\.system\)\}/);
 });
 
 test("input/output token row drops arrows and keeps values on one line", () => {
@@ -208,8 +131,6 @@ test("panel reuses the SessionStatus detail builder and keeps compact action", (
 	assert.match(source, /detail\.replyPerfRows\.map\(/);
 	assert.match(source, /t\("ctx\.detail\.lastReply"\)/);
 	// DSH 会话统计组（host sessionStats 投影；回合/墙钟/平均首字/生成速度）
-	assert.match(source, /detail\.sessionStatRows\.map\(/);
-	assert.match(source, /t\("ctx\.detail\.sessionStats"\)/);
 	assert.match(source, /row\.emphasis \? " mt-1 border-t border-border\/70 pt-1\.5" : ""/);
 	// 旧的自实现三行（命中率/输入输出/费用）已删除，避免与 builder 重复
 	assert.doesNotMatch(source, /sessionContext\.cacheHit/);
@@ -284,7 +205,6 @@ test("context meter copy is present in both locale dictionaries", () => {
 		assert.match(locale, /"sessionContext\.system":/);
 		assert.match(locale, /"sessionContext\.tools":/);
 		// 会话统计组文案（DSH sessionStats 投影）
-		assert.match(locale, /"ctx\.detail\.sessionStats":/);
 		assert.match(locale, /"ctx\.detail\.turnsSteps":/);
 		assert.match(locale, /"ctx\.detail\.llmDuration":/);
 		assert.match(locale, /"ctx\.detail\.toolDuration":/);

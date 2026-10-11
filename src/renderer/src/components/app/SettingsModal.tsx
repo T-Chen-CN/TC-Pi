@@ -252,10 +252,6 @@ const TAB_META: Record<SettingsTabId, { labelKey: TranslationKey; icon: ReactNod
 	hostplugins: { labelKey: SETTINGS_TAB_LABEL_KEYS.hostplugins, icon: <Puzzle size={16} /> },
 };
 
-/**
- * 设置弹框壳：只持有跨 tab 共享状态（草稿/脏标记/视觉桥/重置信号）与 Tabs 导航，
- * 各 tab 内容拆为独立 memo 组件（settings/*Tab.tsx），切换 tab 只挂载目标 tab。
- */
 function SettingsModalContent(props: SettingsModalProps) {
 	// 弹窗每次打开都会重新挂载（Radix Dialog 关闭即卸载内容）。
 	// 深链（如 Git「去设置」）优先于上次记住的 tab，否则会停在外观/开发等其它页。
@@ -397,7 +393,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 		applyCustomThemeTokens(root, baseSnapshotRef.current, root.dataset.theme === "dark");
 	}, []);
 
-	/** 保存全部内容：全局设置差异提交（无差异也提交空 patch，触发「已保存」反馈）+ 视觉桥/生图草稿（若有改动）；返回是否全部成功 */
 	const saveAll = async (): Promise<boolean> => {
 		let ok = true;
 		// 无修改也支持再次保存：始终提交当前草稿差异（无差异即空 patch），
@@ -418,7 +413,6 @@ function SettingsModalContent(props: SettingsModalProps) {
 		return ok;
 	};
 
-	/** 取消全部修改：将草稿回退到初始快照，丢弃所有未保存变更（含视觉桥/生图草稿与各 tab 局部编辑态） */
 	const cancelAll = () => {
 		setDraftSettings(deepClone(baseSnapshotRef.current));
 		restoreAppearanceFromSnapshot();
@@ -551,7 +545,7 @@ function SettingsModalContent(props: SettingsModalProps) {
 	}, [activeTab, hiddenModules, revealedTabs]);
 
 	const hasDirtyChanges = dirtyFields.size > 0;
-	// 视觉桥/生图草稿有未保存改动时，头部保存/取消按钮同样点亮（与全局设置脏标记合并判定）
+
 	const hasAnyDirtyChanges = hasDirtyChanges;
 	// 关闭确认：列出全部变更项（不再只点第一条），多项按设置页 tab/字段顺序逐条展示。
 	const unsavedSummary = useMemo(

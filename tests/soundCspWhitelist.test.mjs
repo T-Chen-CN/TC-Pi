@@ -25,7 +25,7 @@ test("CSP media-src：预设（'self'）与自定义（pideck-sound:）音效都
 test("CSP img-src：既有自定义协议放行不得被顺手删掉", () => {
 	const imgSrc = cspDirective("img-src");
 	assert.ok(imgSrc, "img-src 缺失");
-	for (const scheme of ["pideck-bg:", "pideck-pet:", "pideck-img:"]) {
+	for (const scheme of ["pideck-bg:"]) {
 		assert.ok(imgSrc.includes(scheme), `img-src 必须继续放行 ${scheme}`);
 	}
 });

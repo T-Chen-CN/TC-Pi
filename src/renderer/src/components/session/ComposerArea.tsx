@@ -48,7 +48,7 @@ export type ComposerAreaProps = {
 	queuePanel?: ReactNode;
 	enqueue?: (sessionId: string, snapshot: EnqueuePromptSnapshot) => boolean;
 	ensureSessionId?: (sessionId: string) => Promise<string>;
-	/** 当前会话中用户发起的轮次，用于 pi 统计栏；DSH 自带 sessionStats 时不重复显示。 */
+
 	turnCount?: number;
 	/** 引导页虚拟会话没有 SessionRecord，用它兑底确定文件树/模型目录所属项目。 */
 	bootstrapProjectId?: string;
@@ -182,7 +182,7 @@ export const ComposerArea = forwardRef<HTMLElement, ComposerAreaProps>(function 
 							messages={props.replyActionMessages}
 							rules={props.replyActionRules ?? EMPTY_REPLY_RULES}
 							target={props.replyActionsTarget ?? null}
-							hidden={Boolean(props.replyActionsBlocked || composer.isBusy || composer.isStarting || composer.sendState.status === "sending" || composer.sendState.status === "unknown" || composer.mode === "imagegen" || composer.backend === "imagegen")}
+							hidden={Boolean(props.replyActionsBlocked || composer.isBusy || composer.isStarting || composer.sendState.status === "sending" || composer.sendState.status === "unknown")}
 							sendDisabled={!composer.delivery.canSendQuickMessage}
 							onSend={composer.delivery.sendQuickMessage}
 						/>
@@ -204,9 +204,7 @@ export const ComposerArea = forwardRef<HTMLElement, ComposerAreaProps>(function 
 									state={composer.runtime?.state}
 									turnCount={props.turnCount}
 									contextMeter={
-										composer.mode === "imagegen" ? null : (
-											<SessionContextMeter state={composer.runtime?.state} onCompact={composer.delivery.compact} overflowRecoveryTarget={composer.delivery.overflowRecoveryTarget} onOverflowRecovery={composer.delivery.onOverflowRecovery} backend="pi" fallbackProvider={composer.bootstrapDefaultModel?.provider} />
-										)
+										<SessionContextMeter state={composer.runtime?.state} onCompact={composer.delivery.compact} overflowRecoveryTarget={composer.delivery.overflowRecoveryTarget} onOverflowRecovery={composer.delivery.onOverflowRecovery} backend="pi" fallbackProvider={composer.bootstrapDefaultModel?.provider} />
 									}
 								/>
 							}
@@ -288,10 +286,7 @@ export const ComposerArea = forwardRef<HTMLElement, ComposerAreaProps>(function 
 										defaultModel={composer.bootstrapDefaultModel}
 										backend={composer.backend}
 										enhance={composerFeatureVisible("enhance") ? composer.enhance : undefined}
-										securityControl={
-											/* C20：后端安全控制位统一入口（pi 安全等级 / DSH 权限预设） */
-											composerFeatureVisible("security") ? <SecurityControl sessionId={props.sessionId} backend={composer.backend} disabled={composer.isStarting} /> : undefined
-										}
+										securityControl={composerFeatureVisible("security") ? <SecurityControl sessionId={props.sessionId} backend={composer.backend} disabled={composer.isStarting} /> : undefined}
 										quickMessagesControl={
 											/* 快捷消息：点条目插入草稿，条目右侧按钮直发（正文不进草稿，见 useSessionSend 的 overrideText 契约）；
 											   sessionId 供全局快捷键（Ctrl/Cmd+Shift+M）按聚焦栏去重时使用。 */

@@ -1,6 +1,6 @@
 import type { AppSettings, AgentBackend } from "./types";
 
-/** Features removed from this distribution; saved legacy identifiers remain readable. */
+/** Features removed from this distribution; removed identifiers are rejected at public boundaries. */
 export const REMOVED_MODULE_IDS: readonly string[] = ["dsh", "acp", "imagegen", "im", "pet", "vision", "floating", "cua", "stores"];
 
 /** Product availability is independent of the user's UI visibility preferences. */
@@ -28,7 +28,16 @@ export function effectiveProductBackend(_backend?: AgentBackend): "pi" {
 	return "pi";
 }
 
-/** Project settings without mutating or deleting legacy user data. */
+/** Drop settings for removed capabilities when reading or accepting a patch. */
+export function stripRemovedSettings<T extends object>(settings: T): T {
+	const result = { ...settings };
+	for (const key of Object.keys(result)) {
+		if (/^(dsh|acp|pet|feishu|im[A-Z]|vision|miniOverlay|floatingBall|cua|imageGen|promptStore|skillStore|skillHub|xue|yao|announcement|feedback)/.test(key) || key === "sessionSortMode") Reflect.deleteProperty(result, key);
+	}
+	return result;
+}
+
+/** Expose only settings that have a current product capability. */
 export function productSettings(settings: AppSettings): AppSettings {
-	return { ...settings, defaultAgentBackend: "pi", acpEnabled: false, acpTools: [], petEnabled: false, floatingBallEnabled: false, cuaEnabled: false };
+	return { ...stripRemovedSettings(settings), defaultAgentBackend: "pi" };
 }

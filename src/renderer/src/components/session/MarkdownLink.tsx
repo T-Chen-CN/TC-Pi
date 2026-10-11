@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type React from "react";
-import { isLocalPathRef, remarkLinkifyPaths } from "./MarkdownLinkCore";
+import { isLocalPathRef } from "./MarkdownLinkCore";
 import { useFileLinkContext, useFilePathExists } from "./FileLinkBase";
 import { extractFileLinkLocation, relativeFilePathWithinRoot, resolveFileLinkPath } from "../../utils/filePathLinks";
 import { isExecutableLikePath } from "../../utils/externalPathAccessPolicy";

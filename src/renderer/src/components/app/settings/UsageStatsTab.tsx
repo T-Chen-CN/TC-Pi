@@ -1,11 +1,3 @@
-/**
- * 用量统计设置页 Tab。
- *
- * 数据源：pi-tracker（pi）+ dsh-bill（DSH）日志，主进程聚合后整体下发。
- * 三态：未安装（引导卡，仅 pi 侧需要装插件）/ 加载中 / 数据视图（空数据有专门空态）。
- * 图表为自绘 SVG（UsageHeatmap / UsageDailyChart），不引入图表库。
- */
-
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { UsageAggregated, UsageStatsDetectResult } from "../../../../../shared/types";
@@ -166,7 +158,6 @@ export function UsageStatsTab() {
 			setDetect(detectResult);
 			const installed = await probePluginInstalled();
 			if (!detectResult.installed && installed === false) {
-				// 两边都还没日志，且未装 pi-tracker → 引导安装（文案同时说明 DSH 已内置 dsh-bill）
 				setPhase("missing");
 				return;
 			}

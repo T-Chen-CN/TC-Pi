@@ -9,10 +9,25 @@ const features = loadTsCommonJs("src/shared/productFeatures.ts");
 const visibility = loadTsCommonJs("src/shared/hiddenModules.ts");
 
 test("legacy settings cannot enable removed modules and are not mutated", () => {
-	const saved = { defaultAgentBackend: "dsh", acpEnabled: true, acpTools: [{ id: "old" }], petEnabled: true, floatingBallEnabled: true, cuaEnabled: true, webServiceEnabled: true, voiceTranscriptionEnabled: true };
+	const saved = {
+		defaultAgentBackend: "dsh",
+		acpEnabled: true,
+		acpTools: [{ id: "old" }],
+		petEnabled: true,
+		floatingBallEnabled: true,
+		cuaEnabled: true,
+		feishuAppId: "old",
+		visionEnabled: true,
+		imEnabled: true,
+		promptStoreLastQuery: "old",
+		sessionSortMode: "updated",
+		announcementNotificationEnabled: true,
+		webServiceEnabled: true,
+		voiceTranscriptionEnabled: true,
+	};
 	const projected = features.productSettings(saved);
 	assert.equal(projected.defaultAgentBackend, "pi");
-	for (const key of ["acpEnabled", "petEnabled", "floatingBallEnabled", "cuaEnabled"]) assert.equal(projected[key], false);
+	for (const key of ["acpEnabled", "acpTools", "petEnabled", "floatingBallEnabled", "cuaEnabled", "feishuAppId", "visionEnabled", "imEnabled", "promptStoreLastQuery", "sessionSortMode", "announcementNotificationEnabled"]) assert.equal(Object.hasOwn(projected, key), false);
 	assert.equal(projected.webServiceEnabled, true);
 	assert.equal(projected.voiceTranscriptionEnabled, true);
 	assert.equal(saved.defaultAgentBackend, "dsh");
@@ -70,23 +85,4 @@ test("distribution dependencies and resources exclude removed runtimes", () => {
 	for (const dependency of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) assert.doesNotMatch(dependency, /^(?:@deepseek-ai\/|@larksuiteoapi\/|koffi$|dsh-|@astron-team\/)/);
 	for (const resource of pkg.build.extraResources) assert.doesNotMatch(resource.from, /dsh-runtime|build\/pets|xueprompts/);
 	assert.doesNotMatch(pkg.scripts.build, /dsh|xueprompts|runtime:pack/);
-});
-
-test("historical attachments can be read without a generation service; invalid and oversized files are rejected", async () => {
-	const { readLegacyImage } = loadTsCommonJs("src/main/images/legacyImages.ts", { stubs: { electron: {} } });
-	const root = mkdtempSync(join(tmpdir(), "pideck-image-read-"));
-	try {
-		const ref = `${"a".repeat(64)}.png`;
-		const path = join(root, ref);
-		writeFileSync(path, Buffer.from([1, 2, 3]));
-		const image = await readLegacyImage(root, ref);
-		assert.equal(image.mimeType, "image/png");
-		assert.equal(image.data, "AQID");
-		assert.equal(await readLegacyImage(root, "../secret.png"), null);
-		assert.equal(await readLegacyImage(root, null), null);
-		truncateSync(path, 33 * 1024 * 1024);
-		assert.equal(await readLegacyImage(root, ref), null);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
 });

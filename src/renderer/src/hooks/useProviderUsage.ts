@@ -107,11 +107,6 @@ export function useProviderUsageStatesLoader(providers: string[], backend: Usage
 	}, [providerKey, backend, merge, markStatus]);
 }
 
-/**
- * 重拉指定 provider 的状态（用量查询弹窗保存后调）：徽章的开关态/间隔来自状态表，
- * 保存只写了 usage-probes.json，必须回读一次才能让徽章立即从「未启用」变「查询中」。
- * 只请求该 provider（pi 侧主进程仍全量解析，dsh 侧只回名单内），开销与一次刷新同级。
- */
 export function useRefreshProviderUsageState(): (provider: string, backend?: UsageProbeBackend) => Promise<void> {
 	const merge = useSetAtom(mergeProviderUsageStatesAtom);
 	return useCallback(

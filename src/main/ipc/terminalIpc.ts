@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { ipcChannels } from "../../shared/ipc";
-import type { SessionCommandError, SessionRuntimeTarget, TerminalShell, TerminalTarget } from "../../shared/types";
+import type { SessionCommandError, TerminalShell, TerminalTarget } from "../../shared/types";
 import type { AppLogger } from "../logging/AppLogger";
 import { listSystemFontFamilies } from "../fonts/SystemFonts";
 import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";

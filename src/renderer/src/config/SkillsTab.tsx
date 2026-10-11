@@ -4,8 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../components/ui-shadcn/select";
 import { useEffect, useState, type ReactNode } from "react";
 import { ContentTabs } from "./ContentTabs";
-import { Check, FileEdit, Pencil, ShoppingBag, Sparkles, Trash2, X, Store, Globe } from "lucide-react";
-import type { CreatePiSkillInput, PiSkillListResult, PiSkillLocation, PiSkillSummary, ProjectResourceOverrides } from "../../../shared/types";
+import { Check, FileEdit, Pencil, Sparkles, Trash2, X } from "lucide-react";
+import type { PiSkillListResult, PiSkillLocation, PiSkillSummary, ProjectResourceOverrides } from "../../../shared/types";
 import { t } from "../i18n";
 import { ContentStoreUpdatePanel } from "./ContentStoreUpdatePanel";
 import { desktopApi } from "../desktopApi";

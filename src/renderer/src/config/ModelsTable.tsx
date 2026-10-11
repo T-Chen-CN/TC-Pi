@@ -6,7 +6,7 @@ import type { ModelItem } from "./configTypes";
 import { ConfigSelect, ConfigComboboxInput, openDocsInSystemBrowser } from "./ConfigShared";
 import { getUserAgentOptions } from "./userAgentPresets";
 import { emptyTierDraft, normalizeTiers, toTierDrafts, type CostTierDraft } from "./modelCostTiers";
-import { countSelectedModelIndexes, getModelSelectionState } from "./modelBatchSelection";
+import { getModelSelectionState } from "./modelBatchSelection";
 import { Button } from "../components/ui-shadcn/button";
 import { Checkbox } from "../components/ui-shadcn/checkbox";
 import { Input } from "../components/ui-shadcn/input";

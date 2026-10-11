@@ -18,17 +18,6 @@ type ProviderGripHandlers = {
 	onDragEnd: () => void;
 };
 
-/**
- * 供应商卡片排序交互（拖动 + 上移/下移）的共享状态机，Pi 模型页与 DSH 模型页复用同一份。
- *
- * 为什么抽成 hook 而不是各页各写一套：
- * 1. 落点判定、拖动中半透明、插入指示线、边界禁用这些规则必须两页一致，复制两份必然漂移；
- * 2. DOM 结构两页不同（Pi 卡的标题行是内联 JSX，DSH 用 ProviderRowHead），
- *    所以 hook 只暴露事件/ref 工厂，由调用方决定贴到哪个元素上。
- *
- * 顺序语义交给 utils/providerOrder 的纯函数：names 是完整顺序（含隐藏项），
- * visibleNames 只用于上移/下移取邻居，避免隐藏项打断可见区的相对顺序。
- */
 export function useProviderReorder(options: { names: readonly string[]; visibleNames: readonly string[]; onReorder: (nextOrder: string[]) => void }) {
 	const { names, visibleNames, onReorder } = options;
 	const cardRefs = useRef<Record<string, HTMLElement | null>>({});

@@ -74,7 +74,7 @@ export function createSessionRuntimeUiResponder(input: {
 	rollback: ResponseRollback;
 	send: (input: SessionUiResponseInput) => Promise<void>;
 	onError?: (error: unknown) => void;
-	/** 应答成功（host 已收到）后的旁路回调：DSH 回显等，不参与应答流程 */
+
 	onAccepted?: (request: AgentUiRequest, response: AgentUiResponse) => void;
 }): SessionRuntimeUiResponder {
 	return {

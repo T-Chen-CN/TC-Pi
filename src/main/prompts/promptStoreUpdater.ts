@@ -10,7 +10,7 @@
  * 新模板会作为新 slug 出现在商店列表里）。
  */
 
-import { BuiltinContentUpdater, type BuiltinContentUpdaterOptions } from "../updates/builtinContentUpdater";
+import { BuiltinContentUpdater } from "../updates/builtinContentUpdater";
 import type { UpdateSourceId } from "../../shared/types/settings";
 
 /** 覆盖层目录名（userData 下）。 */

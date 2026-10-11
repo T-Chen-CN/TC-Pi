@@ -2,11 +2,9 @@ import { app, BrowserWindow, Menu } from "electron";
 import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DEFAULT_IMAGE_GEN_OUTPUT_FORMAT, DEFAULT_IMAGE_GEN_SIZE, DEFAULT_IMAGE_GEN_WATERMARK, parseImageGenOutputFormat, parseImageGenSize, parseImageGenWatermark } from "../../shared/imageGenParams";
 import {
 	createDefaultExternalEditorSettings,
 	createDefaultSoundAlertSettings,
-	DEFAULT_PET_SCALE,
 	DEFAULT_TOAST_DURATION_MS,
 	TOAST_DURATION_STICKY_MS,
 	normalizeSoundAlertSettings,
@@ -20,9 +18,8 @@ import {
 	type TerminalThemeId,
 } from "../../shared/types";
 import { normalizePinnedSessionIds } from "../../shared/pinnedSessions";
-import { normalizeSessionSortMode } from "../../shared/sessionSort";
 import { normalizeHiddenModules } from "../../shared/hiddenModules";
-import { productSettings } from "../../shared/productFeatures";
+import { productSettings, stripRemovedSettings } from "../../shared/productFeatures";
 import { normalizeHiddenComposerFeatures } from "../../shared/composerFeatures";
 import { parseBusySendDelivery } from "../../shared/busySendDelivery";
 import { sanitizeShortcutOverrides } from "../../shared/shortcuts";
@@ -31,7 +28,6 @@ import { normalizeEnhanceModel } from "../../shared/enhanceModelPreference";
 import { normalizeQuickMessages } from "../../shared/quickMessages";
 import { sanitizePiCustomPaths } from "../pi/piCustomPaths";
 import { sanitizeCustomThemeSnapshot } from "../../shared/customThemes";
-import { sanitizeAcpTools } from "../compatibility/acpToolConfig";
 import { normalizeFontSizeMode, normalizeOptionalFontSizeMode } from "../../shared/fontSize";
 import { clampSessionTabMaxWidth, SESSION_TAB_MAX_WIDTH_DEFAULT } from "../../shared/sessionTabWidth";
 import { getAppLogger } from "../logging/sharedLogger";
@@ -80,28 +76,11 @@ export function readSingleInstancePreference(settings: Partial<AppSettings> = re
 	return value !== false;
 }
 
-/**
- * 在 app.ready 之前同步读取桌面宠物开关（启动时快照）。
- * Linux 的 XWayland 兼容层（见 main/linuxDisplayBackend.ts，#108）必须在 ready 前
- * 决定是否强制 ozone-platform=x11，而宠物是该兼容层的唯一受益者，故以此为准。
- * 缺省 false：未启用宠物的 Linux 用户走原生显示后端，主窗口不受兼容层影响。
- * 可传入共享快照（readBootPreferences）：避免启动阶段重复读盘。
- */
-export function readPetEnabledPreference(settings: Partial<AppSettings> = readDesktopSettingsSync()): boolean {
-	return settings.petEnabled === true;
-}
-
-/**
- * ready 前启动偏好的合并读取（index.ts 模块顶层）：一次文件读取返回三个启动快照值，
- * 替代三个 helper 各自 readFileSync+JSON.parse 的重复 IO（2026-10 启动审计）。
- * 启动后调用方（PetWindow）继续走各 helper 的独立读取，语义不变。
- */
 export function readBootPreferences() {
 	const settings = readDesktopSettingsSync();
 	return {
 		electronChromiumSandbox: readElectronChromiumSandboxPreference(settings),
 		singleInstance: readSingleInstancePreference(settings),
-		petEnabled: readPetEnabledPreference(settings),
 	};
 }
 
@@ -149,7 +128,7 @@ const defaultSettings: AppSettings = {
 	// 默认开启：标题由当前 pi 模型异步生成，侧栏不再全是「新会话」；
 	// 会额外消耗一次模型调用和少量 token，设置说明已写明，用户可随时关闭。
 	autoSessionTitle: true,
-	// 忙碌时发送默认「插入当前回合」（对齐 pi 历史行为）；dsh 会话此前默认排队，
+
 	// 统一后由本设置项决定，用户可在常用设置→会话中改回。
 	busySendDelivery: "steer",
 	// 快捷消息：**遗留字段**。新版本清单存在 userData/quick-messages.json（QuickMessageStore），
@@ -181,7 +160,6 @@ Gitmoji 对应关系：
 	gitCommitMessageModel: "",
 	// 空串 = 自动解析（PATH 中的 git → 各平台已知安装位置）；用户可在 Git 设置页显式指定。
 	gitExecutablePath: "",
-	dshRunnerNodePath: "",
 	closeToTray: true,
 	// 默认单实例：托盘隐藏后再次点击快捷方式会唤起原窗口，而不是再开一个进程
 	singleInstance: true,
@@ -192,8 +170,6 @@ Gitmoji 对应关系：
 	askNotificationEnabled: false,
 	// 人文关怀提醒默认开启：用户可在设置中随时关闭
 	agentCountReminderEnabled: true,
-	// 旧版本设置读取兼容：保留字段但不再驱动任何功能。
-	announcementNotificationEnabled: true,
 	// toast 展示时长：全局统一时长（见 AppSettings.toastDurationMs）
 	toastDurationMs: DEFAULT_TOAST_DURATION_MS,
 	showThinking: readPiAgentShowThinking() ?? true,
@@ -236,23 +212,6 @@ Gitmoji 对应关系：
 	maxEditorFileSizeMB: 5,
 	externalEditors: createDefaultExternalEditorSettings(),
 
-	// 桌面宠物默认关闭：关闭后应用与现状完全一致，零回归风险
-	petEnabled: false,
-	petId: "clawd",
-	petAlwaysOnTop: true,
-	petScale: DEFAULT_PET_SCALE,
-	// 巡游默认开启：宠物 idle 时自动沿屏幕底部左右走动，业务态出现即让位
-	petPatrolEnabled: true,
-	// 巡游碰边后 idle 停顿默认 5 分钟
-	petPatrolPauseMin: 5,
-
-	// ── 悬浮球（floater）：默认关闭；开启后主窗口可隐藏为常驻小圆点 ──
-	floatingBallEnabled: false,
-	floatingBallExpandTarget: "mini",
-	floatingBallAlwaysOnTop: true,
-	floatingBallShowRunningBadge: true,
-	floatingBallSnapToEdge: true,
-
 	// ── 闲置 agent 内存优化：自动释放长时间闲置的 agent 进程 ──
 	// 默认开启；保留最近闲置的 5 个；连续闲置 1 小时（60 分钟）才可释放
 	idleAgentAutoRelease: true,
@@ -261,11 +220,6 @@ Gitmoji 对应关系：
 
 	// standby 预热池默认开启：新建会话近即时；10 分钟未使用自动回收，与闲置释放互补
 	standbyRuntimeEnabled: true,
-
-	// CUA 默认关闭：关闭时不监听本地端点、不改动 pi 的 mcp.json，与现状完全一致
-	cuaEnabled: false,
-	// 自动审批默认开启；显式保存的 false 仍由 load 合并保留，不自动改写用户选择。
-	cuaAutoApprove: true,
 
 	favoriteModels: [],
 	// 提供商与模型显示开关默认全显示：隐藏列表为空 = 不隐藏任何提供商/模型
@@ -278,10 +232,6 @@ Gitmoji 对应关系：
 	hiddenComposerFeatures: [],
 	// 供应商卡片自定义顺序：空数组 = 未自定义，按配置原序展示
 	providerOrder: [],
-	dshProviderOrder: [],
-	// ACP 总开关默认 false（opt-in，见 settings.acpEnabled 注释）；工具表默认空。
-	acpEnabled: false,
-	acpTools: [],
 
 	// ── 扩展管理 ──
 	/** 用户手动移除的内置扩展，启动时跳过自动部署 */
@@ -300,11 +250,6 @@ Gitmoji 对应关系：
 	/** 旧版提示词禁用记录（小写 name）；现代版本写 pi 原生过滤规则，此字段仅由启动迁移读取并清理 */
 	disabledPrompts: [],
 
-	// 生图参数：记在 composer 底栏，跨会话复用；缺省不指定分辨率、不带水印
-	imageGenSize: DEFAULT_IMAGE_GEN_SIZE,
-	imageGenWatermark: DEFAULT_IMAGE_GEN_WATERMARK,
-	imageGenOutputFormat: DEFAULT_IMAGE_GEN_OUTPUT_FORMAT,
-
 	// 提示词增强模型：null = 跟随会话模型；设置页可指定固定模型
 	enhanceModel: null,
 
@@ -315,21 +260,7 @@ Gitmoji 对应关系：
 	// 自定义镜像前缀（保留向下兼容字段），空串 = 未填
 	customUpdateSourceUrl: "",
 
-	// ── Agent 后端：默认 pi（经典后端），用户可在设置中切换为 dsh ──
 	defaultAgentBackend: "pi",
-
-	// ── DSH 外部会话：默认启动时只读扫磁盘入侧栏（不 boot host）──
-	dshAutoImportSessions: true,
-
-	// ── DSH host 手动停止：默认 false（按需自动启动）；用户在配置页停止后持久化，
-	// 跨重启不再自动 fork（不想用 DSH 的用户不用反复停）──
-	dshManualStopped: false,
-
-	// ── DSH agent-team 实验预设：默认关（组合层完全不注入）；开启需重启 host 生效 ──
-	dshAgentTeamPreset: false,
-
-	// ── DSH runtime 迁移提示闩：默认 false（还没提示过）；展示后置位，跨重启不重弹 ──
-	dshRuntimeMigrationNoticeShown: false,
 
 	// ── Agent 启动诊断/加速：offline 默认关（保证 pi 启动时模型目录走网络刷新，
 	// 用户新增/更新的模型能实时出现在模型列表）；扩展/技能默认加载 ──
@@ -442,7 +373,7 @@ export class SettingsStore {
 		if (persisted === null) {
 			this.settings = { ...defaultSettings };
 		} else {
-			const parsed = persisted;
+			const parsed = stripRemovedSettings(persisted);
 			this.settings = {
 				...defaultSettings,
 				...parsed,
@@ -456,9 +387,6 @@ export class SettingsStore {
 				this.settings.autoSessionTitle = defaultSettings.autoSessionTitle;
 			}
 			// 仅兼容旧字段读取，非法旧值归一化后忽略。
-			if (typeof this.settings.announcementNotificationEnabled !== "boolean") {
-				this.settings.announcementNotificationEnabled = defaultSettings.announcementNotificationEnabled;
-			}
 			// toast 展示时长：旧 settings.json 缺字段或脏值（0/负数/超大/字符串）钳回默认，
 			// 避免升级后 toast 永不再消失或瞬间消失。
 			this.settings.toastDurationMs = clampToastDurationMs(this.settings.toastDurationMs);
@@ -508,9 +436,6 @@ export class SettingsStore {
 			this.normalizePiProxyProviders();
 			this.normalizePiProxyModels();
 			// 生图尺寸/水印来自旧 JSON 时可能非法；回落默认，避免底栏和下一次请求带着坏值。
-			this.settings.imageGenSize = parseImageGenSize(this.settings.imageGenSize) ?? DEFAULT_IMAGE_GEN_SIZE;
-			this.settings.imageGenWatermark = parseImageGenWatermark(this.settings.imageGenWatermark, DEFAULT_IMAGE_GEN_WATERMARK);
-			this.settings.imageGenOutputFormat = parseImageGenOutputFormat(this.settings.imageGenOutputFormat) ?? DEFAULT_IMAGE_GEN_OUTPUT_FORMAT;
 			this.settings.theme = this.normalizeThemeMode(this.settings.theme);
 			const schedule = normalizeThemeSchedule({
 				lightStart: this.settings.themeScheduleLightStart,
@@ -521,11 +446,7 @@ export class SettingsStore {
 			// 置顶状态只接受稳定、非空的 SessionRecord id；旧设置缺省时自然回落为空。
 			this.settings.pinnedSessionIds = normalizePinnedSessionIds(parsed.pinnedSessionIds);
 			// 会话排序模式：未知字符串（手改/未来删除的方案）回落默认「最近活跃」。
-			this.settings.sessionSortMode = normalizeSessionSortMode(parsed.sessionSortMode);
-			// ACP 总开关：可选布尔，缺省/非布尔→false（opt-in；老用户升级后 ACP 入口保持关闭直到主动开启）。
-			this.settings.acpEnabled = parsed.acpEnabled === true;
-			// ACP 工具登记表：手改 settings.json 的脏条目在加载边界归一，不等到首次 update。
-			this.settings.acpTools = sanitizeAcpTools(parsed.acpTools);
+
 			// 字号档位：旧版本有 5 档（多一个已删除的 "default"），现在是 4 档（紧凑/中/大/特大）。
 			// 刻意不做迁移框架——任何不在档位表里的历史值一律落到「中」，旧用户升级后自动等于中；
 			// 同时避免 UI 下拉读到未知值时变成空白。null（跟随全局）必须保持 null。
@@ -539,20 +460,10 @@ export class SettingsStore {
 			// git 可执行文件路径来自旧 JSON 时可能是脏值（非字符串）；回落空串（自动解析），
 			// 避免 spawn 拿到非字符串路径把整个 Git 面板打挂。
 			this.settings.gitExecutablePath = typeof parsed.gitExecutablePath === "string" ? parsed.gitExecutablePath.trim() : "";
-			this.settings.dshRunnerNodePath = typeof parsed.dshRunnerNodePath === "string" ? parsed.dshRunnerNodePath.trim() : "";
-			// DSH 手动停止标记来自旧 JSON 时可能是脏值（字符串等）；非布尔一律回落 false，
+
 			// 否则一个 "true" 字符串会让 host 永远起不来，且 UI 开关状态不可信。
-			if (typeof this.settings.dshManualStopped !== "boolean") {
-				this.settings.dshManualStopped = false;
-			}
 			// agent-team 实验预设开关同理：非布尔一律回落 false（默认关，脏值不得误开实验域）。
-			if (typeof this.settings.dshAgentTeamPreset !== "boolean") {
-				this.settings.dshAgentTeamPreset = false;
-			}
 			// 迁移提示闩同理：非布尔回落 false（旧 JSON 缺字段 = 还没提示过，首次启动照常提示一次）。
-			if (typeof this.settings.dshRuntimeMigrationNoticeShown !== "boolean") {
-				this.settings.dshRuntimeMigrationNoticeShown = false;
-			}
 			// 快捷键覆盖来自旧 settings.json 时可能是脏值（未知 id / 非法 accelerator）；
 			// 统一清洗，坏条目回落平台默认，避免主进程匹配读到无效键。
 			this.settings.shortcuts = sanitizeShortcutOverrides(parsed.shortcuts, process.platform);
@@ -669,7 +580,7 @@ export class SettingsStore {
 
 	async update(patch: Partial<AppSettings>) {
 		// showThinking 完全由 pi agent 的 hideThinkingBlock 控制，不允许通过桌面设置修改
-		const { showThinking: _, ...safePatch } = patch;
+		const { showThinking: _, ...safePatch } = stripRemovedSettings(patch);
 		// 按供应商/模型代理白名单变更时做规范化（去重去空白），避免非法值写入磁盘。
 		if ("piProxyProviders" in safePatch) {
 			safePatch.piProxyProviders = normalizeProxyList(safePatch.piProxyProviders);
@@ -695,14 +606,6 @@ export class SettingsStore {
 		if ("autoSessionTitle" in safePatch && typeof safePatch.autoSessionTitle !== "boolean") {
 			delete safePatch.autoSessionTitle;
 		}
-		// CUA 开关来自渲染层，入参不可信：只接受布尔值，非法值保持原有设置。
-		if ("cuaEnabled" in safePatch && typeof safePatch.cuaEnabled !== "boolean") {
-			delete safePatch.cuaEnabled;
-		}
-		// 免审批开关同理：只接受布尔值（安全相关设置，非法值一律回退原值）。
-		if ("cuaAutoApprove" in safePatch && typeof safePatch.cuaAutoApprove !== "boolean") {
-			delete safePatch.cuaAutoApprove;
-		}
 		if ("navigationMode" in safePatch && safePatch.navigationMode !== "tabs" && safePatch.navigationMode !== "simple") {
 			delete safePatch.navigationMode;
 		}
@@ -727,14 +630,8 @@ export class SettingsStore {
 		if ("quickMessages" in safePatch) {
 			safePatch.quickMessages = normalizeQuickMessages(safePatch.quickMessages);
 		}
-		// ACP 工具登记表来自渲染层，入参不可信：逐条过滤（字符串字段去空白/限长、
+
 		// args 只收字符串数组），非法条目丢弃而不是拒绝整表（单条脏数据不阻断保存）。
-		if ("acpEnabled" in safePatch) {
-			safePatch.acpEnabled = safePatch.acpEnabled === true;
-		}
-		if ("acpTools" in safePatch) {
-			safePatch.acpTools = sanitizeAcpTools(safePatch.acpTools);
-		}
 		// 更新源 id 归一化（只允许已知枚举：atomgit 第一首选，github 官方；其余历史值回退 atomgit）。
 		if ("updateSource" in safePatch) {
 			const candidate = safePatch.updateSource;
@@ -786,7 +683,7 @@ export class SettingsStore {
 		// 供应商卡片顺序来自渲染层拖拽/上移下移结果，入参不可信：只接受字符串数组，
 		// 去重、去空、按上限截断。内容无变化时从 patch 中剔除——拖拽落在原位置、
 		// 或上移下移撞到列表边界时都会产生「和当前顺序一致的数组」，没必要写盘与刷审计。
-		for (const orderKey of ["providerOrder", "dshProviderOrder"] as const) {
+		for (const orderKey of ["providerOrder"] as const) {
 			if (!(orderKey in safePatch)) continue;
 			const candidate = safePatch[orderKey];
 			const cleaned: string[] = [];
@@ -817,9 +714,6 @@ export class SettingsStore {
 			safePatch.pinnedSessionIds = normalizePinnedSessionIds(safePatch.pinnedSessionIds);
 		}
 		// 排序模式来自渲染层下拉，入参不可信：非法值回落默认而不是写入坏字符串。
-		if ("sessionSortMode" in safePatch) {
-			safePatch.sessionSortMode = normalizeSessionSortMode(safePatch.sessionSortMode);
-		}
 		// 隐藏模块清单来自渲染层开关，入参不可信：只收字符串、去重去空。
 		if ("hiddenModules" in safePatch) {
 			safePatch.hiddenModules = normalizeHiddenModules(safePatch.hiddenModules);
@@ -877,34 +771,12 @@ export class SettingsStore {
 			const n = Math.floor(Number(safePatch.idleAgentTimeoutMin));
 			safePatch.idleAgentTimeoutMin = Number.isFinite(n) ? Math.min(24 * 60, Math.max(1, n)) : 60;
 		}
-		// DSH 手动停止标记来自渲染层，入参不可信：只接受布尔值，非法值不落盘，
+
 		// 避免脏值把 host 永久锁死在「已停止」态。
-		if ("dshManualStopped" in safePatch && typeof safePatch.dshManualStopped !== "boolean") {
-			delete safePatch.dshManualStopped;
-		}
 		// agent-team 实验预设开关来自渲染层，入参不可信：只接受布尔，非法值不落盘。
-		if ("dshAgentTeamPreset" in safePatch && typeof safePatch.dshAgentTeamPreset !== "boolean") {
-			delete safePatch.dshAgentTeamPreset;
-		}
 		// 迁移提示闩同理：只接受布尔，非法值不落盘（脏 true 会永久静音提示，脏 false 会重弹）。
-		if ("dshRuntimeMigrationNoticeShown" in safePatch && typeof safePatch.dshRuntimeMigrationNoticeShown !== "boolean") {
-			delete safePatch.dshRuntimeMigrationNoticeShown;
-		}
 		this.settings = { ...this.settings, ...safePatch };
 		// 生图字段来自渲染层，非法值丢掉，避免下次请求带坏 size/watermark。
-		if ("imageGenSize" in safePatch) {
-			this.settings.imageGenSize = parseImageGenSize(this.settings.imageGenSize) ?? DEFAULT_IMAGE_GEN_SIZE;
-		}
-		if ("imageGenWatermark" in safePatch) {
-			this.settings.imageGenWatermark = parseImageGenWatermark(this.settings.imageGenWatermark, DEFAULT_IMAGE_GEN_WATERMARK);
-		}
-		if ("imageGenOutputFormat" in safePatch) {
-			this.settings.imageGenOutputFormat = parseImageGenOutputFormat(this.settings.imageGenOutputFormat) ?? DEFAULT_IMAGE_GEN_OUTPUT_FORMAT;
-		}
-		// 增强模型来自渲染层，入参不可信：非合法形态一律归一为 null（跟随会话模型）。
-		if ("enhanceModel" in safePatch) {
-			this.settings.enhanceModel = normalizeEnhanceModel(this.settings.enhanceModel);
-		}
 		if ("theme" in safePatch) {
 			this.settings.theme = this.normalizeThemeMode(this.settings.theme);
 		}

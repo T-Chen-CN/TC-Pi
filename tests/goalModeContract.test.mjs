@@ -12,12 +12,12 @@ const sendHook = readFileSync("src/renderer/src/hooks/useSessionSend.ts", "utf8"
 const timelineCss = readFileSync("src/renderer/src/styles/timeline.css", "utf8");
 
 test("goal mode is a first-class ComposerAgentMode", () => {
-	assert.match(agentTypes, /ComposerAgentMode = "normal" \| "plan" \| "imagegen" \| "goal"/);
+	assert.match(agentTypes, /ComposerAgentMode = "normal" \| "plan" \| "goal"/);
 	assert.equal(existsSync("resources/extensions/pi-deck-goal-mode.ts"), true);
 	assert.match(builtIns, /"pi-deck-goal-mode.ts"/);
 });
 
-test("mode picker lists goal between plan and imagegen", () => {
+test("mode picker supports normal, plan and goal", () => {
 	// 模式选择器已重构进 ComposerComponents（旧 ComposerModeSelect.tsx 已删）：
 	// 三态由 props.composerAgentMode 驱动，图标/文案锚点在同组件内
 	assert.match(composerModeSelect, /mode === "goal"/);
@@ -27,8 +27,7 @@ test("mode picker lists goal between plan and imagegen", () => {
 	// 图标分支顺序：plan → imagegen → goal（实现）；契约只断言 goal 存在且三态齐全
 	const planOrder = composerModeSelect.indexOf('mode === "plan"');
 	const goalOrder = composerModeSelect.indexOf('mode === "goal"');
-	const imagegenOrder = composerModeSelect.indexOf('mode === "imagegen"');
-	assert.ok(planOrder >= 0 && goalOrder >= 0 && imagegenOrder >= 0);
+	assert.ok(planOrder >= 0 && goalOrder >= 0);
 });
 
 test("pi goal extension auto-continues until complete, blocked, or max rounds", () => {

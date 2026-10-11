@@ -1,31 +1,4 @@
-/**
- * PiDeck 内置扩展热更新器（扩展设置页的「内置扩展」更新入口）。
- *
- * 背景：内置扩展（resources/extensions/*.ts）随应用分发，RPC 启动时经 `-e <绝对路径>`
- * 注入 pi。打包态 resources 目录不可写（Program Files 权限 / 签名校验），扩展出 bug 只能
- * 等下一次应用发版，紧急补丁的反馈闭环太长。
- *
- * 机制（对齐 PiAiCatalogUpdater）：
- * 1. 仓库 main 分支提交 resources/extensions/extensions-manifest.json（包版本 + 每文件 sha256）；
- * 2. 客户端拉远端清单，与本地生效版本逐文件比对 sha，把有差异的文件写进 userData 覆盖层
- *    `<userData>/builtin-extensions/`；
- * 3. 覆盖层是**完整自洽快照**（未变化的文件从当前生效源复制），因为扩展之间存在相对
- *    import（如 pi-deck-todo.ts → ./pi-deck-todo-state.ts），只放差量文件会让 pi 解析不到依赖；
- * 4. 覆盖层同时**自带 vendored 运行时依赖**（node_modules/undici 等）：pi 按扩展文件所在目录
- *    向上查 node_modules，覆盖层上层没有 node_modules，缺了就是 `Cannot find module 'undici'`
- *    → pi 启动失败 → 全部扩展被禁用。更新时随 tmp 复制，旧覆盖层由 ensureOverlayVendorDependencies
- *    启动自愈；
- * 5. builtInExtensions.resolveBuiltInExtensionPath 覆盖层优先，重启会话即生效。
- *
- * 安全底线：先下载校验、后原子替换。任一环节失败（网络/sha 不符/写盘异常）都保持当前
- * 生效版本不变；替换前把现有覆盖层整体转为 `.bak`，支持「恢复上一个覆盖版」。
- *
- * 边界（刻意）：只更新**本地已知文件名**（内置清单声明的那些）。远端清单里多出的新文件名
- * 会被忽略——扩展的注入清单 BUILT_IN_EXTENSIONS 编译在应用代码里，热更新不应该也无法
- * 让远端数据凭空往 pi 里塞新代码。
- */
-
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decodeAtomGitContentsBuffer, repoFileSourceEntries, type RepoFileSourceEntry } from "../update/atomGitContents";
 import type { UpdateSourceId } from "../../shared/types/settings";
@@ -43,18 +16,6 @@ export const BUILT_IN_EXTENSIONS_UPDATE_ALLOWED_BRANCHES = ["main", "dev"] as co
 /** 扩展目录在仓库中的相对路径（与 resources/extensions 一致）。 */
 const EXTENSIONS_REPO_DIR = "resources/extensions";
 
-/**
- * 扩展运行时依赖的 vendored 包名清单（与 package.json extraResources 的
- * `extensions/node_modules/<pkg>` 映射保持同集合，extensionPackagingDeps.test.mjs 双向把关）。
- *
- * 背景（2026-09-15 线上事故）：pi 扩展加载器按扩展文件所在目录向上查 node_modules。
- * 随包目录有 extraResources 复制进来的 `extensions/node_modules/undici` 兜底，覆盖层
- * `<userData>/builtin-extensions/` 上层却没有 node_modules——pi-deck-vision.ts 顶部
- * `import "undici"` 直接 MODULE_NOT_FOUND → pi 启动失败 → PiDeck 禁用全部扩展重启
- * （Magic Context 等一并失效）。因此覆盖层必须自带同一份 vendored 依赖。
- */
-export const VENDOR_DEP_PACKAGE_NAMES = ["undici"] as const;
-
 /** 源候选（atomgit OpenAPI / github raw）；形态与 update/atomGitContents 共用，避免两处各定义一份。 */
 type SourceEntry = RepoFileSourceEntry;
 
@@ -70,35 +31,11 @@ type ResponseLike = {
 	arrayBuffer?(): Promise<ArrayBuffer>;
 };
 
-/**
- * 逐包复制 vendored 依赖到 `<target>/node_modules/<pkg>`（覆盖层 tmp 组装与自愈共用）。
- * 源缺包时跳过（旧安装包可能没有该 vendored 目录，跳过不比现状更糟）；
- * 目标已有该包时幂等跳过；复制失败上抛（fail-closed：宁可不更新，也不写半截覆盖层）。
- */
-function copyVendorPackages(targetDir: string, vendorNodeModulesDir: string): boolean {
-	let wrote = false;
-	for (const pkg of VENDOR_DEP_PACKAGE_NAMES) {
-		const source = join(vendorNodeModulesDir, pkg);
-		const target = join(targetDir, "node_modules", pkg);
-		if (!existsSync(join(source, "package.json"))) continue;
-		if (existsSync(join(target, "package.json"))) continue;
-		cpSync(source, target, { recursive: true });
-		wrote = true;
-	}
-	return wrote;
-}
-
 export type BuiltInExtensionsUpdaterOptions = {
 	/** 应用 userData 目录：覆盖层落在它下面（打包态可写）。 */
 	userDataDir: string;
 	/** 随包分发的内置扩展目录（dev 与打包态由调用方用同一 roots 解析）。 */
 	builtinExtensionsDir: string;
-	/**
-	 * 扩展运行时依赖的 vendored node_modules 源目录（dev = 仓库顶层，打包态 =
-	 * `resources/extensions/node_modules`，见 resolveVendorNodeModulesDir）。
-	 * 写覆盖层/自愈旧覆盖层时把其中的 vendored 包复制进去；缺省（测试/旧调用方）跳过复制。
-	 */
-	vendorNodeModulesDir?: string;
 	/** 网络实现注入（单测）；默认 globalThis.fetch。 */
 	fetchImpl?: typeof fetch;
 	timeoutMs?: number;
@@ -113,7 +50,6 @@ export type BuiltInExtensionsUpdaterOptions = {
 export class BuiltInExtensionsUpdater {
 	private readonly userDataDir: string;
 	private readonly builtinExtensionsDir: string;
-	private readonly vendorNodeModulesDir: string | undefined;
 	private readonly fetchImpl: typeof fetch;
 	private readonly timeoutMs: number;
 	private readonly maxManifestBytes: number;
@@ -124,7 +60,6 @@ export class BuiltInExtensionsUpdater {
 	constructor(options: BuiltInExtensionsUpdaterOptions) {
 		this.userDataDir = options.userDataDir;
 		this.builtinExtensionsDir = options.builtinExtensionsDir;
-		this.vendorNodeModulesDir = options.vendorNodeModulesDir;
 		this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
 		this.timeoutMs = options.timeoutMs ?? 15_000;
 		this.maxManifestBytes = options.maxManifestBytes ?? 256 * 1024;
@@ -290,11 +225,13 @@ export class BuiltInExtensionsUpdater {
 	 */
 	private localFileShas(): Map<string, string> {
 		const manifest = this.effectiveManifest();
-		if (manifest) return new Map(manifest.files.map((file) => [file.name, file.sha256]));
+		// An old overlay cannot reintroduce files removed from this distribution.
+		// Include bundled helpers as well as entry points so snapshots stay complete.
+		const overlayShas = new Map(manifest?.files.map((file) => [file.name, file.sha256]));
 		const shas = new Map<string, string>();
 		for (const name of listExtensionFileNames(this.builtinExtensionsDir)) {
 			try {
-				shas.set(name, sha256Of(readFileSync(join(this.builtinExtensionsDir, name))));
+				shas.set(name, overlayShas.get(name) ?? sha256Of(readFileSync(join(this.builtinExtensionsDir, name))));
 			} catch {
 				// 读不到就当作不在集合里（该文件本次不参与比对，也就不会被更新）
 			}
@@ -341,14 +278,12 @@ export class BuiltInExtensionsUpdater {
 					writeFileSync(target, buffer);
 				} else {
 					// 未变化：从当前生效源复制，保证覆盖层自洽（扩展间相对 import 可解析）
-					copyFileSync(join(sourceDir, file.name), target);
+					const source = join(sourceDir, file.name);
+					copyFileSync(existsSync(source) ? source : join(this.builtinExtensionsDir, file.name), target);
 				}
 				written.push({ name: file.name, sha256: file.sha256, bytes: file.bytes });
 			}
 			if (written.length === 0) throw new Error("no updatable file found in remote manifest");
-
-			// vendored 运行时依赖随覆盖层落盘（undici 等），否则覆盖层路径解析不到裸导入
-			this.copyVendorDependencies(tmpDir);
 
 			const overlayManifest: BuiltInExtensionsManifest = {
 				schemaVersion: remote.schemaVersion,
@@ -366,30 +301,6 @@ export class BuiltInExtensionsUpdater {
 			rmSync(tmpDir, { recursive: true, force: true });
 			throw error;
 		}
-	}
-
-	/**
-	 * 自愈：给「旧版热更新器写出的」覆盖层补拷 vendored 运行时依赖（node_modules/<pkg>）。
-	 *
-	 * 已存在的覆盖层目录是旧代码写的、没有 node_modules，pi 会因 `Cannot find module 'undici'`
-	 * 启动失败——不能要求用户先点一次「更新」才能修好。启动装配时调用一次：
-	 * 覆盖层有效且缺包、源目录有该包时整目录复制；幂等，无操作返回 false。
-	 */
-	ensureOverlayVendorDependencies(): boolean {
-		if (!this.vendorNodeModulesDir) return false;
-		const overlayDir = this.resolveOverlayDir();
-		// 只对通过整体校验的覆盖层动手；无效覆盖层本就不参与注入，不必补
-		if (!readVerifiedArtifact(overlayDir)) return false;
-		const wrote = copyVendorPackages(overlayDir, this.vendorNodeModulesDir);
-		// 补写虽然不影响清单校验结果，但让路径解析重新校验一次最稳
-		if (wrote) invalidateBuiltInExtensionsOverlayCache();
-		return wrote;
-	}
-
-	/** 把 vendored 依赖复制进目标目录（覆盖层 tmp 组装与自愈共用）。 */
-	private copyVendorDependencies(targetDir: string): void {
-		if (!this.vendorNodeModulesDir) return;
-		copyVendorPackages(targetDir, this.vendorNodeModulesDir);
 	}
 
 	/**

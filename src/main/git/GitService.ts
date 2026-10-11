@@ -1,6 +1,6 @@
 import { constants, realpathSync } from "node:fs";
 import { lstat, open, readlink, realpath, unlink } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { trashPath } from "../fs/trash";
 import { REF_BASE } from "../rewind/checkpointConstants";
 import type { RunGitOptions } from "./gitProcess";

@@ -1,20 +1,3 @@
-/**
- * 把一轮的扁平展示序列（`buildTurnDisplay` 输出）切成「过程组 + 一级行」序列。
- *
- * 展示语义（与用户确认，对齐 DSH `standard` 模式）：
- * - 大折叠栏内，内容严格按原始时序交替：中间回复 → 过程组 → 中间回复 → 过程组 → …
- * - **过程组**把连续的过程条目（思考 / 工具调用）合并成一组，组头给类别摘要，组体默认收起；
- * - **中间回复**是组的一级兄弟节点（不折进组内），视觉沿用 `InterimAnswer`；
- * - **重试 / 错误诊断**与中间回复同级：它们自己是一级行，并**截断**前后两个组
- *   （对齐 DSH 把 model-retry / turn-error 当独立节点的规则）。
- *
- * 为什么重试/错误要截断组：它们代表「这一轮中途出了状况/换了次重试」，把它混进
- * 一个组里会让「读取文件 → 失败重试 → 再读取」看起来像同一段连续作业。
- * 护栏（`AppUtils.ts:148-171` 的历史教训）：必须是**严格原位的轻量单行**，
- * 不能重回「时间线独立大卡片 + 与工具顺序错乱」的旧形态。
- *
- * 纯函数、无 React 依赖（node 单测直接加载）。
- */
 import type { ChatMessage } from "../../../../../shared/types";
 import { getToolName } from "../../../../../shared/fileChanges";
 import { activityCountsFromToolNames, toolActivityCategory, type ActivityCount, type ToolActivityCategory } from "./toolCategory";

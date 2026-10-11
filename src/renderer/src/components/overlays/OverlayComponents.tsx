@@ -4,7 +4,7 @@ import { Button } from "../ui-shadcn/button";
 import { X, FolderOpen } from "lucide-react";
 import { ConfirmDialog as ShadcnConfirmDialog } from "../ui-shadcn/ConfirmDialog";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "../ui-shadcn/dialog";
-import type { AppInfo, Project, PiInstallation, PiInstallStatus, PiInstallExecResult } from "../../../../shared/types";
+import type { PiInstallation, PiInstallStatus, PiInstallExecResult } from "../../../../shared/types";
 import { Input } from "../ui-shadcn/input";
 import { Label } from "../../components/ui-shadcn/label";
 import { EnvironmentGuidePanel } from "./EnvironmentGuidePanel";

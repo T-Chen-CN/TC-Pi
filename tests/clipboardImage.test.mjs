@@ -165,7 +165,7 @@ describe("writeClipboardImage", () => {
 test("copy-as-image paths use writeClipboardImage instead of ClipboardItem", () => {
 	const surface = read("src/renderer/src/components/session/SurfaceComponents.tsx");
 	const timeline = read("src/renderer/src/components/session/SessionMessageTimeline.tsx");
-	const finalAnswer = read("src/renderer/src/components/session/turn/FinalAnswer.tsx");
+	const finalAnswer = read("src/renderer/src/components/session/imageActions.tsx");
 
 	assert.match(surface, /writeClipboardImage/);
 	assert.match(surface, /if \(!blob\) throw/);

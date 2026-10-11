@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Copy, Eye, EyeOff, ExternalLink, GripVertical, SquarePen, Trash2, X } from "lucide-react";
 import { t } from "../i18n";
 import { desktopApi } from "../desktopApi";
-import type { ModelItem, ModelsFile, ProviderConfig } from "./configTypes";
+import type { ModelsFile, ProviderConfig } from "./configTypes";
 import { openDocsInSystemBrowser } from "./ConfigShared";
 import { getHeaderValue, setHeaderValue } from "./providerHeaders";
 import { buildModelsFromFetchedSelection } from "./modelsUtils";
@@ -247,7 +247,7 @@ export function ModelsTab(props: {
 	);
 
 	// 拖动与上移/下移的状态机（落点判定、拖动中半透明、插入指示线、边界禁用）内聚在共享 hook，
-	// DSH 模型页的供应商卡片复用同一份，避免两页规则漂移。
+
 	// 拖拽的作用域是「模型 + 认证」两页的并集（providerOrderScope）：认证页独有的供应商也要参与
 	// 同一份顺序，否则在认证页排一次会在并集里丢掉它们，模型页的顺序跟着回到默认。
 	const providerReorder = useProviderReorder({ names: props.providerOrderScope?.length ? props.providerOrderScope : orderedProviderNames, visibleNames: visibleProviderNames, onReorder: reorderProviders });

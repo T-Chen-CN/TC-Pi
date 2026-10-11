@@ -6,7 +6,7 @@ import { t } from "../../i18n";
 import { cn } from "../../lib/utils";
 import { formatFullDateTime } from "../../utils/relativeTime";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../ui-shadcn/hover-card";
-import { SessionBackendMark, SessionSourceBadge } from "../session/SessionSourceBadge";
+import { SessionSourceBadge } from "../session/SessionSourceBadge";
 
 export interface SessionHoverCardProps {
 	children: ReactNode;
@@ -178,8 +178,7 @@ export function SessionHoverCard({ children, session, title, projectName, status
 						</span>
 					)}
 
-					{/* 后端标识（dsh / imagegen） */}
-					{session?.backend && session.backend !== "pi" && <SessionBackendMark backend={session.backend} />}
+					{}
 
 					{/* 外部导入来源（codex / claude / workbuddy 等） */}
 					{session?.source && session.source !== "pi" && <SessionSourceBadge source={session.source} />}

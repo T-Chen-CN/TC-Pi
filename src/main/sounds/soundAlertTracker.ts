@@ -1,18 +1,7 @@
-/**
- * 声音提醒事件跟踪器（纯逻辑，无 Electron 依赖，可单测）。
- *
- * 输入 Agent 状态变化/完成回调/UI 请求事件，输出「该不该响」的提醒事件；
- * 与 PetStateBridge 的口径保持一致（error 边沿 + 完成冷却 + waiting 按批去重），
- * 避免同一个完成动作被 agent_settled 与 get_state 兜底重复触发两次。
- *
- * 注意：本模块不读设置——开关/音量/音效引用由 SoundAlertService 在发出前判定，
- * 职责分离：这里只负责「什么时候算一个提醒事件」。
- */
 import type { AgentStatus } from "../../shared/types/agent";
 import type { AgentUiRequest } from "../../shared/types/agent";
 import { DEFAULT_SOUND_BY_KIND, parseSoundAlertRef, type SoundAlertKind, type SoundAlertPlayEvent, type SoundAlertSettings } from "../../shared/types/soundAlert";
 
-/** 触发提醒的交互方法白名单（与 PetStateBridge 的 WAITING_METHODS 一致）。 */
 const WAITING_METHODS = new Set(["select", "confirm", "input", "editor", "batch_ask"]);
 
 /** 同一 Agent 成功完成的提醒冷却：settled 与 get_state 兜底可能重复触发，8 秒内只提醒一次 */

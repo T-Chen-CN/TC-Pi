@@ -223,11 +223,6 @@ function QueuedPromptRow(props: {
 	);
 }
 
-/**
- * composer 上方的排队消息卡（移植自 dsh-web QueueDock 的独立卡形态）。
- * 与 todo / goal 同列同宽：1 条直接一行；多条默认折叠计数头，展开后 180px 内滚动。
- * 行内操作：插入当前回合 / 排队下一轮 / 并行发送，以及撤回进输入框 / 丢弃。
- */
 export function QueuedPromptPanel(props: {
 	trackRef: RefObject<HTMLElement | null>;
 	sessionId?: string;

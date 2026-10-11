@@ -58,32 +58,10 @@ export function resolveComposerLiveModel(input: { record?: { provider?: string; 
 	};
 }
 
-/**
- * 引导页（无 record、未启动 Agent）的默认模型展示决策。
- *
- * 不变量：必须与主进程 `resolveLaunchDefaultOptions` 的来源次序一致
- * （点选 welcomeModel > 显式默认 > enabledModels > 上次使用），否则「底栏/选择器
- * 显示的默认」与「首次发送真实套用的默认」会分叉——用户表现为「页面切了但发送后
- * 变回去」。历史上展示层只建模了「显式默认」一级（defaultModelConfigured 为 true
- * 时直接屏蔽点选），而创建解析有四级来源，这就是「配了默认模型就切不动」的根因。
- *
- * 收拢为单一函数的原因：该规则曾在 ComposerPickerHost 与 ComposerComponents 各写
- * 一份（两份都带同一个闸门），任何一侧改动都容易漏改另一侧。
- *
- * 两种后端都是「点选 > 默认」（issue #253）：
- * - pi：点选是 welcomeModel，默认是 launchDefaults 的折叠结果（显式默认 / 切换列表 /
- *   上次使用）。
- * - DSH：点选来自独立的 WELCOME_MODEL_KEY，默认是部署默认（settings.yaml 的
- *   agent-default-model）。历史上 dsh 分支直接返回 defaultModel，把点选丢掉了——
- *   理由是「DSH 模型由部署默认决定」，但 host 提供 sessions.selectModel（PiDeck 的
- *   DshAgentManager.setModel 就在用），运行中也能换模型，所以引导页点选同样有意义。
- *   真正需要隔离的只是「pi 的偏好不能泄漏到 DSH」，这件事由存储键分开保证，
- *   不需要在展示层把两种后端的点选一起丢掉。
- */
 export function resolveGuideDisplayModel(input: {
 	/** 引导页点选（已经过 isWelcomeModelLost 校验，失效时为 undefined）。两种后端各自传入对应存储的偏好。 */
 	welcomeModel?: { provider: string; modelId: string; modelName?: string };
-	/** 主进程解析出的预选默认（pi 的 launchDefaults 折叠结果 / DSH 的部署默认）。 */
+
 	defaultModel?: ComposerLiveModelSource;
 }): ComposerLiveModelSource | undefined {
 	return input.welcomeModel ?? input.defaultModel;

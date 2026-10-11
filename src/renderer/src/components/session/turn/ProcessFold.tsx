@@ -1,7 +1,7 @@
 import { ChevronUp } from "lucide-react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { t } from "../../../i18n";
-import { lastProcessGroup, type TurnProcessNode } from "../timeline/groupTurnProcess";
+import { type TurnProcessNode } from "../timeline/groupTurnProcess";
 import { boundMountedSteps, PROCESS_FOLD_NODE_LIMIT } from "../timeline/turnMountBudget";
 import { ErrorStep } from "./ErrorStep";
 import { InterimAnswer } from "./InterimAnswer";
@@ -10,19 +10,6 @@ import { RetryStep } from "./RetryStep";
 import type { ProcessGroupOpenState } from "./useProcessGroupState";
 import { isGroupOpen } from "./useProcessGroupState";
 
-/**
- * 大折叠栏的内容区（过程组模式）。
- *
- * 语义（用户已确认，对齐 DSH standard 模式）：
- * - 严格按 `groupTurnProcess` 给出的原始时序交替渲染「中间回复 / 过程组 / 一级行」；
- * - 中间回复保持正文样式，不加任何视觉标记；
- * - 过程组自行折叠，组体默认收起（由 `open` 控制）；
- * - 重试 / 错误是**与中间回复同级**的一级行（它们同时是组边界，由分组层决定）；
- * - 最终回答不在这里（`FinalAnswer` 在大折叠栏外常驻）。
- *
- * 挂载预算：`nodes` 与组内成员各自套 `boundMountedSteps`（尾部窗口 + 「显示更早」入口），
- * 否则极端会话（一轮上百步、单组上百成员）会重演 2026-08 渲染进程 OOM 事故。
- */
 export type ProcessFoldProps = {
 	nodes: readonly TurnProcessNode[];
 	/** 大折叠栏是否展开（本组件只在展开时被挂载，保留该 prop 供入口按钮与收起按钮使用） */

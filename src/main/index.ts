@@ -11,7 +11,6 @@ import { AutomationRunCoordinator } from "./automation/AutomationRunCoordinator"
 import { AutomationScheduler } from "./automation/AutomationScheduler";
 import { AutomationStore } from "./automation/AutomationStore";
 import { toggleMainWindowDevTools } from "./devTools";
-import { registerLegacyImages } from "./images/legacyImages";
 import { registerAutomationIpc } from "./ipc/automationIpc";
 import { registerSoundIpc } from "./ipc/soundIpc";
 import { applyLinuxDisplayBackendWorkaround, isUsingLinuxXWaylandWorkaround } from "./linuxDisplayBackend";
@@ -81,7 +80,7 @@ const bootAnchorMs = Date.now();
 
 // userData 决策（三分支判定在 portableUserData.resolveAppUserDataDir，单测覆盖）：
 // - 未打包 npm run dev：功能分支再按 git 分支名拆目录（pi-desktop-dev-<branch>），
-//   避免多个 worktree 同时启动共用 catalog / 单实例锁 / DSH home；main/dev 仍用历史目录。
+
 // - 打包态（stable 与 dev 通道安装包）：共用历史 %APPDATA%/pi-desktop（便携版 exe 同级 data/）。
 // 必须在读取 settings / 版本单实例锁之前设置。
 let userDataNameMigrationResult: UserDataNameMigration | null = null;
@@ -128,7 +127,6 @@ app.setPath(
 	}),
 );
 
-// Linux XWayland 兼容层：仅当桌面宠物启用时才强制 ozone-platform=x11（#108，
 // 强制 XWayland 在部分 GNOME/Wayland 环境会导致主窗口不可见）。
 // ozone 平台一经启动不可更改，整个生命周期统一使用启动时快照。
 // 注意必须放在 dev userData 覆盖之后，否则 dev 模式会误读正式版的 petEnabled。
@@ -226,7 +224,7 @@ import { DiagnosticsMonitor } from "./diagnostics/DiagnosticsMonitor";
 import { detectExternalEditors, mergeDetectedExternalEditors } from "./editors/EditorDetector";
 import { ExtensionManager } from "./extensions/ExtensionManager";
 import { PluginDevService } from "./extensions/PluginDevService";
-import { resolveBuiltInExtensionsDir, resolveBuiltInExtensionsOverlayDir, resolveVendorNodeModulesDir, type BuiltInExtensionPathRoots } from "./extensions/builtInExtensions";
+import { resolveBuiltInExtensionsDir, resolveBuiltInExtensionsOverlayDir, type BuiltInExtensionPathRoots } from "./extensions/builtInExtensions";
 import { BuiltInExtensionsUpdater } from "./extensions/builtInExtensionsUpdater";
 import { createPiProcessExtensionResolvers } from "./extensions/piProcessExtensionResolvers";
 import { GitRefsWatcher } from "./git/GitRefsWatcher";
@@ -384,7 +382,7 @@ let piLocator: PiLocator;
 let agentManager: AgentManager;
 /** 全局模型 capability snapshot；仅在启动/配置变更时临时拉起 Pi。 */
 let piModelCapabilityCache: PiModelCapabilityCache | undefined;
-/** 多后端合成网关（pi + dsh + 未来后端）；启动装配后赋值，供发送链路按 agentId 路由。 */
+
 let compositeAgentGateway: CompositeAgentGateway | undefined;
 let configManager: ConfigManager;
 /** pi 原生资源配置服务与迁移状态（A2/A3；启动装配，IPC 复用）。 */
@@ -522,8 +520,6 @@ function emitSessionRuntimeEvent(agentId: string, sourceChannel: string, payload
 			// 触发一次 attach；canonical 归一后再比，无实质变化不再入队。
 			const sessionPathUnchanged = entry?.filePath !== undefined && canonicalizeSessionPath(entry.filePath, entry.environment) === canonicalizeSessionPath(tab.sessionPath, entry.environment);
 			if (canAttachRuntimeMetadata(entry, tab) && (!sessionPathUnchanged || entry.piSessionId !== tab.sessionId)) {
-				// 仅 pi JSONL 走文件配对。DSH 的 sessionPath 是 zstd，canAttach 已拒绝；
-				// host id 由 Coordinator activate/dispatch 回写 dshSessionId。
 				void sessionCatalog
 					.attachRuntime({
 						sessionId: runtimeBinding.sessionId,
@@ -595,12 +591,7 @@ async function readCatalogSessionReferenceMessages(sessionId: string) {
 
 async function copyCatalogSession(sessionId: string) {
 	const entry = sessionCatalog.get(sessionId);
-	// DSH 会话复制走运行中 agent 的 clone（sessionsRuntimeClone 已按 backend 分流）；
-	// 历史 DSH 会话没有宿主文件可复制（host 会话在 $DSH_HOME），显式拒绝并提示正确入口，
-	// 而不是报「文件不存在」误导（A8）。
-	if (entry?.backend === "dsh") {
-		throw new Error(mainCopy("session.copyDshUnsupported"));
-	}
+
 	if (!entry?.filePath) throw new Error(mainCopy("session.fileNotFound"));
 	const result = (await agentManager.cloneSessionFile(entry.projectId, entry.filePath, entry.environment)) as {
 		cancelled?: boolean;
@@ -1707,7 +1698,6 @@ function resolveBuiltInExtensionRoots(): BuiltInExtensionPathRoots {
 }
 
 function registerIpc() {
-	registerLegacyImages(join(app.getPath("userData"), "imagegen", "blobs"));
 	// 用量统计：业务在 UsageStatsService，handler 薄层只校验/适配
 	registerUsageStatsIpc(ipcMain, usageStatsService);
 	// 供应商认证（/login）：同样只做校验/适配，进程与协议在 PiAuthService
@@ -2016,14 +2006,11 @@ function registerIpc() {
 	const builtInExtensionsUpdater = new BuiltInExtensionsUpdater({
 		userDataDir: app.getPath("userData"),
 		builtinExtensionsDir: resolveBuiltInExtensionsDir(builtInExtensionRoots),
-		// vendored 运行时依赖（node_modules/undici 等）的源目录：覆盖层上层没有 node_modules，
-		// 缺了它 pi 会因扩展裸导入解析不到而启动失败（2026-09-15 线上事故）。
-		vendorNodeModulesDir: resolveVendorNodeModulesDir(builtInExtensionRoots),
+
 		// 与模型目录/应用更新共用 settings.updateSource：默认 AtomGit，切 GitHub 后 raw 直连优先。
 		source: () => settingsStore.get().updateSource,
 	});
-	// 旧覆盖层（没有 vendored 依赖的版本写的）启动自愈，不能要求用户先点一次「更新」
-	builtInExtensionsUpdater.ensureOverlayVendorDependencies();
+
 	// 后台更新检查：Windows / 支持自动升级的发行物走 electron-updater；
 	// macOS 当前未签 Developer ID，不能承诺稳定的替换/重启，因此只检测 Release 并交给用户手动安装。
 	// 两条路径都由同一个 UpdateService 快照推送渲染层，设置页能明确表达能力边界。
@@ -2147,7 +2134,7 @@ function registerIpc() {
 			resolveEndpoint: () => configManager.resolveProviderEndpoint(TOKENDANCE_PROVIDER),
 			request: usageProbeRequest,
 		}),
-		// 一键安装：pi models.json + DSH llm-pi-ai 双落盘（复用迁移服务的写盘策略：
+
 		// host 就绪走官方 settings API，否则直写 settings.yaml/.credentials.yaml）
 		tokendanceInstall: (apiKey) =>
 			installTokendanceProvider(
@@ -2234,7 +2221,6 @@ function registerIpc() {
 
 	registerStoreIpc({
 		promptManager,
-		skillManager,
 		extensionManager,
 		projectResourceManager,
 		configManager,
@@ -2297,7 +2283,6 @@ function registerIpc() {
 		menuTitle: mainCopy("shellMenu.openWithPiDeck"),
 		quickTaskTitle: mainCopy("shellMenu.quickTask"),
 	});
-	// registerQuickTaskIpc 移至 floating/mini-overlay 装配处（依赖 expandMiniOverlay 做模式互切）。
 }
 
 function sendTelemetryHeartbeat() {
@@ -2359,7 +2344,6 @@ protocol.registerSchemesAsPrivileged([
 	{ scheme: "pideck-bg", privileges: { secure: true, standard: true, corsEnabled: false, supportFetchAPI: true, stream: false } },
 	{ scheme: "pideck-sound", privileges: { secure: true, standard: true, corsEnabled: false, supportFetchAPI: true, stream: true } },
 	// 生图历史图片：渲染层 <img> 直接加载落盘 blob，避免把 base64 搬回渲染进程堆
-	{ scheme: "pideck-img", privileges: { secure: true, standard: true, corsEnabled: false, supportFetchAPI: true, stream: true } },
 ]);
 
 app
@@ -2451,8 +2435,7 @@ app
 		}
 		rpcLogger = new RpcLogger();
 		// 用量统计：pi-tracker 的 <agentDir>/analytics/usage.jsonl
-		// + dsh-bill 的 <DSH_HOME>/dsh-bill/records.jsonl（采集由插件负责，此处只读）。
-		// DSH_HOME 与 DshHost 同一套解析（设置覆盖 > ~/.dsh > 应用私有目录）。
+
 		usageStatsService = new UsageStatsService({
 			agentDir: join(app.getPath("home"), ".pi", "agent"),
 			logger: {
@@ -2877,7 +2860,7 @@ app
 				// standby 补热：与桌面 IPC（sessionIpc createDraft）同款——Web 建草稿即「马上要开聊」，
 				// 趁用户输入空窗后台预热 pi 进程；首条消息经 activateRuntime 认领实现秒级启动。
 				// fire-and-forget；ensure 幂等且受 standbyRuntimeEnabled 设置闸。
-				if (draft.backend !== "dsh") agentManager.ensureStandbyAgent(draft.projectId);
+				agentManager.ensureStandbyAgent(draft.projectId);
 				return draft;
 			},
 			updateSessionRecord: async (sessionId, patch) => {
@@ -2987,8 +2970,8 @@ app
 			// 会话活动监控（第二批 strips）：与桌面 sessionIpc.ts 同源同闸门
 			listSessionFileChanges: (sessionId) => {
 				const entry = sessionCatalog.get(sessionId);
-				// DSH/生图会话无 pi 会话文件，文件汇总无意义
-				if (!entry?.filePath || entry.backend === "dsh" || entry.backend === "imagegen") return Promise.resolve([]);
+
+				if (!entry?.filePath) return Promise.resolve([]);
 				return agentManager.readSessionFileChanges(entry.filePath);
 			},
 			listSessionSubagents: async (sessionId) => {
@@ -3015,8 +2998,8 @@ app
 			},
 			listSessionTodo: (sessionId) => {
 				const entry = sessionCatalog.get(sessionId);
-				// DSH/生图会话无 pi 会话文件，无 todo 快照
-				if (!entry?.filePath || entry.backend === "dsh" || entry.backend === "imagegen") return Promise.resolve(undefined);
+
+				if (!entry?.filePath) return Promise.resolve(undefined);
 				return agentManager.readSessionTodo(entry.filePath);
 			},
 		});
@@ -3772,7 +3755,7 @@ app.on("before-quit", (event) => {
 	// 退出清理统一走登记表（C12）：各常驻资源在创建处 register，这里只负责顺序执行。
 	// 新增资源不再改 before-quit；单项失败由 registry 记日志不阻塞其余清理。
 	// Electron 不等异步 promise：preventDefault 挡住本次退出，等 runAll 收尾后再
-	// app.quit()（重入时放行），否则 whisper/DSH dispose 等异步清理会被进程终止截断。
+
 	// 总预算 5s：任一清理任务挂死不能让应用永远退不出去。
 	if (quitCleanupStarted) return;
 	quitCleanupStarted = true;

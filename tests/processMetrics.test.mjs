@@ -245,7 +245,6 @@ test("process monitor i18n keys exist in zh-CN and en-US", () => {
 		"config.process.agentSection",
 		"config.process.section",
 		"config.process.empty",
-		"config.process.stopHostConfirm",
 		"config.process.loadFailed",
 		"config.process.column.memory",
 		"config.process.column.agentId",

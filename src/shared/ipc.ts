@@ -1,5 +1,4 @@
 export const ipcChannels = {
-	imagesReadBlob: "images:read-blob",
 	projectsList: "projects:list",
 	projectsAdd: "projects:add",
 	// 文件夹右键菜单直达：按路径添加项目（渲染层确认后调用；projectsAdd 走系统目录选择框）
@@ -720,11 +719,6 @@ export const ipcChannels = {
 	usageStatsDetect: "usage-stats:detect",
 	usageStatsRefresh: "usage-stats:refresh",
 	usageStatsGet: "usage-stats:get",
-	/**
-	 * 按需取回落盘生图图片的 base64（入参为 blob 引用名）。
-	 * 展示走 pideck-img:// 协议流式加载，这个通道只服务「复制 / 保存 / 重发带回参考图」。
-	 */
-	imagegenReadImageBlob: "imagegen:read-image-blob",
 
 	// ===== 提示词增强（输入框草稿 → 模型改写 → 回填） =====
 	/** 发起增强：受理后流式事件经 enhance:event 推送（按 runId 配对） */

@@ -21,7 +21,7 @@ import { resolveComposerLiveModel, resolveGuideDisplayModel, type ModelPending }
 import { resolveComposerThinkingLevel } from "../utils/thinkingDisplay";
 import { modelThinkingLevelOfMap } from "../../../shared/modelThinkingLevels";
 import { modelKey } from "../utils/preferenceCycle";
-import { GUIDE_BOOTSTRAP_SESSION_ID, WELCOME_MODEL_KEY, isWelcomeModelLost, readWelcomeBackendPreference, readWelcomeModelPreference, readWelcomeThinkingPreference, shouldClearWelcomePreference } from "../utils/chatSessionBootstrap";
+import { WELCOME_MODEL_KEY, isWelcomeModelLost, readWelcomeModelPreference, readWelcomeThinkingPreference, shouldClearWelcomePreference } from "../utils/chatSessionBootstrap";
 
 /**
  * 会话「模型 + 思考强度」的读侧状态：模型目录、收藏、当前模型与可用档位。
@@ -224,7 +224,7 @@ export function useSessionPreferenceState(options: {
 	const currentThinkingLevel = resolveComposerThinkingLevel({
 		record: record?.thinkingLevel,
 		// 无 record（引导页）：显式点选 > 每模型默认 > 配置默认 > 模型默认（与底栏同规则）。
-		fallback: welcomeThinking ?? perModelThinkingDefault ?? options.defaultThinkingLevel ?? currentModelEntry?.defaultEffort,
+		fallback: welcomeThinking ?? perModelThinkingDefault ?? options.defaultThinkingLevel,
 	});
 
 	function setModelPending(pending: ModelPending | undefined) {

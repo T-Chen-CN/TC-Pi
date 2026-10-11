@@ -320,26 +320,6 @@ test("promoteSessionMessagesCacheAtom is a no-op without a source cache and appe
 	assert.equal(store.get(atoms.sessionMessagesCacheAtom).virtual, undefined);
 });
 
-test("anonymous session switch-back does not wipe runtime messages via empty disk write", () => {
-	const atoms = loadAtoms();
-	const store = createStore();
-	store.set(atoms.cacheSessionMessagesAtom, {
-		sessionId: "anon-42",
-		messages: [{ id: "m1", role: "user", text: "hi" }],
-		source: "runtime",
-		revision: 1,
-		pageState: { hasMoreOld: false, hasMoreNew: false, loaded: "all" },
-	});
-	const applied = store.set(atoms.cacheSessionMessagesAtom, {
-		sessionId: "anon-42",
-		messages: [],
-		source: "disk",
-		expectedRevision: 1,
-	});
-	assert.equal(applied, false);
-	assert.deepEqual(store.get(atoms.sessionMessagesCacheAtom)["anon-42"].messages, [{ id: "m1", role: "user", text: "hi" }]);
-});
-
 test("routes runtime payloads into session-keyed messages and state", () => {
 	const atoms = loadAtoms();
 	const store = createStore();
@@ -414,50 +394,6 @@ test("ignores late events from an older runtime generation", () => {
 	assert.equal(runtime.status, "idle");
 	assert.equal(messages.length, 1);
 	assert.equal(messages[0].text, "new runtime");
-});
-
-test("anonymous detach clears its record and rejects a late catalog refresh", () => {
-	const atoms = loadAtoms();
-	const store = createStore();
-	const anonymous = session("anonymous-1", "project-1", {
-		noSession: true,
-		status: "active",
-	});
-	store.set(atoms.replaceProjectSessionsAtom, {
-		projectId: "project-1",
-		sessions: [anonymous],
-	});
-	store.set(atoms.applySessionRuntimeEventAtom, {
-		sessionId: anonymous.id,
-		agentId: "anonymous-agent",
-		runtimeGeneration: 1,
-		sourceChannel: "agents:state",
-		payload: {
-			id: "anonymous-agent",
-			projectId: "project-1",
-			cwd: "C:/project",
-			status: "idle",
-			createdAt: 1,
-			noSession: true,
-		},
-	});
-	store.set(atoms.applySessionRuntimeEventAtom, {
-		kind: "detach",
-		sessionId: anonymous.id,
-		agentId: "anonymous-agent",
-		runtimeGeneration: 1,
-		sourceChannel: "sessions:runtime-detach",
-		payload: null,
-	});
-	assert.equal(store.get(atoms.sessionRecordsAtom)[anonymous.id], undefined);
-	assert.equal(store.get(atoms.discardedTransientSessionIdsAtom).has(anonymous.id), true);
-
-	store.set(atoms.replaceProjectSessionsAtom, {
-		projectId: "project-1",
-		sessions: [anonymous],
-	});
-	assert.equal(store.get(atoms.sessionRecordsAtom)[anonymous.id], undefined);
-	assert.deepEqual(store.get(atoms.sessionIdsByProjectAtom)["project-1"], []);
 });
 
 test("incremental message flush merges tail upserts and discards non-contiguous deltas", () => {

@@ -1,28 +1,3 @@
-/**
- * AtomGit/GitCode 镜像源 noCache 参数修复（main/update 域）。
- *
- * 背景：AtomGit（及同平台域名 gitcode.com）的 `releases/download` 路由对
- * **任何 query string 都返回 404**（实测 atomgit.com / gitcode.com、latest 别名 /
- * 具体 tag 全中招）。而 electron-updater 检查更新时会在 URL 上无条件附加
- * `?noCache=<时间戳36进制>`（configureRequestUrl 写死，无配置开关），导致
- * 切到 AtomGit 镜像源后「检查更新」永远 404（安装包/blockmap 下载不带 query，
- * 不受影响）。
- *
- * 修复方式：不能改 electron-updater（无开关），改走 Electron session 级
- * `webRequest` 拦截 —— 把镜像下载路径请求中的 noCache 参数剥掉后重定向。
- *
- * ⚠️ 关键：electron-updater 的请求**不走 defaultSession**。它的
- * ElectronHttpExecutor.createRequest（electron-updater/out/electronHttpExecutor.js）
- * 显式 `net.request({ ..., session: session.fromPartition("electron-updater", { cache: false }) })`
- * 用独立 partition 发请求，因此拦截器必须注册在同一个 partition session 上，
- * 注册到 defaultSession 会永远拦不到（0.7.5 曾因此漏修）。
- * `fromPartition` 同名幂等，此处拿到的与 updater 内部缓存的是同一实例。
- * api.atomgit.com（公告/扩展/探针）不在拦截前缀内，不受影响。
- *
- * 注意：webRequest 监听注册后不可移除，本模块使用幂等注册（与 PetWindow CSP
- * 安装同一模式），防止重复调用累积监听。
- */
-
 // 仅类型导入，运行时无 electron 依赖（node --test 可直接加载本模块测纯函数）
 import type { Session } from "electron";
 

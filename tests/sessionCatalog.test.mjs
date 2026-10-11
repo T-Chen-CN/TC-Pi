@@ -69,106 +69,6 @@ test("does not restore an unsubmitted draft after the catalog is reloaded", asyn
 	}
 });
 
-// 回归：DSH 草稿必须跨重启保留（host 会话由 $DSH_HOME 持久化，catalog 只是映射）。
-// 仅清除 pi 后端（backend !== "dsh"）的草稿；dsh draft（含带 dshSessionId 的异常
-// 中间态）与 active 条目都应原样保留。
-test("keeps dsh drafts across reload while clearing pi drafts", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-dsh-draft-"));
-	const filePath = join(dir, "sessions.json");
-	const now = Date.now();
-	const entry = (overrides) => ({
-		projectId: "project-1",
-		title: "Entry",
-		source: "pi",
-		environment: "native",
-		status: "active",
-		createdAt: now,
-		updatedAt: now,
-		...overrides,
-	});
-	const catalogFile = {
-		version: 1,
-		sessions: [
-			entry({ id: "dsh-draft", title: "DSH draft", backend: "dsh", status: "draft" }),
-			entry({
-				id: "dsh-draft-with-session",
-				title: "DSH draft (mid-activation)",
-				backend: "dsh",
-				status: "draft",
-				dshSessionId: "session-host-orphan",
-			}),
-			entry({ id: "pi-draft", title: "Pi draft", status: "draft" }),
-			entry({ id: "active", title: "Active", status: "active" }),
-		],
-	};
-	try {
-		await writeFile(filePath, JSON.stringify(catalogFile), "utf8");
-		const catalog = new SessionCatalog(filePath);
-		await catalog.load();
-		const ids = new Map(catalog.listEntries().map((item) => [item.id, item]));
-		assert.equal(ids.size, 3, "pi draft should be cleared on load");
-		assert.equal(ids.get("dsh-draft")?.status, "draft", "dsh draft without dshSessionId must survive");
-		assert.equal(ids.get("dsh-draft-with-session")?.status === "draft" && ids.get("dsh-draft-with-session")?.dshSessionId === "session-host-orphan", true, "dsh draft with dshSessionId (abnormal mid-state) must survive");
-		assert.equal(ids.get("active")?.status, "active", "active entry preserved");
-		assert.equal(ids.get("pi-draft"), undefined, "pi draft removed from memory");
-		// 清理结果应落盘：磁盘上也不再有 pi draft
-		const persisted = JSON.parse(await readFile(filePath, "utf8"));
-		const persistedIds = persisted.sessions.map((item) => item.id);
-		assert.ok(persistedIds.includes("dsh-draft"), "dsh draft persisted after cleanup");
-		assert.ok(persistedIds.includes("dsh-draft-with-session"), "dsh mid-state draft persisted after cleanup");
-		assert.ok(!persistedIds.includes("pi-draft"), "pi draft not persisted after cleanup");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-// 回归：ACP 草稿必须跨重启保留（同 dsh 例外）。ACP 会话数据由外部 agent 侧持久化，
-// catalog 只是映射；激活失败兜底（SessionRuntimeCoordinator 不带 promoteToActive）留下的
-// draft+acpSessionId 若在 load() 被清，agent 侧会话孤儿化且 acpSessionId 永久丢失。
-// 探测集合（staleDrafts）排除了 acp，但剔除 filter 只豁免 dsh —— 两个过滤器自相矛盾。
-test("keeps acp drafts across reload while clearing pi drafts", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-acp-draft-"));
-	const filePath = join(dir, "sessions.json");
-	const now = Date.now();
-	const entry = (overrides) => ({
-		projectId: "project-1",
-		title: "Entry",
-		source: "pi",
-		environment: "native",
-		status: "active",
-		createdAt: now,
-		updatedAt: now,
-		...overrides,
-	});
-	const catalogFile = {
-		version: 1,
-		sessions: [
-			entry({ id: "acp-draft", title: "ACP draft", backend: "acp", status: "draft" }),
-			entry({
-				id: "acp-draft-attach-fallback",
-				title: "ACP draft (attach fallback)",
-				backend: "acp",
-				status: "draft",
-				acpSessionId: "agent-side-orphan",
-			}),
-			entry({ id: "pi-draft", title: "Pi draft", status: "draft" }),
-		],
-	};
-	try {
-		await writeFile(filePath, JSON.stringify(catalogFile), "utf8");
-		const catalog = new SessionCatalog(filePath);
-		await catalog.load();
-		const ids = new Map(catalog.listEntries().map((item) => [item.id, item]));
-		assert.ok(ids.has("acp-draft"), "acp draft must survive reload");
-		assert.ok(ids.get("acp-draft-attach-fallback")?.status === "draft" && ids.get("acp-draft-attach-fallback")?.acpSessionId === "agent-side-orphan", "acp draft with acpSessionId (attach fallback) must survive reload");
-		assert.equal(ids.get("pi-draft"), undefined, "pi draft still cleared");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
 // 回归：备份自愈后的启动补写失败不得阻断 load()。主文件损坏、从 .bak 恢复
 // （skipNextBackup=true）时 load() 末尾会 writeSnapshot 落盘恢复结果；磁盘满/
 // 目录只读会让 rename 失败 —— load() 若 reject，whenReady 的 Promise.all 中断、
@@ -214,172 +114,6 @@ test("backup-restore snapshot write failure must not reject load()", async () =>
 		await catalog.load();
 		const ids = catalog.listEntries().map((item) => item.id);
 		assert.ok(ids.includes("restored-active"), "memory must hold restored entries after failed self-heal write");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("persists an active session backend switch from pi to dsh", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-backend-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		// 未发送的 draft 会在重启时被清理（load 清理逻辑），要验证持久化必须让会话 active。
-		const draft = await catalog.createDraft({
-			projectId: "project-1",
-			title: "New session",
-			environment: "native",
-		});
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			filePath: "C:\\Sessions\\Example.jsonl",
-		});
-		const updated = await catalog.update(draft.id, { backend: "dsh" });
-		assert.equal(updated.backend, "dsh");
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		assert.equal(reloaded.getRecord(draft.id)?.backend, "dsh");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("persists DSH session id so a restarted app can attach the same host session", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-dsh-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const draft = await catalog.createDraft({
-			projectId: "project-1",
-			title: "DSH session",
-			environment: "native",
-			backend: "dsh",
-		});
-		// DSH 会话没有 pi 会话文件：attachRuntime 只带 dshSessionId（backend=dsh 的 Coordinator 路径）。
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-host-abc123",
-		});
-		const record = catalog.getRecord(draft.id);
-		assert.equal(record?.dshSessionId, "session-host-abc123");
-		assert.equal(record?.filePath, undefined, "DSH 会话不落 pi 会话文件");
-		assert.equal(record?.status, "draft", "预热只绑 host id，不能把空草稿抬成 active");
-		// 重启后 catalog 重载：dshSessionId 存活，Coordinator 可据此 attach 旧会话。
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		const restored = reloaded.getRecord(draft.id);
-		assert.equal(restored?.backend, "dsh");
-		assert.equal(restored?.dshSessionId, "session-host-abc123");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("imports a foreign DSH session as active (survives restart cleanup, attachable)", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-foreign-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		// 外部（dsh-web 等）会话导入：createDraft 带 dshSessionId 直接置 active，
-		// 不经过「创建→发送→attach」的激活链路。
-		const imported = await catalog.createDraft({
-			projectId: "project-1",
-			title: "dsh-web session",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-foreign-xyz789",
-		});
-		assert.equal(imported.status, "active", "imported session must be active, not draft");
-		assert.equal(imported.dshSessionId, "session-foreign-xyz789");
-		// 重启清理只删 pi draft：active 的导入会话必须保留并可 attach。
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		const restored = reloaded.getRecord(imported.id);
-		assert.equal(restored?.status, "active");
-		assert.equal(restored?.dshSessionId, "session-foreign-xyz789");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("remembered dismissed DSH sessions survive reload and stay out of createDraft", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-dismissed-dsh-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const imported = await catalog.createDraft({
-			projectId: "project-1",
-			title: "Gone",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-gone",
-		});
-		await catalog.rememberDismissedDshSession("session-gone");
-		await catalog.remove(imported.id);
-		assert.equal(catalog.listDismissedDshSessionIds().has("session-gone"), true);
-
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		assert.equal(reloaded.listDismissedDshSessionIds().has("session-gone"), true);
-		assert.equal(reloaded.listEntries().length, 0);
-		// 自动同步/刷新不得清墓碑：否则删映射后磁盘还在就会写回侧栏。
-		await assert.rejects(
-			() =>
-				reloaded.createDraft({
-					projectId: "project-1",
-					title: "Back again",
-					environment: "native",
-					backend: "dsh",
-					dshSessionId: "session-gone",
-				}),
-			{ message: "DISMISSED_DSH_SESSION" },
-		);
-		assert.equal(reloaded.listEntries().length, 0);
-		assert.equal(reloaded.listDismissedDshSessionIds().has("session-gone"), true);
-		// 手动导入是用户明确找回：带 restoreDismissed 才成功并清掉墓碑。
-		const restored = await reloaded.createDraft({
-			projectId: "project-1",
-			title: "Back again",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-gone",
-			restoreDismissed: true,
-		});
-		assert.equal(restored.dshSessionId, "session-gone");
-		assert.equal(reloaded.listDismissedDshSessionIds().has("session-gone"), false);
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("attachRuntime does not clear a DSH delete tombstone unless restoreDismissed", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-attach-tombstone-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const draft = await catalog.createDraft({
-			projectId: "project-1",
-			title: "Live",
-			environment: "native",
-			backend: "dsh",
-		});
-		await catalog.rememberDismissedDshSession("session-old");
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-old",
-		});
-		assert.equal(catalog.listDismissedDshSessionIds().has("session-old"), true);
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-old",
-			restoreDismissed: true,
-		});
-		assert.equal(catalog.listDismissedDshSessionIds().has("session-old"), false);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
@@ -453,110 +187,6 @@ test("attachRuntime still refreshes updatedAt when runtime metadata actually cha
 		});
 		const secondAt = catalog.getRecord(draft.id)?.updatedAt;
 		assert.ok(typeof secondAt === "number" && secondAt > firstAt, "piSessionId 变化必须刷新 updatedAt");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-// 墓碑清除发生在 enqueueMutation 回调内：若不计入 changed，内存里已删但快照不落盘，
-// 重启后墓碑复活。restoreDismissed 必须无条件计入 changed。
-test("attachRuntime restoreDismissed persists even when nothing else changes", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-attach-restore-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const draft = await catalog.createDraft({
-			projectId: "project-1",
-			title: "Restored session",
-			environment: "native",
-			backend: "dsh",
-		});
-		await catalog.rememberDismissedDshSession("session-old");
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-old",
-		});
-		const firstAt = catalog.getRecord(draft.id)?.updatedAt;
-		assert.ok(typeof firstAt === "number");
-		await new Promise((resolve) => setTimeout(resolve, 5));
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-old",
-			restoreDismissed: true,
-		});
-		const secondAt = catalog.getRecord(draft.id)?.updatedAt;
-		assert.ok(typeof secondAt === "number" && secondAt > firstAt, "清除墓碑必须刷新 updatedAt 计入 changed");
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		assert.equal(reloaded.listDismissedDshSessionIds().has("session-old"), false, "墓碑清除必须随快照落盘");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-// 回归：外部会话重复导入（自动同步与手动导入并发、配置页重复点击、host-ready 重放）
-// 必须幂等吸收——同一 dshSessionId 只保留一条记录，后续导入只更新标题/项目归属，
-// 否则侧栏出现两条同 host 会话记录（「重复导入」用户问题）。
-test("createDraft with the same dshSessionId is idempotent (updates in place, no duplicate)", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-foreign-dedup-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const first = await catalog.createDraft({
-			projectId: "project-1",
-			title: "Old title",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-foreign-dedup-1",
-		});
-		const second = await catalog.createDraft({
-			projectId: "project-2",
-			title: "New title",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-foreign-dedup-1",
-		});
-		assert.equal(second.id, first.id, "same host session must resolve to the same catalog record");
-		assert.equal(catalog.listEntries().length, 1);
-		assert.equal(second.title, "New title");
-		assert.equal(second.projectId, "project-2");
-		assert.equal(second.status, "active");
-		// 持久化同样只有一条：重启重载后不出现重复。
-		const reloaded = new SessionCatalog(join(dir, "sessions.json"));
-		await reloaded.load();
-		assert.equal(reloaded.listEntries().length, 1);
-		assert.equal(reloaded.getRecord(first.id)?.title, "New title");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("createDraft keepExistingTitle preserves title while moving project", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-keep-title-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		await catalog.createDraft({
-			projectId: "builtin-external",
-			title: "Host 回写标题",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-keep-title",
-		});
-		const moved = await catalog.createDraft({
-			projectId: "project-elsewhere",
-			title: "elsewhere",
-			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-keep-title",
-			keepExistingTitle: true,
-		});
-		assert.equal(moved.title, "Host 回写标题");
-		assert.equal(moved.projectId, "project-elsewhere");
-		assert.equal(catalog.listEntries().length, 1);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
@@ -913,37 +543,6 @@ test("maps scanned child parent paths to desktop session IDs and survives reload
 	}
 });
 
-test("DSH attachRuntime ignores zstd filePath and only promotes draft when asked", async () => {
-	const { SessionCatalog } = loadCatalog();
-	const dir = await mkdtemp(join(tmpdir(), "pideck-catalog-dsh-promote-"));
-	try {
-		const catalog = new SessionCatalog(join(dir, "sessions.json"));
-		await catalog.load();
-		const draft = await catalog.createDraft({
-			projectId: "project-1",
-			title: "DSH session",
-			environment: "native",
-			backend: "dsh",
-		});
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			filePath: "C:\\Users\\me\\.dsh\\sessions\\ws\\session-1\\session.jsonl.zst",
-			dshSessionId: "session-host-abc123",
-		});
-		const warmed = catalog.getRecord(draft.id);
-		assert.equal(warmed?.filePath, undefined, "zstd 不得写入 filePath");
-		assert.equal(warmed?.status, "draft");
-		await catalog.attachRuntime({
-			sessionId: draft.id,
-			dshSessionId: "session-host-abc123",
-			promoteToActive: true,
-		});
-		assert.equal(catalog.getRecord(draft.id)?.status, "active");
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
 test("runtime event attachment rejects active origin changes but accepts metadata drafts", () => {
 	const { canAttachRuntimeMetadata } = loadCatalog();
 	const active = {
@@ -975,22 +574,6 @@ test("runtime event attachment rejects active origin changes but accepts metadat
 			},
 		),
 		true,
-	);
-	assert.equal(
-		canAttachRuntimeMetadata(
-			{
-				...active,
-				backend: "dsh",
-				filePath: undefined,
-				status: "draft",
-			},
-			{
-				sessionPath: "C:/Users/me/.dsh/sessions/ws/session-1/session.jsonl.zst",
-				backend: "dsh",
-			},
-		),
-		false,
-		"DSH zstd 路径不得走 pi 文件配对",
 	);
 });
 
@@ -1214,15 +797,13 @@ test("removeByProjectId drops every catalog entry for a removed sidebar project"
 			projectId: "gone-project",
 			title: "Keep me out",
 			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-gone",
+			backend: "pi",
 		});
 		await catalog.createDraft({
 			projectId: "keep-project",
 			title: "Stay",
 			environment: "native",
-			backend: "dsh",
-			dshSessionId: "session-keep",
+			backend: "pi",
 		});
 		const removed = await catalog.removeByProjectId("gone-project");
 		assert.equal(removed, 1);

@@ -6,17 +6,6 @@ import { Loader } from "../motion/loader";
 import { VoiceLevelBars } from "./VoiceLevelBars";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
 
-/**
- * 语音输入控件：动效一律用已 vendored 的 beui 组件（motion/button、motion/loader），
- * 但几何与配色跟随输入框底栏既有语言（28px、rounded-md、text-foreground、hover:bg-muted/60），
- * 避免和左侧的「+ / 模型」chip 不齐，也避免抢走右侧那颗实心发送圆钮的视觉主次。
- *
- * 三个状态必须在**不看文字**时也能区分（用户反馈：以前只能看出在录音，不知道在不在转写）：
- * - idle：mic 图标 + beui Button（按下缩放 + 点击涟漪）；
- * - recording：红色胶囊 + 电平波纹（`VoiceLevelBars`，跟随真实麦克风音量，不说话不动）；
- * - transcribing：中性胶囊 + loader `helix`（波形塌缩成点的「解码中」语义）+ 文案呼吸。
- * 用不同变体而不是只换颜色：色盲/高对比主题下也能分辨。
- */
 const BAR_BUTTON_CLASS = "size-7 rounded-md text-foreground hover:bg-muted/60";
 
 /** 转写胶囊：与录音胶囊同为 28px 高，但走中性色 + 波形塌缩动效，避免与录音混淆。 */

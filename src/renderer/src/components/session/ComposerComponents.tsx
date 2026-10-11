@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
 import { composerModesHiddenAtom } from "../../atoms";
-import { AlertCircle, Check, ChevronDown, ChevronLeft, CornerDownLeft, Eye, EyeOff, FileText, GitBranch, ImageIcon, ListChecks, Loader2, Paperclip, Plus, RefreshCw, Sparkles, Star, Target, Wrench, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, ChevronLeft, CornerDownLeft, Eye, EyeOff, FileText, GitBranch, ListChecks, Loader2, Paperclip, Plus, RefreshCw, Sparkles, Star, Target, Wrench, X } from "lucide-react";
 import { t, type TranslationKey } from "../../i18n";
 import type { PromptEnhanceView } from "../../hooks/usePromptEnhance";
 import { PromptEnhanceControls } from "./PromptEnhanceControls";
@@ -33,13 +33,12 @@ const MODE_LABEL: Record<ComposerAgentMode, TranslationKey> = {
 	normal: "app.composerModeNormal",
 	goal: "app.composerModeGoal",
 	plan: "app.composerModePlan",
-	imagegen: "app.composerModeImagegen",
 };
 
 /** 模式图标：普通=扳手，规划=清单，目标=靶心，生图=图片（与旧 chip 图标一致）。 */
 function modeGlyph(mode: ComposerAgentMode) {
 	if (mode === "plan") return <ListChecks size={14} strokeWidth={2} aria-hidden="true" />;
-	if (mode === "imagegen") return <ImageIcon size={14} strokeWidth={2} aria-hidden="true" />;
+
 	if (mode === "goal") return <Target size={14} strokeWidth={2} aria-hidden="true" />;
 	return <Wrench size={14} strokeWidth={2} aria-hidden="true" />;
 }
@@ -241,7 +240,7 @@ export function ComposerBottomBar(props: {
 	// 首次发送再由 App.ensureSessionForSend 把同一显式选择带入真实会话。
 	// 该偏好可能指向已删除的模型（localStorage 残留，用户删除模型后底栏仍显示旧默认）：
 	// 引导页（无 record）模型目录：后端各自的目录都要加载，才能对各自的点选做存在性
-	// 校验（pi 读 models.json 列表，DSH 读 host catalog）。目录命中主进程全局缓存
+
 	//（模型选择器同源），通常不会额外 fork pi。
 	const needsWelcomeCatalog = !props.record;
 	const { models: welcomeCatalogModels, report: welcomeCatalogReport } = useBackendModelCatalog({
@@ -249,8 +248,7 @@ export function ComposerBottomBar(props: {
 		backend: "pi",
 		enabled: needsWelcomeCatalog,
 	});
-	// 引导页点选按后端读各自的存储（issue #253）：DSH 的模型是 host route 名，
-	// 存在 WELCOME_MODEL_KEY；读错会拿到 pi 的 model 去校验 DSH 目录（必然「失效」）。
+
 	const welcomeModel = needsWelcomeCatalog ? readWelcomeModelPreference()?.model : undefined;
 	const welcomeModelLost = isWelcomeModelLost(welcomeModel, welcomeCatalogModels);
 	// 删除不可逆，走保守判定：只有「一次成功的完整加载」才具备判死资格。
@@ -283,14 +281,12 @@ export function ComposerBottomBar(props: {
 		record: props.record?.model,
 		fallback: guideDefaultModel,
 	});
-	// 用量查询链路随会话后端：DSH 会话走 dsh（$DSH_HOME 配置 + 凭据库），其余走 pi。
-	// 圆球面板必须与 DSH 卡片/选择器同一 backend，否则查的是另一条 usage-probes.json。
+
 	const isPlanMode = props.composerAgentMode === "plan";
-	const isImageGenMode = props.composerAgentMode === "imagegen";
 	const isGoalMode = props.composerAgentMode === "goal";
-	const isSpecialMode = isPlanMode || isImageGenMode || isGoalMode;
+	const isSpecialMode = isPlanMode || isGoalMode;
 	// 模式选择器常驻底栏（外移自「+」菜单，2026-10 用户要求直接可见）；可用性（plan/goal 扩展开关、
-	// imagegen 仅 pi、imageGenLocked 锁定）由专用 hook 统一维护（原 ComposerModeSelect 逻辑）。
+
 	const { visibleModes, refreshAvailability } = useComposerModeAvailability({
 		backend: props.backend,
 		value: props.composerAgentMode,
@@ -375,7 +371,7 @@ export function ComposerBottomBar(props: {
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start" sideOffset={4} className="min-w-44">
 							{/* 生图模式用图片粘贴添加参考图，不需要文件选择器上传附件 */}
-							{!isImageGenMode && (
+							{!false && (
 								<DropdownMenuItem onSelect={() => props.onAttachFile()}>
 									<Paperclip size={14} strokeWidth={2} aria-hidden="true" />
 									{t("app.composerAddAttach")}
@@ -501,7 +497,6 @@ const MODEL_LIST_FAILURE_REASON_TEXT: Record<ModelListFailReason, TranslationKey
 	"config-invalid": "app.modelListFailConfigInvalid",
 	"cli-failed": "app.modelListFailCliFailed",
 	"waf-blocked": "app.modelListFailWafBlocked",
-	"dsh-host-stopped": "app.modelListFailDshStopped",
 	empty: "app.modelListFailEmpty",
 };
 
@@ -567,13 +562,13 @@ export function ModelPicker(props: {
 	refreshing?: boolean;
 	/** 手动刷新：绕过缓存重新拉取模型列表 */
 	onRefresh?: () => void;
-	/** 用量查询链路：DSH 会话（目录 provider 是 DSH route 名）传 "dsh"，缺省 pi。 */
+
 	backend?: UsageProbeBackend;
 	/** 最近使用的供应商 ID 列表（最新在前）：已用过的分组排最前，未用过的按内置置顶+字母序。 */
 	recentProviders?: string[];
 	/** 供应商自定义顺序（模型页排序结果，后端对应数组由宿主选择）：列出的严格按此展示且不再被最近使用覆盖。 */
 	providerOrder?: string[];
-	/** 用户隐藏的供应商 key 列表（Pi 模型页眼睛开关）；Pi 后端按 provider 过滤，DSH 不生效。 */
+
 	hiddenProviders?: string[];
 	/** 用户隐藏的模型列表（格式："provider/modelId"）；Pi 后端过滤单个模型。 */
 	hiddenModels?: string[];
@@ -582,7 +577,7 @@ export function ModelPicker(props: {
 }) {
 	const currentModelKey = props.current?.provider && props.current?.modelId ? `${props.current.provider}/${props.current.modelId}` : undefined;
 	const favoritesSet = new Set(props.favoriteModels ?? []);
-	// 隐藏开关：Pi 后端按 provider 与 model 过滤（DSH 的 route 名不参与隐藏列表）；
+
 	// 过滤后收藏/分组/搜索都基于可见模型，隐藏供应商与隐藏模型不出现在主选择区。
 	const hiddenProviderSet = new Set(props.hiddenProviders ?? []);
 	const hiddenModelSet = new Set(props.hiddenModels ?? []);
@@ -633,7 +628,7 @@ export function ModelPicker(props: {
 
 	// 供应商用量行（cc-switch inline）：打开选择器时批量 TTL 去重查询，供应商标题行右侧
 	// 显示彩色剩余/百分比；查不到（未启用/不支持/失败/查询中）的分组保持干净不渲染。
-	// backend 按会话后端透传（DSH 目录的 provider 是 route 名，配置/凭据在 dsh 链路）。
+
 	const batchRefreshUsage = useProviderUsageBatchRefresh();
 	const providerKey = sortedProviders.join("\n");
 	useEffect(() => {

@@ -199,7 +199,7 @@ export class UsageStatsService {
 	constructor(deps: UsageStatsServiceDeps) {
 		this.agentDir = deps.agentDir;
 		this.logger = deps.logger;
-		// 独立缓存文件：与 session-summary-cache 互不干扰；pi / dsh 按 logPath 分键
+
 		const cache = new SessionSummaryCache<CachedUsageStats>("usage-stats-cache.json", deps.userDataDir);
 		this.piSource = new UsageLogSource("pi", new UsageLogReader(), cache, deps.logger);
 	}
@@ -219,7 +219,7 @@ export class UsageStatsService {
 	async detect(): Promise<UsageStatsDetectResult> {
 		const logPath = this.piLogPath;
 		const result = await this.piSource.detect(logPath);
-		return { installed: result.present, piInstalled: result.present, dshInstalled: false, dshAvailable: false, logPath: result.present ? logPath : null, recordCount: result.recordCount, firstRecordAt: result.firstRecordAt, lastRecordAt: result.lastRecordAt };
+		return { installed: result.present, piInstalled: result.present, logPath: result.present ? logPath : null, recordCount: result.recordCount, firstRecordAt: result.firstRecordAt, lastRecordAt: result.lastRecordAt };
 	}
 
 	/** 增量刷新两路源：返回本次解析统计；缓存已最新时零 IO。 */

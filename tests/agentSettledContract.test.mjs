@@ -24,5 +24,8 @@ test("notifyAgentSettled has exactly two call sites: settled and get_state fallb
 });
 
 test("markIdle fallback path also notifies settled after confirming no work", () => {
-	assert.match(source, /兜底确认无工作也算成功空闲[\s\S]{0,80}this\.notifyAgentSettled\(agentId, runtime\.tab\.title\);/);
+	const start = source.indexOf("private async markIdleIfPiReportsNoWork");
+	const fallback = source.slice(start, source.indexOf("private requireRuntime", start));
+	assert.match(fallback, /if \(state\.isStreaming \|\| state\.isCompacting \|\| \(state\.pendingMessageCount \?\? 0\) > 0\) return;/);
+	assert.match(fallback, /this\.notifyAgentSettled\(agentId, runtime\.tab\.title\);/);
 });

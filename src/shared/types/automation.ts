@@ -1,12 +1,5 @@
 import type { AgentBackend, ComposerAgentMode } from "./agent";
 
-/**
- * 定时任务可配置的工作模式。
- *
- * 只开放 composer 三态里的普通/计划/目标：imagegen 是独立后端（无 LLM 回合概念，
- * 且 AutomationTask.backend 已排除 imagegen），计划/目标靠 PiDeck 内置扩展在 pi 的
- * input 事件里识别隐藏标记，因此这两个模式要求 pi 后端 + 对应扩展已启用。
- */
 export type AutomationTaskMode = Extract<ComposerAgentMode, "normal" | "plan" | "goal">;
 
 /** P0 scheduler supports local-time five-field cron plus explicitly manual tasks. */
@@ -49,8 +42,8 @@ export type AutomationTask = {
 	prompt: string;
 	schedule: AutomationSchedule;
 	enabled: boolean;
-	/** imagegen is intentionally excluded: scheduled runs must use a conversational runtime. */
-	backend?: Exclude<AgentBackend, "imagegen">;
+
+	backend?: AgentBackend;
 	model?: { provider: string; modelId: string };
 	thinkingLevel?: string;
 	/**
@@ -58,8 +51,6 @@ export type AutomationTask = {
 	 * plan 先只读分析出计划；goal 围绕提示词自动连续推进到完成/阻塞。
 	 */
 	mode?: AutomationTaskMode;
-	/** DSH-only permission preset; pi ignores this field through the existing session contract. */
-	permissionPreset?: string;
 	/** 归一化后预算：null 已被剔除，键缺省即不限（运行态/持久化统一形态）。 */
 	budget: NormalizedAutomationBudget;
 	createdAt: number;
@@ -130,12 +121,11 @@ export type CreateAutomationTaskInput = {
 	prompt: string;
 	schedule: AutomationSchedule;
 	enabled?: boolean;
-	backend?: Exclude<AgentBackend, "imagegen">;
+	backend?: AgentBackend;
 	model?: { provider: string; modelId: string };
 	thinkingLevel?: string;
 	/** 工作模式，缺省普通模式；见 AutomationTaskMode。 */
 	mode?: AutomationTaskMode;
-	permissionPreset?: string;
 	budget?: Partial<AutomationBudget>;
 };
 

@@ -10,7 +10,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { open, readFile, stat } from "node:fs/promises";
-import type { CommitEntry, FileTreeNode, GitBranchInfo, GitResourceGroups, GitWorkspaceFileDiff, PiExtensionListResult, PiExtensionSummary, PiSkillListResult, PiSkillSummary, Project, YaoPromptDetailResult, YaoPromptListResult } from "../../shared/types";
+import type { CommitEntry, FileTreeNode, GitBranchInfo, GitResourceGroups, GitWorkspaceFileDiff, PiExtensionListResult, PiExtensionSummary, PiSkillListResult, PiSkillSummary, Project } from "../../shared/types";
 import { assertProjectFileReadPath, FILE_OUTSIDE_PROJECT_ERROR } from "../files/projectFileAccess";
 
 export type WebWorkspaceRoutesDeps = {
@@ -28,11 +28,6 @@ export type WebWorkspaceRoutesDeps = {
 	files?: {
 		listTree: (root: string, maxDepth?: number, directory?: string) => Promise<FileTreeNode[]>;
 	};
-	/** 提示词库（XuePromptManager 注入；缺省时 prompts 路由返回 503）。 */
-	prompts?: {
-		list: (opts?: { category?: string; search?: string; page?: number; pageSize?: number }) => Promise<YaoPromptListResult>;
-		detail: (slug: string, category: string) => Promise<YaoPromptDetailResult | null>;
-	};
 	/** 技能/扩展资产面板（SkillManager / ExtensionManager 注入；缺省时对应路由返回 503）。 */
 	assets?: {
 		listSkills: () => Promise<PiSkillListResult>;
@@ -48,8 +43,6 @@ const MAX_FILE_CONTENT_BYTES = 2 * 1024 * 1024;
 const TRUNCATED_PREVIEW_BYTES = 512 * 1024;
 /** 单次 diff 上限：1MB（原 256KB 对合并冲突/大重构文件偏紧，超限时 GitService 返回 null 会让用户深以为文件丢了）。 */
 const MAX_DIFF_BYTES = 1024 * 1024;
-/** 提示词列表单页上限。 */
-const MAX_PROMPT_PAGE_SIZE = 50;
 /**
  * 二进制扩展名黑名单：命中直接按二进制拒绝（不看内容，快速且准确）。
  * 白名单外其余类型（含无扩展名的 Makefile/Dockerfile/LICENSE 与生僻文本格式如 .gradle/.cmake）
@@ -342,48 +335,6 @@ export class WebWorkspaceRoutes {
 			return true;
 		}
 		sendJson(response, 200, { content: buffer.toString("utf8"), size: info.size });
-		return true;
-	}
-
-	private async listPrompts(url: URL, response: ServerResponse): Promise<boolean> {
-		if (!this.deps.prompts) {
-			sendError(response, 503, "webError.promptsUnavailable", "prompt library is not available");
-			return true;
-		}
-		const search = url.searchParams.get("search")?.trim() || undefined;
-		const category = url.searchParams.get("category")?.trim() || undefined;
-		const pageRaw = Number(url.searchParams.get("page"));
-		const pageSizeRaw = Number(url.searchParams.get("pageSize"));
-		const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.trunc(pageRaw) : 1;
-		const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(MAX_PROMPT_PAGE_SIZE, Math.trunc(pageSizeRaw)) : 20;
-		const result = await this.deps.prompts.list({ search, category, page, pageSize });
-		// YaoPromptItem.path 是宿主机绝对路径 —— 对外剥离
-		sendJson(response, 200, {
-			categories: result.categories,
-			prompts: result.prompts.map(({ path: _path, ...rest }) => rest),
-			total: result.total,
-			page,
-			pageSize,
-		});
-		return true;
-	}
-
-	private async promptDetail(slug: string, url: URL, response: ServerResponse): Promise<boolean> {
-		if (!this.deps.prompts) {
-			sendError(response, 503, "webError.promptsUnavailable", "prompt library is not available");
-			return true;
-		}
-		const category = url.searchParams.get("category")?.trim() ?? "";
-		if (!category) {
-			sendError(response, 400, "webError.invalidRequest", "category is required");
-			return true;
-		}
-		const detail = await this.deps.prompts.detail(decodeURIComponent(slug), category);
-		if (!detail) {
-			sendError(response, 404, "webError.promptNotFound", "prompt not found");
-			return true;
-		}
-		sendJson(response, 200, { detail: { title: detail.title, description: detail.description, promptContent: detail.promptContent } });
 		return true;
 	}
 

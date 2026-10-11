@@ -5,10 +5,6 @@ import { Button } from "../components/ui-shadcn/button";
 import { Input } from "../components/ui-shadcn/input";
 import type { FetchedModel } from "../../../shared/types/fetchedModel";
 
-/**
- * 从 /models 拉回后的多选器（Pi 配置页与 DSH 自定义模型共用）。
- * 已存在的模型灰掉不可再选；全选只作用于当前筛选结果。
- */
 export function FetchedModelCombobox(props: { models: FetchedModel[]; value: string[]; existingModelIds: string[]; onChange: (value: string[]) => void }) {
 	const [filter, setFilter] = useState("");
 	const inputRef = useRef<HTMLInputElement | null>(null);

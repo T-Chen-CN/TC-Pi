@@ -20,7 +20,7 @@ export class HostPluginSessions {
 	}
 
 	private path(entry: SessionCatalogEntry): string | undefined {
-		if (!entry.filePath || entry.noSession || entry.backend === "dsh") return undefined;
+		if (!entry.filePath || entry.noSession) return undefined;
 		if (process.platform === "win32" && entry.environment === "wsl") {
 			if (!entry.wslDistro) return undefined;
 			return toWindowsHostPath(entry.filePath, { distro: entry.wslDistro });

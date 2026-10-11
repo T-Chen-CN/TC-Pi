@@ -1,14 +1,3 @@
-/**
- * 用量统计（Usage Stats）跨进程 DTO。
- *
- * 数据源（只读，采集由各后端插件负责）：
- *  - pi：pi-tracker 写入的 usage.jsonl
- *  - DSH：dsh-bill 写入的 $DSH_HOME/dsh-bill/records.jsonl
- * PiDeck 只读数据做展示，不承担采集职责（扩展机制：装插件=开功能）。
- *
- * 注意：IPC 结构化克隆不支持 Set，聚合内部可用 Set，跨层 DTO 一律用数组。
- */
-
 /** 单条用量记录（对应 usage.jsonl 一行，位置数组 10/11 字段）。 */
 export type UsageRecord = {
 	/** Unix ms */
@@ -29,16 +18,11 @@ export type UsageRecord = {
 	costKnown: boolean;
 };
 
-/** 检测结果：pi-tracker / dsh-bill 是否已装、日志是否可读。 */
 export type UsageStatsDetectResult = {
 	/** 任一路日志存在 */
 	installed: boolean;
 	/** pi analytics/usage.jsonl 存在 */
 	piInstalled?: boolean;
-	/** DSH_HOME/dsh-bill/records.jsonl 存在 */
-	dshInstalled?: boolean;
-	/** 已解析出 DSH_HOME（即使尚未产生日志） */
-	dshAvailable?: boolean;
 	/** host 路径（诊断/展示用；两路都有时用 " · " 拼接），未安装为 null */
 	logPath: string | null;
 	/** 已解析记录数（缓存的 count），未知为 null */

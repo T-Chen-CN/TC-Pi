@@ -3,14 +3,8 @@ import type { SessionEnvironment, SessionSource } from "./session";
 
 export type AgentStatus = "starting" | "idle" | "running" | "error" | "closed";
 
-/**
- * 运行时后端：pi（stdio JSON-RPC，现有）、dsh（DeepSeek Harness，无 web 内嵌形态）
- * 或 imagegen（生图，无 LLM agent、无 pi/DSH 会话文件，历史独立存 ImageSessionStore）。
- * 与 `SessionSource`（历史导入来源）是两个维度：source 描述会话文件从哪来，
- * backend 描述会话由哪个引擎驱动。缺省视为 "pi"，旧数据天然兼容。
- * 生图是后端维度的独立第三类（不等价于 pi 的一种模式），互不影响。
- */
-export type AgentBackend = "pi" | "dsh" | "imagegen" | "acp";
+/** Pi is the only runtime backend in this distribution. */
+export type AgentBackend = "pi";
 
 export type AgentGatewayCapability =
 	| "compact" // 手动压缩
@@ -37,8 +31,6 @@ export type AgentTab = {
 	sessionSource?: SessionSource;
 	/** 运行时后端；缺省 "pi"（旧数据/旧路径兼容）。 */
 	backend?: AgentBackend;
-	/** DSH agent 预设（会话「模式」）：新建/attach 时从 host 解析，回写 catalog 供头部只读展示。 */
-	agentPreset?: string;
 	wslDistro?: string;
 	wslUser?: string;
 	importedSourceId?: string;
@@ -59,11 +51,7 @@ export type AgentRuntimeState = {
 	modelId?: string;
 	thinkingLevel?: string;
 	isStreaming?: boolean;
-	/**
-	 * pi 的逻辑模型回合状态（agent_start → true，agent_end → false）。
-	 * false 表示本轮回答已结束；runtime 仍可能因为上下文压缩、自动重试收尾或
-	 * 队列检查保持 busy。undefined 兼容不提供该边界的旧 pi / DSH 快照。
-	 */
+
 	isTurnActive?: boolean;
 	isCompacting?: boolean;
 	/** 是否正在执行工具调用（read/write/bash 等） */
@@ -80,22 +68,6 @@ export type AgentRuntimeState = {
 	/** 对话消息估算 token：主进程按会话文件消息文本字符数 ÷ 4 粗估，
 	 *  用于 UI 展示「对话 vs 系统+工具」两段占比（pi 不返回 prompt 构成）。 */
 	contextMessageTokens?: number;
-	/** DSH host contextBreakdown 投影：系统提示 token 估算（缺失 = 无投影；0 表示确实为 0）。 */
-	contextSystemTokens?: number;
-	/** DSH host contextBreakdown 投影：工具 schema token 估算（缺失 = 无投影；0 表示确实为 0）。 */
-	contextToolsTokens?: number;
-	/** DSH 会话统计（host sessionStats 投影：整段日志回合/步骤计数与墙钟汇总；
-	 *  dsh-web StatsLine 同源；pi 无此概念，pi 用「上次回复」性能组）。 */
-	dshSessionStats?: {
-		turns: number;
-		steps: number;
-		llmMs: number;
-		toolMs: number;
-		/** 平均首 token 延迟（ms；ttftMs ÷ ttftSteps），无首字样本时为 undefined */
-		ttftAvgMs?: number;
-		/** 生成速度（tokens/s；decodeTokens ÷ decode 时长），无输出样本时为 undefined */
-		tokensPerSecond?: number;
-	};
 	inputTokens?: number;
 	outputTokens?: number;
 	cacheRead?: number;
@@ -136,13 +108,6 @@ export type AvailableModel = {
 	thinkingLevels?: string[];
 	/** Pi capability hydration 返回的模型特有思考映射；保留给配置补全，不能由静态级别表推断。 */
 	thinkingLevelMap?: ThinkingLevelMap;
-	/** 该模型支持的思考档位（DSH models catalog 的 reasoning.efforts；
-	 *  选择器按它过滤档位——DSH deepseek 适配器只接受 off/high/max，
-	 *  pi-ai provider 按模型声明，选不支持的档位会在下次请求抛 UNSUPPORTED_REASONING_EFFORT）。 */
-	reasoningEfforts?: Array<{ id: string; name?: string; description?: string }>;
-	/** DSH 模型自己的默认思考档位（reasoning.defaultEffort）；settings.yaml 未配
-	 *  agent-default-model.reasoningEffort 时，底栏/选择器应回退到这个值。 */
-	defaultEffort?: string;
 };
 
 /** 模型列表加载失败的成因分类：供模型选择器给出差异化引导（版本过低/配置损坏/pi 未安装）。 */
@@ -157,11 +122,6 @@ export type ModelListFailReason =
 	 * 可操作动作是换代理或配 UA，而不是改配置——混在一起会把用户引向错误方向。
 	 */
 	| "waf-blocked"
-	/**
-	 * DSH 会话专用：host 被用户手动停止，模型目录（host 级 llm.models）读不到。
-	 * 与 cli-failed 的区别：不是运行时故障，重试永远无效，可操作动作是「启动 host」。
-	 */
-	| "dsh-host-stopped"
 	| "empty";
 
 /** 模型列表加载报告（projects:list-models-report）：模型数组 + 为空时的失败原因与详情。
@@ -278,4 +238,4 @@ export type ThinkingUpdate = {
 };
 
 /** 输入框发送模式：普通执行 / 只读计划 / 生图 / 目标自动推进。 */
-export type ComposerAgentMode = "normal" | "plan" | "imagegen" | "goal";
+export type ComposerAgentMode = "normal" | "plan" | "goal";

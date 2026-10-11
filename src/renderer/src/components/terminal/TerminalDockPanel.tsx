@@ -1,7 +1,7 @@
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel } from "../ui-shadcn/resizable";
 import { SessionRuntimeDock } from "../session/SessionRuntimeDock";
-import { TerminalDock, type TerminalDockSettings } from "./TerminalDock";
+import { type TerminalDockSettings } from "./TerminalDock";
 import type { TerminalThemeId } from "../../../../shared/types";
 import type { PiDesktopApi } from "../../../../preload";
 import type { TerminalTarget } from "../../../../shared/types";

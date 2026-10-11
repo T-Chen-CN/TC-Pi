@@ -12,7 +12,7 @@
  *  - level 固定阈值、跨天可比：0 / 1..99 / 100..999 / 1000..99999 / ≥100000
  */
 
-import type { DayTotals, HeatmapCell, ProviderSlice, UsageAggregated, UsageDayModelSlice, UsageDayProjectSlice, UsageDayRow, UsageModelRow, UsageProjectRow, UsageRecord } from "../../shared/types/usageStats";
+import type { DayTotals, HeatmapCell, ProviderSlice, UsageAggregated, UsageDayModelSlice, UsageDayProjectSlice, UsageDayRow, UsageRecord } from "../../shared/types/usageStats";
 
 const DAY_MS = 24 * 3600 * 1000;
 const HEATMAP_WEEKS = 53;

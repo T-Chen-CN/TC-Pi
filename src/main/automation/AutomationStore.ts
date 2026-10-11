@@ -1,8 +1,8 @@
+import { requireSupportedBackend } from "../../shared/productFeatures";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type {
-	AutomationBudget,
 	AutomationChangedEvent,
 	AutomationRun,
 	AutomationRunEvent,
@@ -152,7 +152,6 @@ export class AutomationStore {
 				model: patch.model === undefined ? current.model : patch.model,
 				thinkingLevel: patch.thinkingLevel === undefined ? current.thinkingLevel : patch.thinkingLevel,
 				mode: patch.mode === undefined ? current.mode : patch.mode,
-				permissionPreset: patch.permissionPreset === undefined ? current.permissionPreset : patch.permissionPreset,
 				budget: { ...current.budget, ...(patch.budget ?? {}) },
 			},
 			now,
@@ -368,7 +367,6 @@ function normalizePersistedTask(value: unknown): AutomationTask | undefined {
 				model: value.model,
 				thinkingLevel: value.thinkingLevel,
 				mode: value.mode,
-				permissionPreset: value.permissionPreset,
 				budget: value.budget,
 			},
 			createdAt,
@@ -442,10 +440,10 @@ function normalizeTaskInput(input: CreateAutomationTaskInput | Record<string, un
 	const projectId = requireTrimmedString(input.projectId, "Project", 200);
 	const prompt = requireTrimmedString(input.prompt, "Prompt", 100_000);
 	const schedule = normalizeSchedule(input.schedule);
-	const backend = input.backend === "dsh" ? ("dsh" as const) : input.backend === "pi" ? ("pi" as const) : undefined;
+	requireSupportedBackend(input.backend);
+	const backend = input.backend === "pi" ? ("pi" as const) : undefined;
 	const model = normalizeModel(input.model);
 	const thinkingLevel = optionalTrimmedString(input.thinkingLevel, 100);
-	const permissionPreset = optionalTrimmedString(input.permissionPreset, 100);
 	const mode = normalizeTaskMode(input.mode);
 	return {
 		name,
@@ -459,17 +457,10 @@ function normalizeTaskInput(input: CreateAutomationTaskInput | Record<string, un
 		// 普通模式是缺省语义：不落盘 mode 键，旧数据与新建默认任务结构一致，
 		// 也避免 automation.json 里出现一堆冗余的 "mode": "normal"。
 		...(mode && mode !== "normal" ? { mode } : {}),
-		...(permissionPreset ? { permissionPreset } : {}),
 		budget: normalizeBudget(input.budget, now),
 	};
 }
 
-/**
- * 归一化定时任务工作模式。
- * 只接受正常/计划/目标：imagegen 不适用（backend 已排除生图），非法值一律降级为
- * 「未设置」（调用方按普通模式解释），避免手工编辑 automation.json 注入未知模式后
- * 在 dispatch 时产出无法识别的隐藏标记。
- */
 function normalizeTaskMode(value: unknown): AutomationTaskMode | undefined {
 	if (value === "plan" || value === "goal" || value === "normal") return value;
 	return undefined;

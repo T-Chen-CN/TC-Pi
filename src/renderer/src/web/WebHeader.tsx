@@ -5,7 +5,6 @@
  * 模型与思考档位已迁往 composer 工具行（WebModelSelector/WebThinkingSelector）。
  * 运行态来自 useChat status（submitted/streaming）与轮询的 runtime.status 兜底。
  */
-import { SessionBackendMark } from "@/components/session/SessionSourceBadge";
 import { Button } from "@/components/ui-shadcn/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui-shadcn/dropdown-menu";
 import { t } from "@/i18n";
@@ -64,8 +63,7 @@ export function WebHeader(props: {
 				</Button>
 				<div className="web-title-block flex min-w-0 flex-1 flex-col gap-0.5">
 					<strong className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold tracking-tight text-foreground" title={title}>
-						{/* 后端徽标（C18 同源）：与侧栏会话行一致，头部可辨 pi/dsh */}
-						{backend && <SessionBackendMark backend={backend} className="size-4 shrink-0 rounded" />}
+						{}
 						<span className="min-w-0 truncate">{title}</span>
 					</strong>
 					{/* 运行态：紧凑小圆点+文字，不用带边框底色的大 pill（旧 agent-status-indicator
@@ -78,10 +76,9 @@ export function WebHeader(props: {
 				<div className="web-header-actions flex min-w-0 items-center justify-end gap-1.5">
 					{/* P2：上下文用量环（无窗口数据时隐藏；超限变红；点击开详情弹层） */}
 					{contextUsage && (contextUsage.contextWindow ?? 0) > 0 ? <ContextRing usage={contextUsage} onClick={() => setContextSheetOpen(true)} /> : null}
-					{/* S6.3：DSH 会话的 goals/subagents/skills 工具面板入口（仅 dsh 后端显示） */}
+					{}
 
-					{/* P1：DSH 权限预设——单盾牌图标（强度语义：read-only=ShieldAlert / workspace-write=ShieldCheck /
-						full-access=ShieldOff），下拉选档；与桌面 DshPermissionMenu 同一交互族。 */}
+					{}
 
 					{/* P3：工作区抽屉（Git / 文件）入口 */}
 					{actions?.onOpenWorkspace ? (

@@ -1,14 +1,3 @@
-/**
- * 模型规格自动补全（与 dsh-web 添加模型语义对齐）。
- *
- * 优先级：listing 已有字段 > 当前 Pi/内置能力目录匹配 > 留空。
- * 只填空字段；手填 / 明确关掉的 reasoning=false 一律不覆盖。
- * 不再写入 128k/8k 猜的默认值。
- *
- * 例外（用户决策）：自适应未匹配到任何推理声明时，默认支持思考并开放全部档位
- * （reasoning: true + DEFAULT_OPEN_THINKING_MAP），否则 Pi 只会给 off，用户没得选。
- */
-
 import type { ThinkingLevelMap } from "../../../shared/types/modelSpecs";
 import type { ModelSpec } from "../../../shared/types/modelSpecs";
 import type { FetchedModel } from "../../../shared/types/fetchedModel";
@@ -97,7 +86,7 @@ export function computeModelSpecPatches(model: ModelItem, spec: ModelSpec | null
 		}
 	}
 	// input（输入模态）：目录明确声明时优先；仅当模型 ID 明显是视觉变体且目录
-	// 未声明 input 时兜底补图片能力（否则 vision 模型会被当成 text-only 走视觉桥）。
+
 	// 已有 input（含手填）一律不动——覆盖由「重置为自适应」负责。
 	if (model.input == null) {
 		if (spec?.input && spec.input.length > 0) {
@@ -107,7 +96,7 @@ export function computeModelSpecPatches(model: ModelItem, spec: ModelSpec | null
 			updates.push(["input", ["text", "image"]]);
 		} else if (isVisionModelId(model.id)) {
 			// 目录未收录的视觉模型：ID 本身就是能力声明（如 -vision-exp/-vl），
-			// 补上图片能力而不是留空让 Pi 按 text-only 处理（图片会走视觉桥）。
+
 			updates.push(["input", ["text", "image"]]);
 		}
 	}

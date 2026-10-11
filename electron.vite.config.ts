@@ -178,7 +178,6 @@ export default defineConfig({
         "throttleit",
         "json-schema",
         "eventsource-parser",
-        "undici",
         "pkce-challenge",
         "dequal",
         "use-sync-external-store",

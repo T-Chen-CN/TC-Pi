@@ -1,7 +1,7 @@
 import type { McpProbeResult, McpServerDefinition, McpServerTransport } from "../../shared/types/mcp";
 import type { ResourceImportCandidate, ResourceImportSourceStatus, StoredResourceImportCandidate } from "../../shared/types/resourceImport";
 import { addUnique, isRecord, redactPreviewArgs, redactPreviewUrl, safeMessage, PROBE_CONCURRENCY, PROBE_TIMEOUT_MS, redactPreviewCommand, redactSensitiveList, redactSensitiveText, PREVIEW_TEXT_MAX } from "./common";
-import { isMcpServerName, validateMcpServerValue } from "../config/mcpConfig";
+import { validateMcpServerValue } from "../config/mcpConfig";
 import { parseCodexToml } from "./toml";
 
 export type McpSourceParse = Record<string, unknown>;

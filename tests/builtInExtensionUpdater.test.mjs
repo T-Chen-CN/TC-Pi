@@ -34,14 +34,20 @@ const { resolveBuiltInExtensionPath, resolveBuiltInExtensionsOverlayDir, readEff
 
 const BRANCH = "main";
 
-/** 造一个假的 vendored 依赖源目录（node_modules/undici/package.json），模拟 extraResources 产物。 */
-function makeVendorDir(root) {
-	const vendorDir = join(root, "vendor-node_modules");
-	const undiciDir = join(vendorDir, "undici");
-	mkdirSync(undiciDir, { recursive: true });
-	writeFileSync(join(undiciDir, "package.json"), '{"name":"undici","version":"6.28.0"}\n');
-	return vendorDir;
-}
+test("old overlays cannot hide a current bundled helper from the next complete snapshot", async () => {
+	await withFixture(async (fixture) => {
+		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
+		mkdirSync(overlayDir, { recursive: true });
+		const oldFiles = { "pi-deck-todo.ts": fixture.files["pi-deck-todo.ts"] };
+		writeFileSync(join(overlayDir, "pi-deck-todo.ts"), oldFiles["pi-deck-todo.ts"]);
+		writeFileSync(join(overlayDir, EXTENSIONS_MANIFEST_FILE_NAME), remoteManifestText(oldFiles, "0.9.0"));
+		const { updater } = createUpdater(fixture, repoFilesOf(fixture, { "pi-deck-todo.ts": "export const todo = 2;\n" }));
+		const result = await updater.update();
+		assert.equal(result.ok, true);
+		assert.equal(result.filesWritten, 3);
+		assert.equal(readFileSync(join(overlayDir, "pi-deck-todo-state.ts"), "utf8"), fixture.files["pi-deck-todo-state.ts"]);
+	});
+});
 
 function sha256(text) {
 	return createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
@@ -162,6 +168,25 @@ function repoFilesOf(fixture, override = {}, version = "1.0.1") {
 		...Object.fromEntries(Object.entries(files).map(([name, content]) => [`resources/extensions/${name}`, content])),
 	};
 }
+
+test("a legacy overlay cannot extend the current bundled update file set", async () => {
+	await withFixture(async (fixture) => {
+		const oldFiles = { ...fixture.files, "pi-deck-vision.ts": "export const retired = 1;\n" };
+		const overlayDir = join(fixture.userDataDir, "builtin-extensions");
+		mkdirSync(overlayDir, { recursive: true });
+		for (const [name, content] of Object.entries(oldFiles)) writeFileSync(join(overlayDir, name), content);
+		writeFileSync(join(overlayDir, EXTENSIONS_MANIFEST_FILE_NAME), remoteManifestText(oldFiles, "0.9.0"));
+		const { updater, network } = createUpdater(fixture, repoFilesOf(fixture, { "pi-deck-vision.ts": "export const retired = 2;\n", "pi-deck-todo.ts": "export const todo = 2;\n" }));
+		const result = await updater.update();
+		assert.equal(result.ok, true);
+		assert.equal(existsSync(join(overlayDir, "pi-deck-vision.ts")), false);
+		assert.equal(
+			network.calls.some((url) => url.includes("pi-deck-vision.ts")),
+			false,
+		);
+		assert.ok(existsSync(join(overlayDir, "pi-deck-todo-state.ts")), "current helper modules remain in the complete snapshot");
+	});
+});
 
 /**
  * 每次用例自建夹具并清理，避免跨用例的 userData 覆盖层状态泄漏。
@@ -379,69 +404,6 @@ test("远端不可达时返回 network 失败且不触碰磁盘", async () => {
 		assert.equal(update.code, "network");
 		assert.equal(update.updated, false);
 		assert.equal(existsSync(overlayDir), false);
-	});
-});
-
-/**
- * 2026-09-15 线上事故回归：pi 扩展加载器按扩展文件所在目录向上查 node_modules。
- * 随包目录有 extraResources 的 extensions/node_modules/undici 兜底，覆盖层上层没有——
- * pi-deck-ask-question.ts 顶部 `import "undici"` 在覆盖层路径下 MODULE_NOT_FOUND，pi 启动失败，
- * PiDeck 禁用全部扩展重启。覆盖层必须自带 vendored 依赖。
- */
-test("update 把 vendored node_modules 一并写进覆盖层", async () => {
-	await withFixture(async (fixture) => {
-		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
-		const vendorNodeModulesDir = makeVendorDir(fixture.root);
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
-		const { updater } = createUpdater(fixture, repoFiles, { vendorNodeModulesDir });
-
-		const result = await updater.update();
-		assert.equal(result.ok, true);
-		assert.equal(result.updated, true);
-		// vendored 包整目录复制进覆盖层，扩展的裸导入在覆盖层路径下才解析得到
-		assert.equal(readFileSync(join(overlayDir, "node_modules", "undici", "package.json"), "utf8"), '{"name":"undici","version":"6.28.0"}\n');
-		// 多出的 node_modules 目录不影响清单整体校验（清单只声明 .ts 文件）
-		assert.ok(readVerifiedArtifact(overlayDir), "覆盖层必须通过整体校验");
-	});
-});
-
-test("ensureOverlayVendorDependencies 自愈旧覆盖层且幂等", async () => {
-	await withFixture(async (fixture) => {
-		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
-		const vendorNodeModulesDir = makeVendorDir(fixture.root);
-
-		// 1) 旧版热更新器写的覆盖层：没有 vendorNodeModulesDir，因此不带 node_modules
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
-		const legacy = createUpdater(fixture, repoFiles);
-		assert.equal((await legacy.updater.update()).updated, true);
-		assert.equal(existsSync(join(overlayDir, "node_modules", "undici", "package.json")), false);
-
-		// 2) 自愈：补拷缺失的 vendored 依赖
-		const healer = new BuiltInExtensionsUpdater({
-			userDataDir: fixture.userDataDir,
-			builtinExtensionsDir: fixture.builtinDir,
-			vendorNodeModulesDir,
-		});
-		assert.equal(healer.ensureOverlayVendorDependencies(), true);
-		assert.equal(readFileSync(join(overlayDir, "node_modules", "undici", "package.json"), "utf8"), '{"name":"undici","version":"6.28.0"}\n');
-
-		// 3) 幂等：已有该包时不再写盘
-		assert.equal(healer.ensureOverlayVendorDependencies(), false);
-
-		// 4) 无覆盖层时不作为（restoreBuiltin 之后覆盖层已不存在）
-		legacy.updater.restoreBuiltin();
-		assert.equal(healer.ensureOverlayVendorDependencies(), false);
-	});
-});
-
-test("vendorNodeModulesDir 缺省时跳过 vendored 复制（旧调用方兼容）", async () => {
-	await withFixture(async (fixture) => {
-		const overlayDir = resolveBuiltInExtensionsOverlayDir(fixture.userDataDir);
-		const repoFiles = repoFilesOf(fixture, { "pi-deck-ask-question.ts": "export const vision = 2;\n" }, "1.0.1");
-		const { updater } = createUpdater(fixture, repoFiles);
-		assert.equal((await updater.update()).updated, true);
-		assert.equal(existsSync(join(overlayDir, "node_modules")), false);
-		assert.ok(readVerifiedArtifact(overlayDir));
 	});
 });
 

@@ -47,7 +47,7 @@ function MessageImage(props: {
 
 // Mermaid 库体积数 MB，仅在真正出现 mermaid 代码块时才动态加载，
 // 避免随渲染进程常驻、放大内存占用并在流式期间抢占主线程。
-import { AlertTriangle, Check, ChevronDown, ChevronUp, CircleAlert, CircleDot, Copy, Eye, EyeOff, FileText, Folder, GitFork, LoaderCircle, MessageSquare, Quote, Send, Share, Sparkles, SquarePen, Trash, Undo2, UserPen, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleAlert, CircleDot, Copy, FileText, Folder, GitFork, LoaderCircle, MessageSquare, Quote, Send, Share, Sparkles, SquarePen, Trash, Undo2, UserPen, X } from "lucide-react";
 import removeMarkdown from "remove-markdown";
 import { imageContentSrc } from "../../../../shared/imageContentSrc";
 import type { AgentRuntimeState, ChatMessage, ImageContent } from "../../../../shared/types";
@@ -62,7 +62,6 @@ import type { BubbleRefSegment } from "./composer/quoteChip";
 import { buildBubbleRefSegments, replaceExpandedRefBlocksWithLabels } from "./composer/quoteChip";
 import { ImageActionButtons } from "./imageActions";
 
-import { extractVisionBridgeBlocks } from "../../utils/visionBridgeBlocks";
 import { MultiSelectModal } from "./MessageShareModal";
 import { DiagnosticMessageCard, RespondingIndicator, ThinkingBlock } from "./TimelineEventCards";
 import { formatDuration, formatPercent, formatTime, stripAnsi } from "./TimelineFormat";
@@ -106,8 +105,6 @@ export type SessionStatusDetail = {
 	detailRows: SessionDetailRow[];
 	/** 最近一条回复的性能指标（TTFT/总耗时/tps）：与上下文累计量分开展示，避免误读为整段会话均值 */
 	replyPerfRows: SessionDetailRow[];
-	/** DSH 会话统计（host sessionStats 投影：回合/步骤、墙钟、平均首字、生成速度） */
-	sessionStatRows: SessionDetailRow[];
 	hasDetail: boolean;
 };
 
@@ -116,14 +113,13 @@ export type SessionStatusDetail = {
  * 纯函数：label/value 已本地化，调用方只负责布局。
  */
 export function buildSessionStatusDetail(
-	state: Pick<AgentRuntimeState, "contextPercent" | "contextTokens" | "contextWindow" | "inputTokens" | "outputTokens" | "cacheRead" | "cacheWrite" | "cacheTotal" | "cacheHitPercent" | "ttftMs" | "totalMs" | "tps" | "cost" | "dshSessionStats"> | undefined,
+	state: Pick<AgentRuntimeState, "contextPercent" | "contextTokens" | "contextWindow" | "inputTokens" | "outputTokens" | "cacheRead" | "cacheWrite" | "cacheTotal" | "cacheHitPercent" | "ttftMs" | "totalMs" | "tps" | "cost"> | undefined,
 	averageCacheHit: number | undefined,
 	averageCacheHitSampleCount: number,
 ): SessionStatusDetail {
 	const detailRows: SessionDetailRow[] = [];
 	const replyPerfRows: SessionDetailRow[] = [];
-	const sessionStatRows: SessionDetailRow[] = [];
-	if (!state) return { detailRows, replyPerfRows, sessionStatRows, hasDetail: false };
+	if (!state) return { detailRows, replyPerfRows, hasDetail: false };
 	// 美元→人民币估算汇率（仅用于费用提示的便捷换算，非实时牌价；
 	// 如后续需要跟随实时汇率，可升级为设置项 usdToCnyRate）
 	const cnyAmount = state.cost != null ? `¥${(state.cost * USD_TO_CNY_RATE).toFixed(2)}` : undefined;
@@ -186,33 +182,10 @@ export function buildSessionStatusDetail(
 		detailRows.push({ label: t("ctx.detail.cost"), value: `$${state.cost.toFixed(3)}`, emphasis: true, hint: t("ctx.detail.costHint") });
 		detailRows.push({ label: t("ctx.detail.costCny"), value: cnyAmount ?? "-", emphasis: true, hint: t("ctx.detail.costCnyHint") });
 	}
-	// DSH 会话统计（host sessionStats 投影，dsh-web StatsLine 同源）：整段日志的
-	// 回合/步骤计数与墙钟汇总。与 pi 的「上次回复」性能组语义不同，独立成组展示。
-	const sessionStats = state.dshSessionStats;
-	if (sessionStats) {
-		sessionStatRows.push({
-			label: t("ctx.detail.turnsSteps"),
-			value: `${sessionStats.turns} / ${sessionStats.steps}`,
-			hint: t("ctx.detail.turnsStepsHint"),
-		});
-		if (sessionStats.llmMs > 0) {
-			sessionStatRows.push({ label: t("ctx.detail.llmDuration"), value: formatDuration(sessionStats.llmMs), hint: t("ctx.detail.llmDurationHint") });
-		}
-		if (sessionStats.toolMs > 0) {
-			sessionStatRows.push({ label: t("ctx.detail.toolDuration"), value: formatDuration(sessionStats.toolMs), hint: t("ctx.detail.toolDurationHint") });
-		}
-		if (sessionStats.ttftAvgMs != null) {
-			sessionStatRows.push({ label: t("ctx.detail.ttftAverage"), value: formatDuration(sessionStats.ttftAvgMs), hint: t("ctx.detail.ttftAverageHint") });
-		}
-		if (sessionStats.tokensPerSecond != null) {
-			sessionStatRows.push({ label: t("ctx.detail.tps"), value: `${sessionStats.tokensPerSecond.toFixed(0)} tok/s`, hint: t("ctx.detail.tpsAverageHint") });
-		}
-	}
 	return {
 		detailRows,
 		replyPerfRows,
-		sessionStatRows,
-		hasDetail: detailRows.length > 0 || replyPerfRows.length > 0 || sessionStatRows.length > 0,
+		hasDetail: detailRows.length > 0 || replyPerfRows.length > 0,
 	};
 }
 
@@ -229,7 +202,7 @@ export function SessionStatus(props: {
 	const history = props.cacheHitHistory ?? [];
 	const averageCacheHit = state.cacheHitAveragePercent ?? (history.length > 0 ? history.reduce((sum, value) => sum + value, 0) / history.length : undefined);
 	const averageCacheHitSampleCount = state.cacheHitSampleCount ?? history.length;
-	const { detailRows, replyPerfRows, sessionStatRows, hasDetail } = buildSessionStatusDetail(state, averageCacheHit, averageCacheHitSampleCount);
+	const { detailRows, replyPerfRows, hasDetail } = buildSessionStatusDetail(state, averageCacheHit, averageCacheHitSampleCount);
 	// cost-chip 悬浮提示里的人民币估算（与明细行共用同一汇率常量）
 	const cnyAmount = state.cost != null ? `¥${(state.cost * USD_TO_CNY_RATE).toFixed(2)}` : undefined;
 
@@ -283,17 +256,6 @@ export function SessionStatus(props: {
 						<div className="mt-2.5 grid gap-1 border-t border-border/70 pt-2">
 							<div className="px-1 text-micro font-semibold uppercase tracking-wide text-muted-foreground">{t("ctx.detail.lastReply")}</div>
 							{replyPerfRows.map((row) => (
-								<div key={row.label} title={row.hint} className="flex items-baseline justify-between gap-4 px-1 py-0.5 text-caption leading-5">
-									<span className="shrink-0 text-muted-foreground">{row.label}</span>
-									<span className="min-w-0 whitespace-nowrap text-right font-mono font-semibold tabular-nums text-popover-foreground">{row.value}</span>
-								</div>
-							))}
-						</div>
-					)}
-					{sessionStatRows.length > 0 && (
-						<div className="mt-2.5 grid gap-1 border-t border-border/70 pt-2">
-							<div className="px-1 text-micro font-semibold uppercase tracking-wide text-muted-foreground">{t("ctx.detail.sessionStats")}</div>
-							{sessionStatRows.map((row) => (
 								<div key={row.label} title={row.hint} className="flex items-baseline justify-between gap-4 px-1 py-0.5 text-caption leading-5">
 									<span className="shrink-0 text-muted-foreground">{row.label}</span>
 									<span className="min-w-0 whitespace-nowrap text-right font-mono font-semibold tabular-nums text-popover-foreground">{row.value}</span>
@@ -509,7 +471,6 @@ export const AssistantText = memo(
 				{props.images && props.images.length > 0 && (
 					<div className="message-images">
 						{props.images.map((img, index) => {
-							// 历史生图图片只带 ref 引用（走 pideck-img:// 协议），无源时不渲染空图
 							const src = imageContentSrc(img);
 							if (!src) return null;
 							return <MessageImage key={index} src={src} alt={t("app.imageAlt", { index: index + 1 })} className="message-image" placeholderClass="min-h-24" onClick={() => props.onPreviewImage(img)} />;
@@ -595,14 +556,7 @@ export const UserBubble = memo(function UserBubble(props: {
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, [messageExpanded, editing, message.text]);
-	// 视觉桥块：pi-deck-vision 扩展把用户消息里的图片换成描述文本时，会在消息里
-	// 留下「[图片 #N（视觉桥已查看...）]」/失败标记。先剥出块，渲染成可视化卡片，
-	// 用户才能直观看到「走了视觉桥」以及转换结果/失败原因，而不是一段方括号文本。
-	const vision = extractVisionBridgeBlocks(stripAnsi(message.text));
-	const visionBlocks = vision.blocks;
-	// quoted_context / referenced_session / skill / prompt_template 都在 renderUserBubbleChipText 中
-	// 就地解析为 chip；这里保留完整文本，以便重载后的自包含块不会丢失展示元数据。
-	const cleanText = vision.text;
+	const cleanText = stripAnsi(message.text);
 	// 气泡片段（正文 + 引用/会话/skill chip）严格按原文顺序渲染：
 	// 多个引用各有自己的描述时，顺序就是「引用1 描述1 引用2 描述2」，不能全部提到顶部。
 	const bubbleSegments = buildBubbleRefSegments(cleanText);
@@ -646,52 +600,6 @@ export const UserBubble = memo(function UserBubble(props: {
 					})}
 				</div>
 			)}
-			{visionBlocks.length > 0 && (
-				<div className="mb-2 flex w-full max-w-[min(82%,64ch)] flex-col items-end gap-1.5">
-					{visionBlocks.map((block, bi) =>
-						block.kind === "success" ? (
-							// 成功：徽章行（图标 + 视觉桥已查看 + 图片序号）+ 描述正文
-							<div key={bi} className="vision-bridge-card w-full min-w-0 rounded-lg border border-border bg-background/70 p-2.5" title={t("app.visionBridgeSeenDesc")}>
-								<div className="flex items-center justify-between gap-2">
-									<div className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground">
-										<Eye size={12} className="shrink-0 text-[var(--color-accent)]" />
-										<span>{t("app.visionBridgeSeen")}</span>
-										<span className="text-muted-foreground/60">·</span>
-										<span>{t("app.visionBridgeImageLabel", { index: block.index })}</span>
-									</div>
-								</div>
-								{block.description && <p className="mt-1.5 text-control leading-[1.6] break-words whitespace-pre-wrap text-text-primary">{block.description}</p>}
-							</div>
-						) : block.kind === "skipped" ? (
-							// 未发送：中性提示卡（视觉桥没开/没选模型，图片压根没进转换流程，不是故障）。
-							// 用 warning 而非 danger：红色意味着「出错了」，会把用户引去检查 Key/接口地址，
-							// 而真正要做的只是开视觉桥或给模型勾上图片输入（2026-09 反馈）。
-							<div key={bi} className="w-full min-w-0 rounded-lg border border-warning/40 bg-warning/10 p-2.5" title={t("app.visionBridgeNotSentDesc")}>
-								<div className="flex items-center gap-1.5 text-micro font-medium text-warning">
-									<EyeOff size={12} className="shrink-0" />
-									<span>{t("app.visionBridgeNotSent")}</span>
-									<span className="text-warning/60">·</span>
-									<span>{t("app.visionBridgeImageLabel", { index: block.index })}</span>
-								</div>
-								{block.reason && <p className="mt-1.5 text-control leading-[1.6] break-words whitespace-pre-wrap text-text-primary">{block.reason}</p>}
-							</div>
-						) : (
-							// 失败：红色卡片，原因直出，用户不用去设置页翻日志
-							<div key={bi} className="w-full min-w-0 rounded-lg border border-danger/40 bg-danger-soft/40 p-2.5" title={t("app.visionBridgeFailedDesc")}>
-								<div className="flex items-center gap-1.5 text-micro font-medium text-danger">
-									<AlertTriangle size={12} className="shrink-0" />
-									<span>{t("app.visionBridgeFailed")}</span>
-									<span className="text-danger/60">·</span>
-									<span>{t("app.visionBridgeImageLabel", { index: block.index })}</span>
-								</div>
-								{block.reason && <p className="mt-1.5 text-control leading-[1.6] break-words text-danger/90">{block.reason}</p>}
-							</div>
-						),
-					)}
-				</div>
-			)}
-			{/* 实时消息：文本里没有标记块（转换结果只写会话文件），用事件文件匹配渲染卡片 */}
-
 			{cleanText && !editing && (
 				<div className="user-turn-bubble w-fit min-w-0 max-w-[min(82%,64ch)] rounded-[14px] border px-3 py-2 text-sm text-foreground [overflow-wrap:anywhere] break-words">
 					<div

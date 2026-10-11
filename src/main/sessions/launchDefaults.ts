@@ -2,44 +2,6 @@ import type { ResolveLaunchDefaultsInput, ResolvedLaunchDefaults } from "../../s
 import { createSessionModelPreference } from "../../shared/modelDisplayName";
 import { modelThinkingLevelOf, parseModelThinkingLevels } from "../../shared/modelThinkingLevels";
 
-/**
- * 会话「默认启动偏好」解析器：createDraft 缺省填充与引导页展示共用，保证
- * 「底栏/选择器预选的默认值」与「首次发送时真实套用的默认值」永远一致。
- *
- * 规则（引导页点选优先——本条规则取代更早的「显式默认 > 偏好」排序，见下）：
- * - 模型仅对非 DSH 后端解析——pi 模型配置不适用于 DSH（模型路由由 DSH host
- *   自己的 settings 决定）。解析优先级：
- *     1. 引导页点选模型（渲染层传入的 welcomeModel：用户在「新建 agent 页」刚做的
- *        显式选择。用户规则：本会话就用我选的，点选不得被静态配置静默覆盖）；
- *     2. settings.defaultProvider + defaultModel（用户显式配置的默认模型，有效才算）；
- *     3. settings.enabledModels（pi 的模型切换列表，用户显式维护，glob 匹配）；
- *     4. 用户最后一次实际使用的模型（desktop settings.lastUsedModel，发送时自动记录）；
- *     5. 以上皆无／全部失效 → 空（不再回退 models.json 第一个模型：用户规则
- *        「上次也没有就是默认是空的」，避免在用户删光模型后仍预选到残留项）。
- *   为什么点选排第一：welcomeModel 只有引导页提升为真实会话这一条链路会传（见
- *   main/ipc/sessionIpc.ts createDraft），它表达的是「这一次新建要用哪个模型」的即时
- *   意图；而默认模型/切换列表是长期配置，只应在用户本次没有点选时充当预选值。
- *   旧排序把点选压在第 3 级，导致配置了有效默认模型时引导页选择 100% 静默失效
- *   （症状：切不动的一直显示默认模型；页面看似切了、发送后仍用旧模型）。
- *   **每个来源都会校验目标模型确实仍存在（models.json ∪ pi 目录）**：供应商/模型被删除后，
- *   失效来源自动跳过，保证新会话（底栏预选与真实套用）不再默认已删除的模型。
- *   只查 models.json 会误杀 pi 目录模型（auth 官方供应商、models-store 缓存不在
- *   models.json 里但真实可用，选择器能选到）：把这类 lastUsed/welcomeModel 判死后，
- *   每次新建会话选择器都是空的，用户必须重选（用户报告："选完再新建又让我选"）。
- *   models.json 命中时名称快照仍以 models.json 为准（与选择器展示一致）。
- * - defaultModelConfigured 仅标记「是否存在有效的显式配置默认模型」，供调用方做文案
- *   与诊断用；它**不再**作为渲染层展示回退的闸门（展示与创建必须同序，否则再次分叉）。
- * - 思考档位对两种后端都填充（值域 off/high/max 兼容），按 pi 的解析次序取：
- *   「每模型默认档位」（settings.modelThinkingLevels[provider/modelId]）> 全局
- *   settings.defaultThinkingLevel。pi 在新建会话（core/agent-session.js findInitialModel）
- *   与切换模型（_getThinkingLevelForModelSwitch）都按 显式选择 > 每模型默认 > 全局默认
- *   解析后再 clamp 到该模型可用档位；这里必须同序，否则底栏预选与实际套用再次分叉
- *   （用户规则：思考级别只跟档位默认走，欢迎页偏好级别不参与）。
- *   DSH 后端的模型身份不在 pi 侧（无 modelThinkingLevels 可查），只取全局默认。
- *
- * 输入是磁盘 JSON（pi settings / models.json / desktop settings），字段类型不可信：
- * 用 unknown 收窄，任何字段缺失/类型异常都不抛错，而是逐级降级为 undefined。
- */
 export function resolveLaunchDefaultOptions(input: {
 	backend?: ResolveLaunchDefaultsInput["backend"];
 	settings: unknown;
@@ -53,7 +15,7 @@ export function resolveLaunchDefaultOptions(input: {
 	welcomeModel?: unknown;
 }): ResolvedLaunchDefaults {
 	const defaults: ResolvedLaunchDefaults = {};
-	if (input.backend !== "dsh") {
+	{
 		// 显式默认只解析一次：defaultModelConfigured 仅作「是否存在有效显式默认」的诊断标记
 		// 返回（供文案/排查用）；渲染层展示不再拿它当闸门——展示与创建统一按点选优先。
 		const explicit = strictModelPair(input.settings, input.models, input.catalogModels);
@@ -68,7 +30,7 @@ export function resolveLaunchDefaultOptions(input: {
 	}
 	// 每模型默认优先于全局默认：显式选择（input.thinkingLevel）在调用方，已在此之前判定；
 	// 这里只补「没传显式档位」时的缺省，与 createDraft 的最终模型保持一致。
-	const thinkingLevel = (input.backend !== "dsh" && defaults.model ? modelThinkingLevelOf(input.settings, defaults.model.provider, defaults.model.modelId) : undefined) ?? optionalString(input.settings, "defaultThinkingLevel");
+	const thinkingLevel = (defaults.model ? modelThinkingLevelOf(input.settings, defaults.model.provider, defaults.model.modelId) : undefined) ?? optionalString(input.settings, "defaultThinkingLevel");
 	if (thinkingLevel) defaults.thinkingLevel = thinkingLevel;
 	return defaults;
 }

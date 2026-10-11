@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AgentTab, Project, SessionRecord, SessionSortModeId } from "../../../shared/types";
+import type { AgentTab, Project, SessionRecord } from "../../../shared/types";
 import { agentInventoryAtom, projectInventoryAtom, rpcLoggingAgentIdsAtom, sessionCatalogLoadStateAtom, sessionIdsByProjectAtom, sessionRecordsAtom, sidebarExpandedProjectIdsAtom, sidebarRuntimeAtom, toggleRpcLoggingAgent } from "../atoms";
 import { migrateLegacyCollapsedProjects, sameProjectIdSet, writeExpandedSidebarProjects } from "../utils/sidebarExpandedProjects";
 
@@ -36,8 +36,6 @@ export type SidebarController = {
 	setSearch: (search: string) => void;
 	/** Stable SessionRecord ids pinned within their owning project list. */
 	pinnedSessionIds: ReadonlySet<string>;
-	/** 固定创建时间倒序；忽略旧版可配置排序值。 */
-	sessionSortMode: SessionSortModeId;
 	isSessionPinned: (sessionId: string) => boolean;
 	toggleSessionPin: (sessionId: string) => void;
 	expandedProjectIds: ReadonlySet<string>;
@@ -375,7 +373,6 @@ export function useSidebarController(
 		pinnedSessionIds,
 		isSessionPinned: (sessionId) => pinnedSessionIds.has(sessionId),
 		toggleSessionPin,
-		sessionSortMode: "createdAt",
 		expandedProjectIds,
 		isProjectCollapsed: (projectId) => !expandedProjectIds.has(projectId),
 		toggleProject,

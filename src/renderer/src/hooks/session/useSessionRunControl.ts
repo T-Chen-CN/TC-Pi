@@ -8,7 +8,6 @@ import { t } from "../../i18n";
 import { isPendingAgentId, type PendingAgentTab } from "../../rendererUtils";
 import type { NoticeKind } from "../../utils/notice";
 import { isLiveRuntimeStatus, requireSessionCommand, resolveSessionRunState, SessionCommandFailure, sessionRunCapabilities, toSessionRuntimeTarget, type SessionRunAction, type SessionRunCapabilities } from "../../utils/sessionCommands";
-import { sessionHistoryUnavailableState } from "../../utils/sessionHistoryAvailability";
 import type { QueuedPrompt } from "../useQueuedPrompt";
 
 /** 确认弹窗的最小切片（关闭匿名会话/重启运行中会话需要确认） */
@@ -125,13 +124,8 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 		setSessionMessageLoadState({ sessionId, state: { status: "loading" } });
 		try {
 			const page = await api.sessions.readRecordMessagePage(sessionId, undefined, 100);
-			// DSH host 被手动停止：读盘返回带原因的空页，不是「空会话」。
+
 			// 必须早退，否则 force 写空缓存会把这个会话洗成空白（看着像数据丢了）。
-			const unavailable = sessionHistoryUnavailableState(page);
-			if (unavailable) {
-				setSessionMessageLoadState({ sessionId, state: unavailable });
-				return;
-			}
 			setCacheMessages({
 				sessionId,
 				messages: page.messages,
@@ -154,11 +148,6 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 		}
 	}
 
-	/**
-	 * 关闭 Agent：杀掉绑定的 pi/DSH 进程并解绑（会话记录、历史消息与 Tab 全部保留，
-	 * 之后可再「启动 Agent」）。与「停止回答」（abort，只中断当前回合）语义不同。
-	 * 匿名会话的记录会被主进程丢弃，因此入口走 requestCloseAgent 先确认。
-	 */
 	async function closeAgent(agentId: string) {
 		if (isPendingAgentId(agentId)) return;
 		const target = getRuntimeTargetForAgent(agentId);
@@ -306,7 +295,7 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 			}
 		}
 		// 未启动/已解绑：激活会话（ensureRuntime 对无绑定会话 create 新 Agent，幂等去重防重复点击）。
-		// DSH 会话 runtime 不可用（未安装/损坏）时 host 无法 fork，activateRuntime 只会抛
+
 		// 模块解析裸报错——给「去安装」提示（含直达入口）而不是把底层错误甩给用户。
 		const restartRecord = store.get(sessionRecordsAtom)[sessionId];
 		if (restartRecord?.backend && restartRecord.backend !== "pi") {

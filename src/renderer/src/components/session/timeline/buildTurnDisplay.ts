@@ -123,11 +123,10 @@ export function buildTurnDisplay(
 		const hasImages = Boolean(item.message.images?.length);
 		// 生图消息（meta.imageGen 存在）：即使生成中 text/images 都为空，也不能降级为
 		// interim 挂载点——它需要走 final-answer 才能由 FinalAnswer 渲染生图动画/结果。
-		const hasImageGen = Boolean(item.message.meta?.imageGen);
 		// 空文本但带图（生图结果等）：不降级为 interim 挂载点，走下方最终回答判定——
 		// 否则图片会被丢进折叠容器（InterimAnswer 不传 images），纯图 run 甚至因
 		// hasFoldableContent 判定无折叠内容而整段不渲染。
-		if (!text && !hasImages && !hasImageGen) {
+		if (!text && !hasImages) {
 			items.push({ kind: "interim-answer", id: item.message.id, message: item.message });
 			return;
 		}

@@ -24,7 +24,7 @@ export function QuickMessagePicker(props: {
 	items: readonly string[];
 	loading: boolean;
 	error: string | null;
-	/** 直发不可用（DSH 模型不可路由 / 生图进行中）：仍可插入草稿，只是不给直发。 */
+
 	sendDisabled?: boolean;
 	onInsert: (text: string) => void;
 	onSend: (text: string) => void;

@@ -9,10 +9,10 @@ import { remarkGfmNoSingleTilde } from "../../utils/markdownPlugins";
 import { normalizeMathDelimiters } from "../../utils/normalizeMathDelimiters";
 import { FormulaCopyLayer } from "./FormulaCopyLayer";
 import { useSmoothStream } from "../../utils/useSmoothStream";
-import { STREAM_LIGHT_MAX_CHARS, STREAM_UNFREEZABLE_MIN_CHARS, SETTLE_FULL_MAX_CHARS, shouldRenderStreamPlain, shouldKeepLightOnSettle } from "./markdownStreamPolicy";
+import { STREAM_LIGHT_MAX_CHARS, STREAM_UNFREEZABLE_MIN_CHARS, shouldKeepLightOnSettle } from "./markdownStreamPolicy";
 // 兼容导出：既有引用与源码契约测试从 MarkdownStream 读阈值常量
 export { STREAM_LIGHT_MAX_CHARS } from "./markdownStreamPolicy";
-import { IncrementalMarkdownFrontier, UNSTABLE_TAIL_BLOCKS } from "./markdown/incrementalMarkdown";
+import { IncrementalMarkdownFrontier } from "./markdown/incrementalMarkdown";
 
 /**
  * 数学公式插件（KaTeX）。@streamdown/math 默认 singleDollarTextMath: false，
@@ -64,32 +64,6 @@ const PlainStreamSplit = memo(function PlainStreamSplit(props: { text: string })
 	);
 });
 
-/**
- * Streamdown 渲染管线（唯一 markdown 引擎）。
- *
- * 内置能力（由 streamdown 官方插件接管，不再自研）：
- * - 代码高亮：@streamdown/code（shiki 3.x JS 引擎 + 按语言懒加载；行号/复制/下载由
- *   streamdown 内置外壳提供，观感由 streamdownChrome.css（utilities 层）压掉官方双层皮；
- *   2026-08 曾因全语言常驻移除，恢复时按 memory-profile 复测）
- * - 数学公式：@streamdown/math（KaTeX，$...$/$$...$$）
- * - mermaid 图表：@streamdown/mermaid（```mermaid 代码块 → 交互式 SVG + 全屏/缩放/下载控件）
- * - 表格：GFM + 内建复制/下载（CSV/TSV/Markdown）控件
- * - HTML 标签：默认 sanitize（未知标签剥属性保留文本）
- *
- * 有意保留的项目能力（streamdown 无对应内置或桌面语义不同）：
- * - a 仍走 MarkdownLink：file:// 本地路径可点击打开、外链经 onOpenExternal
- *   走系统浏览器（linkSafety 内置的「打开」用 window.open，桌面端不可用）；
- *   危险协议（javascript:/data:）由 urlTransform 拦截
- * - cytoscape / wardley 图表：streamdown 只有 mermaid，经 plugins.renderers
- *   注册自定义渲染器保留（见 MarkdownDiagramRenderers）
- *
- * 流式冻结（学 dsh IncrementalMarkdownParser）：
- * - 追加文本只重塑解析前沿，prefix 用 generation+offset 钉 key，只重解析尾部
- *   UNSTABLE_TAIL_BLOCKS 个内容块；settle 后整篇一次渲染自愈跨边界链接/脚注。
- * - 不替换 Streamdown，不引入 marked。
- *
- * 注：plugins 传参处对第三方边界类型做了收窄（streamdown 官方组合用法）。
- */
 type StreamdownPipe = {
 	isAnimating?: boolean;
 	remarkPlugins: Parameters<typeof Streamdown>[0]["remarkPlugins"];

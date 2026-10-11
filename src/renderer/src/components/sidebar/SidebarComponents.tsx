@@ -40,7 +40,6 @@ import { Label } from "../../components/ui-shadcn/label";
 import { t } from "../../i18n";
 import { cn } from "../../lib/utils";
 import { archivedPiWorkspaceLabel, filterArchivedPiByFamily, managerArchivedRowKey, mergeManagerArchived, sessionManagerRowKey, sessionWorkspaceLabel, worktreeFamilyProjects, type ManagerArchivedRow } from "../../sessionManagerModel";
-import { SessionBackendMark } from "../session/SessionSourceBadge";
 import { copyTextWithCopiedNotice } from "../../utils/clipboardNotice";
 import { canRunSessionAction, type SessionRunAction, type SessionRunCapabilities } from "../../utils/sessionCommands";
 import { BridgeGuiSlot, useBridgeSessionId } from "../bridge/BridgeSlot";
@@ -98,7 +97,6 @@ export function SessionManagerModal(props: {
 	// 已归档行待删除确认：单行/批量均收敛到这里（数组）；确认后调主进程删除并刷新归档列表。
 	const [pendingDeleteArchived, setPendingDeleteArchived] = useState<ManagerArchivedRow[] | null>(null);
 
-	// 全选/取消全选（只在当前过滤后的范围内；行身份用稳定记录 id，DSH 无 filePath 不冲突）
 	const handleToggleAll = () => {
 		if (selectAll) {
 			setSelected(new Set());
@@ -127,7 +125,6 @@ export function SessionManagerModal(props: {
 		props.onDelete(toDelete);
 	};
 
-	// 归档视图数据：pi（文件归档）+ DSH（host 目录归档）按家族归属过滤后合并，恢复后重新拉取。
 	// 弹窗按项目上下文（整个 worktree 家族）展示归档，不再全量跨项目。
 	const loadArchivedRows = () => {
 		void props
@@ -248,7 +245,6 @@ export function SessionManagerModal(props: {
 										setArchivedSelected(new Set());
 										setArchivedSelectAll(false);
 									} else {
-										// 打开归档视图时懒加载归档列表（pi 文件归档 + DSH host 目录归档）
 										if (archivedRows === null) loadArchivedRows();
 										setShowArchived(true);
 									}
@@ -356,12 +352,7 @@ export function SessionManagerModal(props: {
 														<span className="truncate text-control text-text-primary">{session.name || session.preview?.slice(0, 60) || t("common.untitled")}</span>
 														{/* worktree 家族聚合：非主工作区会话打目录名标签，让用户一眼区分会话属于哪个工作区 */}
 														{sessionWorkspaceLabel(session.projectId, family) && <WorkspaceTag label={sessionWorkspaceLabel(session.projectId, family)!} />}
-														{session.backend === "dsh" || session.backend === "imagegen" ? (
-															// DSH/生图会话无来源徽标（source 恒为 pi），用后端徽标区分（与侧栏树一致）
-															<SessionBackendMark backend={session.backend} />
-														) : (
-															session.source && session.source !== "pi" && <SessionSourceBadge source={session.source} />
-														)}
+														{session.source && session.source !== "pi" && <SessionSourceBadge source={session.source} />}
 													</div>
 												</TableCell>
 												<TableCell className="w-40 text-right">
@@ -842,7 +833,7 @@ export function SessionContextMenu(props: {
 	runControl?: SidebarRunControl;
 	/** 打开会话代理设置弹框（菜单项「会话代理」） */
 	onOpenProxySetting?: () => void;
-	/** 会话是否有文件路径（DSH 会话无 pi 会话文件：隐藏「复制路径/打开文件」） */
+
 	hasFilePath?: boolean;
 	/** RPC 日志菜单组（与 AgentContextMenu 同语义）：仅会话有 live runtime 时显示 */
 	canRpcLog?: boolean;

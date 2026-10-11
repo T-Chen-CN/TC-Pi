@@ -1,17 +1,6 @@
 import { isSupportedBackend } from "../../shared/productFeatures";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
-import {
-	Activity,
-	Code,
-	GitBranch,
-	Globe,
-	History,
-	ListTree,
-	Pencil,
-	// 抽屉 RPC 日志 Tab 图标
-	ScrollText,
-	Terminal,
-} from "lucide-react";
+import { Activity, Code, GitBranch, Globe, History, ListTree, Pencil, ScrollText, Terminal } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { busySendDeliveryAtom, defaultAgentBackendAtom, effectiveAgentBackendAtom, enhanceModelAtom, hiddenModulesAtom, openAutomationModalAtom, openSettingsAtom, rpcLoggingAgentIdsAtom, sessionRecordsAtom, toggleRpcLoggingAgent, turnFlowSettingsAtom } from "./atoms";
 import { logoStyleAtom } from "./atoms/app-ui-atoms";
@@ -279,7 +268,7 @@ export function App() {
 		name: string;
 	} | null>(null);
 	const [renamingFileInput, setRenamingFileInput] = useState("");
-	/** 历史会话来源过滤（按项目）：undefined=显示全部，Record 含项目ID对应 Set（含 DSH 类别） */
+
 	/** 编辑器展示模式：弹框或侧栏 */
 	// showToast 必须是稳定回调：文件树 / overlay 等 effect 若把它当依赖，
 	// 每次 render 新建函数会把 setFiles([]) 打成无限更新（设置/关窗点不动）。
@@ -737,7 +726,7 @@ export function App() {
 	// 查看器已移除：activeAgent 直接从 displayAgents / pendingAgents 取，不再有伪 Agent。
 	const activeAgent = activeAgentId ? [...displayAgents, ...pendingAgents].find((agent) => agent.id === activeAgentId) : undefined;
 	// rewind（检查点）是 pi 后端能力：抽屉 rail 与底栏按钮同口径门控
-	// （dsh/imagegen 会话不展示入口）。与 Injector 的后端只读判定一致。
+
 	const rewindBackend = activeAgent?.backend ?? currentSessionRecord?.backend;
 	const rewindSupported = rewindBackend === undefined || rewindBackend === "pi";
 
@@ -831,7 +820,7 @@ export function App() {
 				message: snapshot.message,
 				displayText: snapshot.displayText,
 				images: snapshot.images,
-				// 未指定行为时按「忙碌时投递行为」设置兜底（pi/dsh 统一，不再按后端分叉）。
+
 				behavior: snapshot.behavior ?? store.get(busySendDeliveryAtom),
 				agentMode: snapshot.agentMode as ComposerAgentMode,
 				timestamp: Date.now(),
@@ -2719,7 +2708,7 @@ export function App() {
 											},
 										]
 									: []),
-								// 检查点面板：仅当前会话为 pi 后端时展示（rewind 能力；dsh 暂不声明）。
+
 								...(rewindSupported
 									? [
 											{

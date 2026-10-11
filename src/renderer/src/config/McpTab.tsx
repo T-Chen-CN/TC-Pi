@@ -18,7 +18,7 @@ import { Textarea } from "../components/ui-shadcn/textarea";
 import { ConfigSelect, openDocsInSystemBrowser } from "./ConfigShared";
 import { ConfirmDialog } from "../components/ui-shadcn/ConfirmDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui-shadcn/collapsible";
-import { detectThirdPartyMcpExtensions, hasLegacyDisabledField, inferMcpTransport, isMcpServerDisabled, McpServerListPane, usesMcpOAuth, usesProviderAuth, type ThirdPartyMcpExtension } from "./McpResourceViews";
+import { detectThirdPartyMcpExtensions, inferMcpTransport, isMcpServerDisabled, McpServerListPane, usesMcpOAuth, usesProviderAuth, type ThirdPartyMcpExtension } from "./McpResourceViews";
 import { argsToText, applyEnabledToggle, buildMcpDisplayServers, isMcpServerName, recordToText, sanitizeLoginOutput, textToArgs, textToRecord } from "./mcpForm";
 import { resolveExposureAliases } from "../../../shared/mcpExposure";
 import { isProjectUntrustedError } from "./projectResourceErrors";

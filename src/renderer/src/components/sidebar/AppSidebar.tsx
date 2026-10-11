@@ -1,4 +1,4 @@
-import React, { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { WorkspaceNavigationPort } from "./WorkspaceNavigation";
 import { useSetAtom } from "jotai";
 import { PanelLeft } from "lucide-react";

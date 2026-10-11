@@ -21,8 +21,6 @@ export * from "./types/dataEnv";
 export * from "./types/usageStats";
 export * from "./types/processMetrics";
 export * from "./types/diagnostics";
-export * from "./types/vision";
-export * from "./types/imagegen";
 export * from "./types/security";
 export * from "./types/modelSpecs";
 export * from "./types/fetchedModel";
@@ -41,7 +39,6 @@ export * from "./types/automation";
 export * from "./types/contentUpdate";
 export * from "./types/piAuth";
 export * from "./types/quickMessages";
-export * from "./types/miniOverlay";
 export * from "./types/noticeHistory";
 
 export * from "./types/scratchPad";

@@ -42,14 +42,6 @@ export function dirtyKeysPreservedOnReload(target: ConfigTab, dirtyTabs: Iterabl
 /** 配置导入会整体替换 models/auth/settings/trust 四个文件，需清掉全部 config 组脏标记（skills/prompts 编辑不涉及配置文件，保留）。 */
 export const ALL_CONFIG_DIRTY_KEYS: readonly ConfigDirtyKey[] = ["config:models", "config:auth", "config:settings", "config:trust", "config:mcp", "config:raw"];
 
-/**
- * 「保存全部脏来源」的保存顺序：`config:settings` 必须排在最后。
- *
- * 为什么：保存 settings 后走的 loadConfig("settings", force) 会连带重载 models/auth/raw 三个文件，
- * 仍处于脏状态（= 尚未保存）的草稿会被磁盘内容静默冲掉。先保存其它键再保存 settings，
- * 重载拿到的就是刚写下的内容（或本来就没改过的内容），不会丢草稿。
- * 其余键保持调用方给定的相对顺序（dsh 与 pi 配置文件互不影响）。
- */
 export function orderDirtyKeysForSave(keys: Iterable<string>): string[] {
 	const list = [...keys];
 	const others = list.filter((key) => key !== "config:settings");

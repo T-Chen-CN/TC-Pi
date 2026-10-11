@@ -626,7 +626,6 @@ export function SidebarContent(props: SidebarContentProps) {
 						void actions.sessions.openFile(menuSession);
 						controller.closeMenu();
 					}}
-					// F5：DSH 会话无 filePath 但可复制 host 会话文件路径（主进程按 dshSessionId 推导）
 					hasFilePath={Boolean(menuSession.filePath)}
 					canRpcLog={Boolean(menuSessionRuntimeAgent)}
 					rpcToggleDisabled={!menuSessionRuntimeAgent}

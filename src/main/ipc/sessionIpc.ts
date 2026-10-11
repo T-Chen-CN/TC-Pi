@@ -211,12 +211,12 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	const backfillHistoricalSessionMetadata = async (sessionId: string, metadata: Pick<SessionMessagePage, "model" | "thinkingLevel">): Promise<void> => {
 		if (sessionRuntimeCoordinator.getTarget(sessionId)) return;
 		const entry = sessionCatalog.get(sessionId);
-		if (!entry || entry.backend === "dsh" || !entry.filePath) return;
+		if (!entry || !entry.filePath) return;
 		if (entry.model && entry.thinkingLevel) return;
 		if (!metadata.model && !metadata.thinkingLevel) return;
 		try {
 			const current = sessionCatalog.get(sessionId);
-			if (!current || current.backend === "dsh" || !current.filePath) return;
+			if (!current || !current.filePath) return;
 			const patch: {
 				model?: SessionModelPreference;
 				thinkingLevel?: string;
@@ -298,7 +298,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			// 引导页重发另建会话留下孤儿空闲 Agent——2026-10-06 事故，与
 			// mergeScanned 的 liveness 豁免同口径）。
 			.filter((record) => {
-				if (!record.filePath || record.backend === "dsh" || record.backend === "acp" || record.filePath.startsWith("\\\\")) return true;
+				if (!record.filePath || record.filePath.startsWith("\\\\")) return true;
 				// WSL 条目豁免：catalog 存的是 Linux 侧路径（/home/...），宿主 existsSync 恒
 				// false，按死链滤掉会把 WSL 用户的全部会话从列表里抹掉（2026-10-07 升级
 				// 0.7.9 反馈：58 条会话一条不少躺在 catalog，列表却全空）。
@@ -446,7 +446,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		const entry = sessionCatalog.get(sessionId);
 		if (!entry) throw new Error(mainCopy("session.notFound"));
 		if (patch.backend !== undefined) requireSupportedBackend(entry.backend);
-		// 后端锁定（草稿期可改，激活后禁止）：pi 会话文件（JSONL）与 DSH 会话
+
 		// （host session log）格式不同，中途切换会导致消息同步渲染不可靠。
 		// 已 active 或已有 runtime 的会话拒绝 backend 变更（渲染层已隐藏入口，这里是边界防御）。
 		if (patch.backend !== undefined && patch.backend !== entry.backend && (entry.status === "active" || sessionRuntimeCoordinator.getTarget(sessionId))) {
@@ -473,12 +473,10 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		return sessionCatalog.update(sessionId, {
 			...patch,
 			title: title || undefined,
-			// 切到生图后端时甩开 pi 会话文件引用：生图历史独立存 ImageSessionStore，
+
 			// 残留 filePath 会让生图/重发/历史加载误落到不存在的 pi 文件（ENOENT 根因）。
-			// 切到生图/ACP 后端时甩开 pi 会话文件引用：生图历史独立存 ImageSessionStore，
-			// ACP 会话由 agent CLI 自持（session/new 在远端）；残留 filePath 会让历史加载
-			// 误落到不存在的 pi 文件（ENOENT 根因，imagegen 同款）。
-			...(patch.backend === "imagegen" || patch.backend === "acp" ? { filePath: null, piSessionId: null } : {}),
+
+			...{},
 		});
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogDelete, async (_event, sessionId: string) => {
@@ -488,11 +486,8 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		// 仍按路径扫一遍游离 agent，避免只解绑 catalog 却留着进程。
 		await sessionRuntimeCoordinator.releaseRuntimeForDelete(sessionId);
 		try {
-			// DSH 没有 session.delete：host 目录会留在 $DSH_HOME。先记墓碑再删映射，
 			// 否则 refreshProjectTree 的自动同步会把同一条再导入。运行中也允许删。
-			if (entry.backend === "dsh" && entry.dshSessionId) {
-				await sessionCatalog.rememberDismissedDshSession(entry.dshSessionId);
-			}
+
 			if (entry.filePath) {
 				const normalizedTarget = canonicalizeSessionPath(entry.filePath, entry.environment);
 				const usingAgent = agentManager
@@ -554,11 +549,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogReadMessages, async (_event, sessionId: string) => {
 		const entry = sessionCatalog.get(sessionId);
-		if (entry?.backend === "acp" || entry?.backend === "dsh") return [];
-		if (entry?.backend === "imagegen") {
-			// imagegen 后端会话：历史独立存 ImageSessionStore，不走 pi 文件
-			return (await readImageSessionMessages?.(sessionId)) ?? [];
-		}
+
 		if (!entry?.filePath) return [];
 		// 有界「加载窗口」（9 轮 + 条目预算），不是全量历史：整量读出在大会话上
 		// 会同时顶爆主进程与渲染层（#213）；需要更早历史走 readRecordMessagePage。
@@ -568,12 +559,12 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		await backfillHistoricalSessionMetadata(sessionId, metadata);
 		return messages;
 	});
-	/** 会话分支树（右侧抽屉「分支」面板）：只读文件索引，无需活 runtime；DSH/imagegen 无 pi 文件返回 null。 */
+
 	ipcMain.handle(ipcChannels.sessionsGetBranchTree, async (_event, sessionId: unknown): Promise<SessionBranchTree | null> => {
 		if (typeof sessionId !== "string" || !sessionId.trim()) throw new Error("Invalid branch-tree request");
 		const entry = sessionCatalog.get(sessionId);
-		// DSH / imagegen 会话没有 pi JSONL：面板按空态处理，不报错。
-		if (!entry?.filePath || entry.backend === "dsh" || entry.backend === "imagegen" || entry.backend === "acp") return null;
+
+		if (!entry?.filePath) return null;
 		return agentManager.readSessionBranchTree(entry.filePath);
 	});
 	/** 子代理列表：从会话文件 subagents:record + catalog 子会话回填合成。 */
@@ -627,23 +618,22 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	ipcMain.handle(ipcChannels.sessionsListFileChanges, async (_event, sessionId: string) => {
 		if (typeof sessionId !== "string" || !sessionId) return [];
 		const entry = sessionCatalog.get(sessionId);
-		// DSH/生图会话无 pi 会话文件，文件汇总无意义
-		if (!entry?.filePath || entry.backend === "dsh" || entry.backend === "imagegen") return [];
+
+		if (!entry?.filePath) return [];
 		return agentManager.readSessionFileChanges(entry.filePath);
 	});
 	/** 会话级 todo 快照：从会话文件 pi-deck-todo custom 条目重建最新计划（历史会话任务 tab）。 */
 	ipcMain.handle(ipcChannels.sessionsListSessionTodo, async (_event, sessionId: string) => {
 		if (typeof sessionId !== "string" || !sessionId) return undefined;
 		const entry = sessionCatalog.get(sessionId);
-		// DSH/生图会话无 pi 会话文件，无 todo 快照
-		if (!entry?.filePath || entry.backend === "dsh" || entry.backend === "imagegen") return undefined;
+
+		if (!entry?.filePath) return undefined;
 		return agentManager.readSessionTodo(entry.filePath);
 	});
 
 	ipcMain.handle(ipcChannels.sessionsCatalogReadMessagePage, async (_event, sessionId: string, before?: number, pageSize?: number, options?: { beforeEntryId?: string }) => {
 		const entry = sessionCatalog.get(sessionId);
-		if (entry?.backend === "imagegen" || !entry?.filePath) {
-			// imagegen 后端会话（可能残留无意义 pi filePath）或纯生图草稿：
+		if (!entry?.filePath) {
 			// 走 ImageSession 独立存储恢复生图历史，避免落到不存在的 pi 文件
 			const imageSessionMessages = (await readImageSessionMessages?.(sessionId)) ?? [];
 			if (imageSessionMessages.length > 0) {
@@ -835,11 +825,11 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			}
 			// 消息被接受才记「最后一次使用」（选而未发不算）：写入 desktop settings.lastUsedModel，
 			// 新会话默认解析（launchDefaults）以它优先。fire-and-forget，不阻塞发送响应。
-			// DSH 会话跳过：其模型归属 host 设置，不在 models.json 中，记录会污染 pi 侧解析。
+
 			// 同时维护 recentProviders（最新在前，去重截断 8）：模型选择器按此优先排列供应商分组。
 			if (result.accepted) {
 				const record = sessionCatalog.get(input.sessionId);
-				if (record?.backend !== "dsh" && record?.backend !== "acp" && record?.model?.provider && record?.model?.modelId) {
+				if (record?.model?.provider && record?.model?.modelId) {
 					const provider = record.model.provider;
 					const current = settingsStore.get().recentProviders ?? [];
 					// 当前供应商提到首位，其余保持原有相对顺序；SettingsStore 会做去重/截断/无变化早退。
@@ -1098,9 +1088,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		}
 	});
 	// fork 与 clone 共用 replaceAgentSession：RPC 成功后刷新 sessionPath / 消息投影
-	/** fork/clone 成功后推送 catalog 刷新：pi 新建了 catalog 条目、DSH 换绑了 dshSessionId，
-	 * 侧栏只有收到 sessionsCatalogRefreshed 才会静默重拉列表（useProjectSync），
-	 * 否则新建/换绑后的会话要等下次手动刷新才出现。 */
+
 	function notifyForkCatalogRefreshed(sessionId: string): void {
 		const projectId = sessionCatalog.get(sessionId)?.projectId;
 		if (!projectId) return;

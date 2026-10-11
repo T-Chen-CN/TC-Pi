@@ -67,11 +67,6 @@ export const DiagnosticMessageCard = memo(function DiagnosticMessageCard(props: 
 	);
 });
 
-/** 思考过程折叠卡片：与 ToolCard 同一套「单行 trigger」语言。
- * 折叠：Brain +「思考了 Xs」+ chevron + 单行预览，全部挤在同一行。
- * 展开：同一行标题，下方左竖线正文走打字机（useSmoothStream）。
- * 默认永远收成单行（对齐 dsh-web ReasoningRow）：流式时单行打字机 + 尾部跟随，
- * 不自动撑开正文；只有用户点开才展开。流式结束也不强行改用户的展开态。 */
 export const ThinkingBlock = memo(
 	function ThinkingBlock(props: {
 		text: string;
@@ -219,12 +214,6 @@ const RESPONDING_PHRASES: Record<RespondingKind, string[]> = {
 	waiting: [t("agent.loading.waiting")],
 };
 
-/**
- * 工具执行态文案：用 runtime 上报的真实工具名生成短语（「正在读取文件...」
- * 「正在执行命令...」），而不是「执行工具 / 读取文件 / 应用改动」的轮播猜测。
- * 工具名缺失时（旧 pi / DSH 快照未上报 executingToolName）退回通用「执行工具」；
- * 过长（扩展 / MCP 工具名）时截断——状态条是单行 nowrap，否则会把消息流撑宽。
- */
 function executingPhrases(toolName: string | undefined): string[] {
 	const fallback = t("agent.loading.executing1");
 	if (!toolName) return [fallback];
@@ -233,7 +222,6 @@ function executingPhrases(toolName: string | undefined): string[] {
 }
 
 export function RespondingIndicator(props: { isCompacting?: boolean; isStarting?: boolean; isExecutingTool?: boolean; executingToolName?: string; liveTextStreaming?: boolean; liveThinkingStreaming?: boolean }) {
-	// 判定抽到 deriveRespondingKind：pi / DSH 共用，状态条跟「此刻有没有字/工具」对齐。
 	const kind = deriveRespondingKind({
 		isCompacting: props.isCompacting,
 		isStarting: props.isStarting,

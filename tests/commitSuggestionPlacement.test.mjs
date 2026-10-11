@@ -133,8 +133,8 @@ test("规则已清空时不回退到内置动作，自定义规则按原文直�
 	assert.deepEqual(sent, ["核对本次差异"]);
 });
 
-test("流式、投递中、投递未知和生图模式不提供快捷动作", () => {
-	for (const composer of [{ isBusy: true }, { isStarting: true }, { sendState: { status: "sending" } }, { sendState: { status: "unknown" } }, { mode: "imagegen" }, { backend: "imagegen" }]) {
+test("流式、投递中和投递未知不提供快捷动作", () => {
+	for (const composer of [{ isBusy: true }, { isStarting: true }, { sendState: { status: "sending" } }, { sendState: { status: "unknown" } }]) {
 		assert.equal(renderComposer(completedRun, { composer }).actionsHtml, "");
 	}
 });

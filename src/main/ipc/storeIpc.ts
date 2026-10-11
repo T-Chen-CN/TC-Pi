@@ -1,21 +1,19 @@
 /**
- * Store IPC handlers: prompts + skills + xue + extensions.
+ * Local prompt and extension IPC handlers.
  * Phase 3.5: extracted from src/main/index.ts registerIpc().
  */
 
 import { ipcMain } from "electron";
 import { ipcChannels } from "../../shared/ipc";
-import type { CreatePiPromptTemplateInput, PiPromptTemplateSummary, PromptStoreItem, PromptStoreRawItem, PromptStoreSearchResponse, PromptStoreSearchResult } from "../../shared/types";
+import type { CreatePiPromptTemplateInput } from "../../shared/types";
 import type { AppLogger } from "../logging/AppLogger";
 import type { PromptManager } from "../prompts/PromptManager";
-import type { SkillManager } from "../skills/SkillManager";
 import type { ExtensionManager } from "../extensions/ExtensionManager";
 import type { ProjectResourceManager } from "../projects/ProjectResourceManager";
 import type { ConfigManager } from "../config/ConfigManager";
 
 export type StoreIpcDeps = {
 	promptManager: PromptManager;
-	skillManager: SkillManager;
 	extensionManager: ExtensionManager;
 	projectResourceManager: ProjectResourceManager;
 	/** Project trust is checked before any store write; optional keeps isolated IPC tests lightweight. */
@@ -25,7 +23,7 @@ export type StoreIpcDeps = {
 	mainCopy: (key: string, params?: Record<string, string | number>) => string;
 };
 
-export function registerStoreIpc({ promptManager, skillManager, extensionManager, projectResourceManager, configManager, projectTrustPath, appLogger, mainCopy }: StoreIpcDeps): void {
+export function registerStoreIpc({ promptManager, extensionManager, projectResourceManager, configManager, projectTrustPath, appLogger, mainCopy }: StoreIpcDeps): void {
 	const requireText = (value: unknown, label: string, maxLength = 4096): string => {
 		if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
 			throw new Error(`Invalid ${label}.`);
@@ -45,18 +43,6 @@ export function registerStoreIpc({ promptManager, skillManager, extensionManager
 		const name = "name" in value ? requireString(value.name, "prompt name", 256) : "";
 		const description = "description" in value ? requireString(value.description, "prompt description", 4096) : "";
 		return { name, description };
-	};
-	/**
-	 * 商店导入载荷校验：渲染层不可信，null/非对象会在解构时变成裸 TypeError，
-	 * content 无上界则可被超大字符串压垮写盘路径。字段上限与 promptsEdit 的
-	 * requireString(content, 4MB) 同构，错误信息带字段名方便排查。
-	 */
-	const requireStoreItem = (value: unknown): { title: string; description: string; content: string } => {
-		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Invalid store item.");
-		const title = requireString((value as { title?: unknown }).title, "store item title", 512);
-		const description = requireString((value as { description?: unknown }).description, "store item description", 4096);
-		const content = requireString((value as { content?: unknown }).content, "store item content", 4 * 1024 * 1024);
-		return { title, description, content };
 	};
 	const projectRoot = (projectId: unknown): string => {
 		if (typeof projectId !== "string" || !projectId.trim() || projectId.length > 256) {
@@ -162,66 +148,6 @@ export function registerStoreIpc({ promptManager, skillManager, extensionManager
 		});
 		return result;
 	});
-
-	// ── Prompt Store (prompts.chat) ──────────────────────────────────────
-	const PROMPT_STORE_BASE = "https://prompts.chat/api";
-
-	/** 将 prompts.chat 原始 prompt 条目扁平化为 UI 消费的格式 */
-	function flattenPromptItem(raw: PromptStoreRawItem): PromptStoreItem {
-		return {
-			id: raw.id,
-			title: raw.title,
-			description: raw.description,
-			content: raw.content,
-			type: raw.type,
-			author: raw.author?.name ?? "",
-			category: raw.category?.name ?? "",
-			tags: raw.tags?.map((t) => t.tag?.name).filter(Boolean) ?? [],
-			votes: raw.voteCount ?? 0,
-			createdAt: raw.createdAt,
-		};
-	}
-
-	/** 将 prompts.chat 的命名变量转换为 pi 的位置参数 */
-	function convertStoreVarsToPiVars(content: string): { converted: string; argumentHint: string; varCount: number } {
-		const varMap = new Map<string, { index: number; hasDefault: boolean; defaultVal?: string }>();
-		let nextIndex = 1;
-		const scanRegex = /\$\{([a-zA-Z_]\w*)(?::(.*?))?\}/g;
-		let scanMatch: RegExpExecArray | null;
-		while ((scanMatch = scanRegex.exec(content)) !== null) {
-			const varName = scanMatch[1];
-			if (!varMap.has(varName)) {
-				varMap.set(varName, {
-					index: nextIndex++,
-					hasDefault: scanMatch[2] !== undefined,
-					defaultVal: scanMatch[2],
-				});
-			}
-		}
-		if (varMap.size === 0) {
-			return { converted: content, argumentHint: "", varCount: 0 };
-		}
-		let converted = content.replace(/\$\{([a-zA-Z_]\w*)(?::(.*?))?\}/g, (_match, varName: string, defaultVal?: string) => {
-			const info = varMap.get(varName)!;
-			if (defaultVal !== undefined) {
-				return `\${${info.index}:-${defaultVal}}`;
-			}
-			return `$${info.index}`;
-		});
-		const hints: string[] = [];
-		for (let i = 1; i < nextIndex; i++) {
-			const entry = Array.from(varMap.entries()).find(([, v]) => v.index === i);
-			if (!entry) continue;
-			const [varName, info] = entry;
-			if (info.hasDefault) {
-				hints.push(`[${varName}:${info.defaultVal}]`);
-			} else {
-				hints.push(`<${varName}>`);
-			}
-		}
-		const argumentHint = hints.length > 0 ? hints.join(" ") : "";
-		return { converted, argumentHint, varCount: varMap.size };
-	}
 
 	// ── Extensions ──────────────────────────────
 	ipcMain.handle(ipcChannels.extensionsList, (_event, forceRefresh?: boolean) => extensionManager.list(Boolean(forceRefresh)));

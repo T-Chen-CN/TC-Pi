@@ -1287,7 +1287,7 @@
   outline: none;
   background: transparent;
   color: var(--color-text-primary);
-  /* 品牌色光标（dsh-web 同款）：默认主题下近黑，彩色 accent 主题下随主题色 */
+
   caret-color: var(--color-accent);
   padding: 10px 12px;
   font-size: var(--font-size-body);
@@ -1764,9 +1764,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .composer-bottom-left .feishu-link-indicator {
-    max-width: min(132px, 38cqi);
-  }
+
   .composer-bar-branch {
     width: min(112px, 32cqi);
   }
@@ -1785,9 +1783,7 @@
     padding: 0;
     justify-content: center;
   }
-  .composer-bottom-left .feishu-link-indicator {
-    display: none;
-  }
+
 }
 /* ---- 命令面板弹框（已迁 Tailwind：PromptSuggestions / SessionHistoryModal）---- */
 

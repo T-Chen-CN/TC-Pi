@@ -54,45 +54,6 @@ function loadStats() {
 	});
 }
 
-test("dsh sessionStats fills counts, durations, speeds, then tokens", () => {
-	const { buildComposerStatsGroups } = loadStats();
-	const groups = buildComposerStatsGroups({
-		dshSessionStats: {
-			turns: 3,
-			steps: 7,
-			llmMs: 2500,
-			toolMs: 800,
-			ttftAvgMs: 120,
-			tokensPerSecond: 42.4,
-		},
-		inputTokens: 1200,
-		outputTokens: 340,
-		cacheHitPercent: 88.2,
-	});
-	assert.equal(groups[0], "3 轮 · 7 步");
-	assert.equal(groups[1], "LLM 2500ms · 工具调用 800ms");
-	assert.equal(groups[2], "首 token 平均 120ms · 42 tok/s");
-	assert.equal(groups[3], "缓存命中 88%");
-	assert.equal(groups[4], "输入 1200 tok · 输出 340 tok");
-});
-
-test("dsh stats line shows turns-only when the fallback has no assembled steps", () => {
-	// 兜底 fallback 的纯工具轮：turns>0 但 steps=0（投影丢弃了无正文的 assistant），
-	// 只显示「N 轮」，不出现「0 步」。
-	const { buildComposerStatsGroups } = loadStats();
-	const groups = buildComposerStatsGroups({
-		dshSessionStats: {
-			turns: 1,
-			steps: 0,
-			llmMs: 0,
-			toolMs: 0,
-			ttftAvgMs: undefined,
-			tokensPerSecond: undefined,
-		},
-	});
-	assert.equal(groups[0], "1 轮");
-});
-
 test("pi last-reply metrics fill the strip when sessionStats is absent", () => {
 	const { buildComposerStatsGroups } = loadStats();
 	const groups = buildComposerStatsGroups({
@@ -109,17 +70,6 @@ test("pi last-reply metrics fill the strip when sessionStats is absent", () => {
 test("segments carry per-metric hints without changing the visible text", () => {
 	// 每个指标带悬停说明：字符串拼接结果与旧版一致，hint 指向对应计算口径文案。
 	const { buildComposerStatsSegments } = loadStats();
-	const dsh = buildComposerStatsSegments({
-		dshSessionStats: { turns: 3, steps: 7, llmMs: 2500, toolMs: 800, ttftAvgMs: 120, tokensPerSecond: 42.4 },
-		inputTokens: 1200,
-		outputTokens: 340,
-		cacheHitPercent: 88.2,
-	});
-	assert.deepEqual(JSON.parse(JSON.stringify(dsh.map((parts) => parts.map((part) => part.text)))), [["3 轮 · 7 步"], ["LLM 2500ms", "工具调用 800ms"], ["首 token 平均 120ms", "42 tok/s"], ["缓存命中 88%"], ["输入 1200 tok · 输出 340 tok"]]);
-	assert.equal(dsh[0][0].hint, "ctx.detail.turnsStepsHint");
-	assert.equal(dsh[1][0].hint, "ctx.detail.llmDurationHint");
-	assert.equal(dsh[1][1].hint, "ctx.detail.toolDurationHint");
-	assert.equal(dsh[2][1].hint, "ctx.detail.tpsAverageHint");
 	const pi = buildComposerStatsSegments({ ttftMs: 210, totalMs: 4300, tps: 31, inputTokens: 800, outputTokens: 90, cacheHitPercent: 91 }, 4);
 	assert.equal(pi[0][0].hint, "composerStats.turnsHint");
 	assert.equal(pi[1][0].hint, "ctx.detail.ttftHint");
@@ -134,7 +84,6 @@ test("empty runtime produces no stats groups", () => {
 	const { buildComposerStatsGroups } = loadStats();
 	assert.equal(buildComposerStatsGroups(undefined).length, 0);
 	assert.equal(buildComposerStatsGroups({}).length, 0);
-	assert.equal(buildComposerStatsGroups({ dshSessionStats: { turns: 0, steps: 0, llmMs: 0, toolMs: 0 } }).length, 0);
 });
 
 test("composer area mounts the stats strip under the input card", () => {

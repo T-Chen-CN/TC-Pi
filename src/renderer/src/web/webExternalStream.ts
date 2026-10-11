@@ -12,7 +12,7 @@
  * - useChat 活跃（本端发送）时由调用方置 enabled=false，关流防止双路渲染同一轮；
  * - 流结束（finish / [DONE] / runtime 转 idle 兜底）后由调用方磁盘重拉权威终态。
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { UIMessage } from "ai";
 import { getWebToken } from "./webApi";
 

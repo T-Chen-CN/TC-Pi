@@ -6,22 +6,8 @@ import { t } from "../../i18n";
 import { Button } from "../ui-shadcn/button";
 import { isCoherentComposerRuntimeUi, type RuntimeHandle } from "./ComposerRuntimeIntegrations";
 import { ComposerWidgetFrame, useComposerWidgetCollapsed } from "./ComposerWidgetLayout";
-import { parseAgentTodoItems, runtimeTodosToItems, sessionTodoSnapshotToItems, stripPiDeckTodoWidgetMetadata, type AgentTodoItem } from "./agentTodoParser";
+import { parseAgentTodoItems, sessionTodoSnapshotToItems, stripPiDeckTodoWidgetMetadata, type AgentTodoItem } from "./agentTodoParser";
 import { useSessionTodoSnapshot } from "../../hooks/useSessionTodoSnapshot";
-
-/**
- * composer 上方的 todo 常驻条（移植自 dsh-web 的 TodoPanel）。
- *
- * 形态：与输入框同宽同列的折叠卡（36px 高：图标 + 标题 + 进度文案 + chevron），
- * 点击展开列表（180px 内滚动）。数据三源归一化成同构行式：
- * - pi 扩展 widget（pi-deck-todo / pi-deck-plan-todos）的行快照；
- * - DSH 官方 todo（AgentRuntimeState.todos 的 TodoItem[]）；
- * - 历史会话的 todo 快照（session 文件 record 解析，无活 runtime 时兜底）。
- * 无任何 todo 行时整体不渲染（「有那个显示那个」，与 dsh 一致）。
- *
- * 尊重历史 dismiss 记录（同一 localStorage 指纹 v2）：手动关闭后内容指纹
- * 不变则保持隐藏，工具更新列表（指纹变化）后重新出现。
- */
 
 // dismiss 语义从 v2 保留：key 按「内容指纹」记录（旧数据形状（数组）不兼容，
 // 直接启用新 key，旧记录自然作废——dismiss 是轻量 UX 状态，不做迁移）。
@@ -151,8 +137,6 @@ export function progressLabel(items: AgentTodoItem[]): string {
 	return [done > 0 ? t("sessionTodo.done", { done }) : null, active > 0 ? t("sessionTodo.active", { active }) : null, pending > 0 ? t("sessionTodo.pending", { pending }) : null].filter(Boolean).join("\u2002·\u2002");
 }
 
-/** TodoItem → 行式（☑/◐/☐ 前缀）：DSH 与历史快照都归一化成与 Pi widget 同构的文本行，
- *  复用同一套 dismiss/解析/字形链路。 */
 function todoItemsToLines(items: readonly AgentTodoItem[]): string[] {
 	return items.map((item) => {
 		const mark = item.status === "completed" ? "☑" : item.status === "in-progress" ? "◐" : "☐";

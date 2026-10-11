@@ -15,7 +15,7 @@
  *   不反射任何查询参数到响应页，不输出 code/key 到日志。
  * - 交换请求必须带 S256 声明（无 PKCE 的有回调模式只提交 code，本实现统一带 PKCE）。
  */
-import { createServer, type Server } from "node:http";
+import { createServer } from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { TOKENDANCE_APP_URL, TOKENDANCE_AUTH_URL, TOKENDANCE_EXCHANGE_URL, TOKENDANCE_KEY_NAME, type TokendanceAuthMode } from "../../shared/tokendance";
 

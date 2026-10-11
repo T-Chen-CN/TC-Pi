@@ -3,7 +3,7 @@ import type { ChatMessage, SessionMessageImageTarget } from "../../../shared/typ
 import { desktopApi } from "../desktopApi";
 import { t } from "../i18n";
 import { messageEntryId, requireSessionCommand } from "../utils/sessionCommands";
-import { visionImageHash } from "../utils/visionImageHash";
+import { imageContentHash } from "../utils/imageContentHash";
 import type { SessionHistoryMutationsDeps } from "./useSessionHistoryMutations";
 
 /** 单图移除确认：由所属 pane 传 sessionId，异步阶段不再读取全局焦点。 */
@@ -32,7 +32,7 @@ export function useSessionMessageImageRemoval(args: { deps: SessionHistoryMutati
 			onConfirm: async () => {
 				deps.clearConfirm();
 				try {
-					const imageTarget: SessionMessageImageTarget = { index, expectedImageCount, expectedHash: await visionImageHash(data, 64) };
+					const imageTarget: SessionMessageImageTarget = { index, expectedImageCount, expectedHash: await imageContentHash(data) };
 					await runFileMutation(sessionId, async () => {
 						requireSessionCommand(await desktopApi.sessions.removeCatalogMessageImage(sessionId, messageId, imageTarget, entryId));
 					});

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { readSettingsObject, readStringArray, resolveFromBase, splitResourceEntries, applyPatterns, SKILL_FILE } from "./resourceWhitelist";
+import { readSettingsObject, resolveFromBase, splitResourceEntries, applyPatterns, SKILL_FILE } from "./resourceWhitelist";
 import { projectResourceEnabled } from "./config/piResourceRules";
 import { resolveConfiguredPackageResources } from "./packageResourceResolver";
 

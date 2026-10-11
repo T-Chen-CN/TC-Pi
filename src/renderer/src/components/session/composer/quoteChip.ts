@@ -10,7 +10,7 @@
  * - 本模块不依赖 React / 编辑器，可被 node:test 直接加载单测。
  */
 
-import { escapeXmlAttribute, parseExpandedRefBlocks, replaceExpandedRefBlocksWithLabels, sanitizeBlockClosingTag } from "./referenceBlocks";
+import { escapeXmlAttribute, parseExpandedRefBlocks, sanitizeBlockClosingTag } from "./referenceBlocks";
 import type { ExpandedRefBlock } from "./referenceBlocks";
 
 // 自包含块的解析/折叠已下沉到 shared/expandedRefBlocks（主进程 preview、Web 端共用一份实现）；

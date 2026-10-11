@@ -78,8 +78,7 @@ const LABEL_CLASS = "shrink-0 text-caption leading-5 text-text-secondary";
 
 export function ProviderUsageDetails(props: {
 	provider: string;
-	/** 查询/缓存链路：dsh（$DSH_HOME 配置 + DSH 凭据库）或 pi（缺省）。
-	 *  圆球面板按会话后端透传——DSH 会话配在 dsh 链路的探针不会被当成 pi 配置漏查。 */
+
 	backend?: UsageProbeBackend;
 	/** 失败态「去配置」动作：圆球面板/选择器深链模型设置。缺省不渲染按钮。 */
 	onConfigureUsage?: () => void;

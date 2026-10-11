@@ -17,7 +17,7 @@ import type { AppUpdateDeliveryMode, AppUpdateDownloadState, AppUpdateStatusSnap
 import type { PiUpdateCheckResult } from "../../shared/types";
 import type { CatalogCheckResult } from "../../shared/types/catalog";
 import type { SettingsStore } from "../settings/SettingsStore";
-import { normalizeUpdateSource, normalizeCustomMirrorHost, updateSourceFeedUrl, updateSourceLatestReleaseUrl } from "./updateSources";
+import { normalizeUpdateSource, updateSourceFeedUrl, updateSourceLatestReleaseUrl } from "./updateSources";
 import type { AutoUpdaterLike } from "./autoUpdaterTypes";
 
 export type AppCheckResult = { latestVersion: string; hasUpdate: boolean };

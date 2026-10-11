@@ -1,6 +1,4 @@
 import type { AgentBackend } from "./agent";
-import type { AcpToolConfig } from "./acp";
-import type { SessionSortModeId } from "./session";
 import type { BusySendDelivery } from "../busySendDelivery";
 import { SESSION_TAB_MAX_WIDTH_DEFAULT } from "../sessionTabWidth";
 import { createDefaultExternalEditorSettings, type ExternalEditorSettings } from "./project";
@@ -72,9 +70,6 @@ export type MirrorHealthResult = {
 	/** 探测完成时间戳（ms）。 */
 	checkedAt: number;
 };
-
-/** 宠物缩放默认值：0.3 = 设置滑块 30%。出厂 100% 太大，新用户/缺省回退都用此值。 */
-export const DEFAULT_PET_SCALE = 0.3;
 /** toast 展示时长（ms）出厂值：全局统一时长，与渲染层 notice.ts 常量一致。 */
 export const DEFAULT_TOAST_DURATION_MS = 4000;
 /**
@@ -158,12 +153,7 @@ export type AppSettings = {
 	 * 设置只在新建或重启 Agent 进程时注入，关闭不影响已有会话的主 agent。
 	 */
 	autoSessionTitle: boolean;
-	/**
-	 * Agent 忙碌时发送消息的默认投递行为。
-	 * "steer"=插入当前回合（模型在本次回合内尽快看到）；"followUp"=排队，当前回合结束后自动发送。
-	 * 仅决定渲染层入队后的默认投递语义；pi/dsh 主进程各自映射到 wire 协议
-	 * （pi streamingBehavior / DSH sessions.prompt mode）。缺省 "steer"，解析见 shared/busySendDelivery.ts。
-	 */
+
 	busySendDelivery: BusySendDelivery;
 	/**
 	 * **遗留字段**：输入框底栏「快捷消息」的条目曾存在这里。
@@ -187,12 +177,6 @@ export type AppSettings = {
 	 * 用户显式配置后，所有 git 子进程（含 worktree）都使用该路径。
 	 */
 	gitExecutablePath: string;
-	/**
-	 * DSH 沙箱 runner 用的本机 Node 绝对路径（Windows 必须是 CUI node.exe）。
-	 * 空串 = 自动探测 PATH / 版本管理器 / 应用数据目录里的专用副本。
-	 * 不随包分发，避免安装包再涨 ~86MB；可在开发设置里一键下载到 userData。
-	 */
-	dshRunnerNodePath: string;
 	/** 关闭窗口时隐藏到系统托盘而不是退出 */
 	closeToTray: boolean;
 	/**
@@ -215,8 +199,6 @@ export type AppSettings = {
 	askNotificationEnabled: boolean;
 	/** 激活 Agent 数量提醒（人文关怀）：激活数达到阈值时，启动时提示关闭空闲会话释放内存。默认开启。 */
 	agentCountReminderEnabled: boolean;
-	/** Legacy read compatibility only; announcement functionality has been removed. */
-	announcementNotificationEnabled: boolean;
 	/**
 	 * 应用内 toast 的展示时长（ms），全局统一口径：所有提示（含调用方显式传入的时长、
 	 * error/warning/question 档）都按此值停留，只有调用方要求「常驻」的提示不受影响。
@@ -363,33 +345,6 @@ export type AppSettings = {
 	/** WSL 用户名，如 piuser */
 	wslUser: string;
 
-	// ── 桌面宠物（全局聚合单宠，默认关闭，不破坏现状） ──
-	/** 是否启用桌面宠物悬浮窗，默认 false：关闭后应用与现状完全一致 */
-	petEnabled: boolean;
-	/** 当前选中的宠物包 id，默认内置水獭 */
-	petId: string;
-	/** 宠物窗是否始终置顶，默认 true */
-	petAlwaysOnTop: boolean;
-	/** 宠物缩放比例 0.3-2.0，默认 DEFAULT_PET_SCALE(0.3=30%)，控制窗口与 sprite 渲染尺寸 */
-	petScale: number;
-	/** 是否启用 idle 巡游（无任务时沿屏幕底部左右走动），默认 true；
-	 *  巡游为低优先级 UI 行为，running/failed/review/逗弄 时自动让位。 */
-	petPatrolEnabled: boolean;
-	/** 巡游碰边后 idle 停顿时长（分钟），默认 5，范围 1–30 */
-	petPatrolPauseMin: number;
-
-	// ── 悬浮球（floater）：主窗口隐藏后屏幕角落的常驻小圆点，点开进入小任务浮窗/工作台 ──
-	/** 是否启用悬浮球，默认 false：开启后主窗口可隐藏为 64px 悬浮球，不挡屏 */
-	floatingBallEnabled: boolean;
-	/** 悬浮球点击后的展开目标：mini=极简浮窗（状态+快捷输入+最近会话），compact=小任务紧凑模式（主窗口紧凑化） */
-	floatingBallExpandTarget: "mini" | "compact";
-	/** 悬浮球是否始终置顶，默认 true */
-	floatingBallAlwaysOnTop: boolean;
-	/** 悬浮球是否显示运行中任务数量角标，默认 true：关闭后球面不再叠加数字徽章 */
-	floatingBallShowRunningBadge: boolean;
-	/** 悬浮球边缘吸附：拖动松手后是否自动贴到屏幕左右边缘，默认 true */
-	floatingBallSnapToEdge: boolean;
-
 	// ── 闲置 Agent 内存优化：自动释放长时间闲置的 agent 进程，降低多会话内存占用 ──
 	/** 是否自动释放闲置 agent，默认 true：开关关闭后闲置 agent 常驻内存不释放 */
 	idleAgentAutoRelease: boolean;
@@ -402,21 +357,6 @@ export type AppSettings = {
 	/** 是否启用 standby 预热（默认 true）：每项目最多一个，约 300MB 内存，10 分钟未使用自动回收。
 	 *  修改后只影响下一次预热/认领（进程 spawn 参数无法热更，指纹不匹配自动回退正常创建）。 */
 	standbyRuntimeEnabled?: boolean;
-
-	// ── CUA（Computer Use Agent）：让 Agent 观察屏幕并注入鼠标/键盘输入 ──
-	/**
-	 * 是否启用 CUA 能力，默认 false。
-	 * 开启后主进程才会监听本地 MCP HTTP 端点并把 `pideck-cua` 写入
-	 * ~/.pi/agent/mcp.json；关闭时不监听、不改动 pi 配置（默认姿态为「关」）。
-	 * 真实输入受全局/会话杀开关保护；关闭自动审批后，每次写操作需显式确认。
-	 */
-	cuaEnabled: boolean;
-	/**
-	 * CUA 免审批（自动放行），默认 true；保留用户显式关闭的选择。
-	 * 开启后写操作（点击/输入/滚动）跳过逐次审批对话框直接执行；
-	 * 全局/会话杀开关仍然生效（关掉 CUA 仍一律拒绝）。风险自担型开关。
-	 */
-	cuaAutoApprove: boolean;
 
 	// ── 模型收藏：ModelPicker 中用 ☆ 标记，收藏的模型在列表中置顶 ──
 	/** 收藏的模型 ID 列表 */
@@ -443,12 +383,7 @@ export type AppSettings = {
 	hiddenAuthProviders?: string[];
 
 	// ── 功能模块显示开关：外观设置里按需收起不用的模块 UI 入口 ──
-	/**
-	 * 用户主动隐藏的功能模块 id 列表（清单与语义见 shared/hiddenModules.ts）。
-	 * 隐藏后：对应设置 tab 从侧栏消失；`dsh` 还会收起配置管理的 DSH 分页与新建会话的 DSH 选项，
-	 * `imagegen` 还会收起输入框的生图入口。只隐藏入口，不清配置、不停已启用的后台功能；
-	 * 命令面板仍可搜到并一键恢复显示。默认 `[]` 全部显示；可选以兼容旧 settings.json。
-	 */
+
 	hiddenModules?: string[];
 
 	/**
@@ -465,11 +400,6 @@ export type AppSettings = {
 	 * （新增/改名的 provider 因此不会被顶到最前）。可选以兼容旧 settings.json。
 	 */
 	providerOrder?: string[];
-	/**
-	 * DSH 模型页供应商卡片的用户自定义顺序（llm-pi-ai providers 的 provider 名数组）。
-	 * 语义同 providerOrder；与 Pi 侧分开存放，避免两套配置互相污染顺序。
-	 */
-	dshProviderOrder?: string[];
 
 	// ── 模型选择器分组排序：记录最近使用的供应商 ──
 	/**
@@ -574,11 +504,7 @@ export type AppSettings = {
 	updateDotHintSeen?: boolean;
 
 	// ── Agent 后端 ──
-	/**
-	 * 新建会话的默认后端（侧栏「+」/ 引导页 / 并行问询共用）。
-	 * "pi" = 经典 pi CLI 后端；"dsh" = DeepSeek Harness 内嵌后端。
-	 * 缺省 "pi"（2026-12 兼容期调整：默认回归 pi，用户可在设置中切换为 dsh）。
-	 */
+	/** 当前发行版的新会话使用 Pi CLI。 */
 	defaultAgentBackend: AgentBackend;
 
 	// ── Agent 启动诊断/加速（开发设置） ──
@@ -621,13 +547,6 @@ export type AppSettings = {
 	 * 在展示时安全忽略，避免修改 pi 会话文件或把短生命周期 agentId 持久化。
 	 */
 	pinnedSessionIds?: string[];
-
-	/**
-	 * 项目会话列表排序模式（2027-03 开放排序规则）：updatedAt=最近活跃（历史默认）、
-	 * createdAt=创建时间、title=标题。缺省/非法值回落 updatedAt；由渲染层策略目录
-	 * （sessionSortModes）解释，主进程只存字符串不参与排序。
-	 */
-	sessionSortMode?: SessionSortModeId;
 
 	// ── 会话导入 ──
 	/**
@@ -673,14 +592,6 @@ export type AppSettings = {
 	 */
 	disabledPrompts: string[];
 
-	// ── 生图模式（composer 底栏记忆，不是独立设置页） ──
-	/** 生图尺寸：unset=不发送 size；或 OpenAI WxH / 火山 1K/2K/4K */
-	imageGenSize: string;
-	/** 生图水印：火山方舟 watermark；默认 false（用户显式打开才带） */
-	imageGenWatermark: boolean;
-	/** 生图文件编码：火山 output_format png|jpeg；默认 png */
-	imageGenOutputFormat: string;
-
 	// ── 安全管理 ──
 	/**
 	 * 安全管理配置（等级/工具动作/目录边界/会话覆盖）。
@@ -688,93 +599,6 @@ export type AppSettings = {
 	 * 变更后主进程会把策略快照写入 userData/security-policy.json 供 pi-deck-security-gate 扩展消费。
 	 */
 	securityConfig?: SecurityConfig;
-
-	// ── DSH 后端 ──
-	/**
-	 * DSH_HOME 覆盖目录：用户自己的 DSH 配置目录（如 ~/.dsh）。
-	 * 缺省 undefined/空串：自动使用用户真实 ~/.dsh（与 dsh CLI 行为一致，
-	 * 配置/凭证/会话全在同一处，不复制）；目录不存在时启动时自动创建。
-	 * 注意：DSH 官方约束「同一 DSH_HOME 只允许一个 host」，与 dsh CLI 共用默认目录
-	 * 时两实例会互相覆盖状态；配置页概览据此给出 DSH_HOME 隔离提示（#189，判定见
-	 * `src/main/dsh/dshHomeSharing.ts`）。
-	 * 实现见 DshHost.resolveDshHomeDir。启动预热前变更会被新 host 读取；
-	 * 已运行时切换需重启 host。
-	 */
-	dshHomeDir?: string;
-
-	/**
-	 * DSH runtime 下载源索引地址（覆盖默认 AtomGit/GitHub latest 应用 Release）。
-	 * 用于镜像/内网分发：索引是分平台 `dsh-runtime-<platform>-<arch>-releases.json`，
-	 * 条目里给出 tarball 直链与 sha256。缺省/空串 = 跟随 settings.updateSource。
-	 * sha256 校验始终生效，镜像也不能绕过。禁止指向独立 `dsh-runtime` tag。
-	 */
-	dshRuntimeIndexUrl?: string;
-
-	/**
-	 * DSH 沙箱 Node 24 下载源索引（覆盖默认 AtomGit/GitHub latest 应用 Release）。
-	 * 缺省/空串 = 跟随 settings.updateSource。sha256 始终校验。
-	 */
-	dshRunnerNodeIndexUrl?: string;
-
-	/**
-	 * DSH 审批自动放行：开启后 DSH 会话的工具/命令审批（approval/requested）
-	 * 自动应答 allowed-once，不再弹出确认。
-	 * 缺省 undefined/false：保持人工审批（会话内 Ask 弹窗）。
-	 * 运行时读取（每次审批即时生效），无需重启 DSH host。
-	 */
-	dshApprovalAutoAllow?: boolean;
-
-	/**
-	 * DSH 外部会话自动导入：应用启动后只读扫描 DSH_HOME/sessions，把其他工具
-	 * （dsh-web 等）创建的、catalog 尚未映射的根会话写入侧栏（按会话自己的 cwd
-	 * 匹配或注册项目；没有 cwd 的才进入「外部会话」兑底项目）。缺省 true。
-	 * 不启动 host、不 attach，避免与 dsh-web 抢同一份 DSH_HOME。
-	 * 关闭后不再把外部会话写入侧栏（无手动导入入口）。
-	 */
-	dshAutoImportSessions?: boolean;
-
-	/**
-	 * DSH host 是否被用户手动停止（不想让它运行）。
-	 *
-	 * 持久化跨应用重启：标记为真后，预热（startDshHostInBackground）、按需兜底
-	 * （ensureStarted）、崩溃自动重启（DshHostProcess.restartAfterCrash）、runtime
-	 * 磁盘操作后的 host 恢复等所有非用户显式发起的路径都不再 fork host。
-	 * 只有用户在 DSH 配置页点「启动」才清除标记并重新 boot。
-	 * 缺省 undefined/false：保持按需自动启动的历史语义。
-	 */
-	dshManualStopped?: boolean;
-
-	/**
-	 * DSH agent-team 实验预设（默认关）：开启后 DSH host 组合追加官方
-	 * @deepseek-ai/dsh-experimental-agent-team-profile（启用 Team 域 spawn_teammate
-	 * 等工具，并禁用 subagent/subagent_fork 工具——同一组合层后行覆盖先行）。
-	 * 仅在 host fork 时读取（--dsh-agent-team=1）：变更后需重启 DSH host 生效，
-	 * 对已运行会话不变。缺省 undefined/false = 完全等同现状（不注入任何行）。
-	 */
-	dshAgentTeamPreset?: boolean;
-
-	/**
-	 * DSH runtime 迁移提示是否已展示过（一次性提示的持久化闩，#317）。
-	 *
-	 * 渲染层展示「runtime 不在 + 存量 dsh 会话」提示前读取；展示后立即写 true，
-	 * 跨重启不再重弹（否则每次启动都弹，提示变成骚扰）。缺省 undefined/false =
-	 * 还没提示过。展示即置位而非「用户点过入口」：错过 toast 的用户仍可从设置页
-	 * 的 DSH 安装引导进入，不为此保持打扰。
-	 */
-	dshRuntimeMigrationNoticeShown?: boolean;
-
-	/**
-	 * ACP 多后端总开关：默认 false（opt-in）——pi 用户不承受任何 ACP 运行时成本，
-	 * 关闭时主进程不创建 AcpAgentManager、不注册进 CompositeAgentGateway，新建会话也无 ACP 入口。
-	 * 变更重启后生效（热切换会牵动运行中会话生命周期，首版不做）；已登记 acpTools 不受影响，重新开启即恢复。
-	 */
-	acpEnabled?: boolean;
-	/**
-	 * ACP agent CLI 工具登记表（backend=acp 会话的驱动器）：gemini --acp /
-	 * opencode acp / kimi acp / codex-acp 等。仅在 acpEnabled=true 时被读取。数组保序（展示=登记顺序）；
-	 * 删除工具后旧会话靠 acpSessionId 只读降级。缺省 undefined = 空表（无 ACP 工具）。
-	 */
-	acpTools?: AcpToolConfig[];
 };
 
 /**
@@ -820,74 +644,6 @@ export type WebServiceStatusInfo = {
 	tokenExpiresAt: number | null;
 };
 
-// ── 桌面宠物类型 ──
-/** 宠物聚合动画状态；映射到 spritesheet 的行号。
- *  前 7 个为业务态（由 PetStateBridge 聚合 Agent 状态产出）；
- *  running-right / running-left / review 为本期启用的预留行——
- *  巡游方向帧由 PetPatrol 引擎直接推送，review 由「任务完成」转换触发。 */
-export type PetMode =
-	| "idle"
-	| "running"
-	| "failed"
-	| "waiting"
-	| "waving"
-	| "hidden"
-	| "jumping"
-	| "running-right" // 行1 巡游向右（PetPatrol 驱动）
-	| "running-left" // 行2 巡游向左（PetPatrol 驱动）
-	| "review"; // 行8 任务完成庆祝（running→idle 转换触发）
-
-/** 多 Agent 聚合后的全局宠物状态，由 PetStateBridge 计算并推送给宠物窗 */
-export type PetAggregateState = {
-	mode: PetMode;
-	/** 当前 running 的 Agent 数 */
-	runningCount: number;
-	/** 当前 error 的 Agent 数（>0 则 mode=failed，优先级最高） */
-	errorCount: number;
-	/** 点击宠物跳转目标 Agent id；无活跃 Agent 时为 null */
-	activeAgentId: string | null;
-	timestamp: number;
-};
-
-/** 宠物包清单项，合并内置包与 petdex 社区包后去重得到 */
-export type PetManifest = {
-	id: string;
-	displayName: string;
-	description?: string;
-	/** 来源：builtin 随应用打包，petdex 扫描自 ~/.codex/pets/ */
-	source: "builtin" | "petdex";
-	/** 渲染层可加载的 spritesheet URL（pideck-pet:// 协议，主进程按需读文件，非 base64 大字符串） */
-	spritesheetUrl: string;
-};
-
-/** 三端宠物窗能力探测结果（设计文档第 5.2 节降级形态） */
-export type PetWindowCaps = {
-	/** 是否支持透明背景（Linux 部分 WM 不支持） */
-	transparent: boolean;
-	/** 是否支持点击穿透（MVP 不用，预留） */
-	clickThrough: boolean;
-	/** 是否支持自由绝对坐标定位（Wayland 受限） */
-	freePosition: boolean;
-};
-
-/** 宠物通知气泡：出错/完成/等待操作时在宠物头顶弹出。
- *  waiting 为持久化提醒（等待用户回应），直到主进程推送 null 才消失；
- *  error/done 由主进程计时 4 秒后推送 null 自动消失。
- *  text 为完整文案（兼容），title/status 供 renderer 分段着色：标题黑色 + 状态词状态色。 */
-export type PetNotification = {
-	type: "error" | "done" | "waiting";
-	text: string;
-	/** 关联的 Agent id（waiting/error 必有，done 尽量带） */
-	agentId?: string;
-	timestamp: number;
-	/** true：不自动消失，直到主进程推送 null 清理（等待操作类） */
-	persistent?: boolean;
-	/** Agent 标题（黑色段）；缺省时 renderer 退化为整行单色绘制 */
-	title?: string;
-	/** 已翻译的状态词，如「已完成」（状态色段）；缺省时退化为整行单色绘制 */
-	status?: string;
-};
-
 /**
  * 渲染层 AppSettings 首屏默认值（App.tsx 在主进程 settings.get 返回前使用）。
  * 口径必须与 main SettingsStore 的 defaultSettings 保持一致：新增设置项时两边同步补，
@@ -931,7 +687,6 @@ export function createDefaultAppSettings(): AppSettings {
 		gitCommitMessageProvider: "",
 		gitCommitMessageModel: "",
 		gitExecutablePath: "",
-		dshRunnerNodePath: "",
 		closeToTray: true,
 		singleInstance: true,
 		enableNotifications: true,
@@ -939,8 +694,6 @@ export function createDefaultAppSettings(): AppSettings {
 		askNotificationEnabled: false,
 		// 人文关怀提醒默认开启：与主进程 SettingsStore 默认一致，首屏未拉到真实设置前不关闭提醒
 		agentCountReminderEnabled: true,
-		// 旧字段读取兼容；此值不再驱动任何功能。
-		announcementNotificationEnabled: true,
 		// toast 展示时长：与主进程 defaultSettings 同源（全局统一口径）
 		toastDurationMs: DEFAULT_TOAST_DURATION_MS,
 		// showThinking 由 pi agent 的 hideThinkingBlock 控制，启动后从主进程加载的真实值会覆盖此处
@@ -980,27 +733,11 @@ export function createDefaultAppSettings(): AppSettings {
 		sessionTabMaxWidth: SESSION_TAB_MAX_WIDTH_DEFAULT,
 		maxEditorFileSizeMB: 5,
 		externalEditors: createDefaultExternalEditorSettings(),
-
-		// 桌面宠物默认关闭：关闭后应用与现状完全一致，零回归
-		petEnabled: false,
-		petId: "clawd",
-		petAlwaysOnTop: true,
-		petScale: DEFAULT_PET_SCALE,
-		petPatrolEnabled: true,
-		petPatrolPauseMin: 5,
-		// 悬浮球默认关闭：开启后主窗口可隐藏为小圆点，不影响现状
-		floatingBallEnabled: false,
-		floatingBallExpandTarget: "mini",
-		floatingBallAlwaysOnTop: true,
-		floatingBallShowRunningBadge: true,
-		floatingBallSnapToEdge: true,
 		// 闲置 agent 自动释放：与 main SettingsStore 默认值保持一致，避免启动时闪烁
 		idleAgentAutoRelease: true,
 		idleAgentKeepCount: 5,
 		idleAgentTimeoutMin: 60,
 		standbyRuntimeEnabled: true,
-		cuaEnabled: false,
-		cuaAutoApprove: true,
 		favoriteModels: [],
 
 		// 字体配置：与 main SettingsStore 默认值保持一致，避免启动时闪烁
@@ -1029,9 +766,6 @@ export function createDefaultAppSettings(): AppSettings {
 		removedBuiltInExtensions: [],
 		// 声音提醒：与主进程 defaultSettings 保持一致（完成/异常开、等待输入关）
 		soundAlert: createDefaultSoundAlertSettings(),
-		imageGenSize: "unset",
-		imageGenWatermark: false,
-		imageGenOutputFormat: "png",
 		autoDownloadUpdates: true,
 		// 与主进程 defaultSettings 保持一致：更新源默认 GitHub 官方，自定义镜像前缀留空
 		updateSource: "github",

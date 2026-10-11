@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { normalizeVoiceTranscriptionUrl, resolveVolcProtocol, VOICE_STREAM_FRAME_BYTES, VOICE_STREAM_FRAME_MS, VOLC_STREAM_ENDPOINT, VOICE_STREAM_SAMPLE_RATE, VOICE_TRANSCRIPTION_MAX_AUDIO_BYTES, VOICE_TRANSCRIPTION_TIMEOUT_MS } from "../../shared/voiceTranscriptionConfig";
+import { normalizeVoiceTranscriptionUrl, resolveVolcProtocol, VOICE_STREAM_FRAME_BYTES, VOLC_STREAM_ENDPOINT, VOICE_STREAM_SAMPLE_RATE, VOICE_TRANSCRIPTION_MAX_AUDIO_BYTES, VOICE_TRANSCRIPTION_TIMEOUT_MS } from "../../shared/voiceTranscriptionConfig";
 import { toSimplifiedChinese } from "./simplifiedChinese";
 import { createSilentPcm, createSilentWav } from "./silentWav";
 import { extractWavPcm } from "./wavPcm";

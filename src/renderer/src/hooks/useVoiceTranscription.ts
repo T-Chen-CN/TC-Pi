@@ -14,7 +14,7 @@ import { createVoicePcmProcessorModuleUrl } from "../utils/voicePcmProcessor";
 import { startVoiceStreamCapture } from "../utils/voiceStreamCapture";
 import { VoiceStreamSession } from "../utils/voiceStreamSession";
 import type { VoiceTranscriptionTarget } from "../utils/voiceTranscriptionInsert";
-import { canCancelVoiceRecording, canStartVoiceRecording, hasSpeakableAudio, isVoiceTranscriptionConfigured, releaseVoiceRecordingResources, resolveVoiceStartBlockedReason, segmentHasSpeakableAudio, shouldRequestVoiceMicrophone, type VoiceTranscriptionState } from "../utils/voiceRecorderLifecycle";
+import { canCancelVoiceRecording, canStartVoiceRecording, isVoiceTranscriptionConfigured, releaseVoiceRecordingResources, resolveVoiceStartBlockedReason, segmentHasSpeakableAudio, shouldRequestVoiceMicrophone, type VoiceTranscriptionState } from "../utils/voiceRecorderLifecycle";
 
 export type { VoiceTranscriptionState } from "../utils/voiceRecorderLifecycle";
 

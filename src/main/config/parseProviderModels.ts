@@ -1,14 +1,3 @@
-/**
- * 解析 provider `/models` 响应（与 dsh-web llm-pi-ai/discovery.readListing 对齐）。
- *
- * 容量只在端点真正给出时保留：context_window / context_length（Gemini 的
- * inputTokenLimit 也算 listing 已返回）；max_output_tokens / max_tokens /
- * outputTokenLimit。缺字段不猜默认值——后续由 pi-ai 目录补，再缺就空着。
- *
- * 推理能力声明（reasoning / input / thinkingLevelMap）同样只在端点实报时保留：
- * 自家 pi-ai 等网关会在 /models 直接下发这些字段，自适应模板以端点实报优先。
- */
-
 import type { FetchedModel } from "../../shared/types/fetchedModel";
 // 排序键收敛到 shared：/models 结果、配置页保存、模型下拉列表用同一套顺序。
 import { sortModelRows } from "../../shared/modelOrder";
@@ -22,7 +11,6 @@ function nonEmptyString(...candidates: readonly unknown[]): string | undefined {
 	return undefined;
 }
 
-/** 多个候选里取第一个正整数容量（dsh discovery.capacity） */
 function capacity(...candidates: readonly unknown[]): number | undefined {
 	for (const candidate of candidates) {
 		const value = positiveInt(candidate);

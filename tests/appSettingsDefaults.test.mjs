@@ -39,19 +39,3 @@ test("processGroupDisplay is synced from settings into turnFlowSettingsAtom with
 	assert.match(syncBlock, /processGroupDisplay\s*:\s*settings\.processGroupDisplay/, "同步 effect 应写入 settings.processGroupDisplay");
 	assert.match(syncBlock, /settings\.processGroupDisplay\s*,/, "同步 effect 依赖数组应包含 settings.processGroupDisplay");
 });
-
-test("acpEnabled is opt-in: default false, migration and patch strictly coerce to boolean", () => {
-	// ACP 是 opt-in 总开关：默认必须 false（pi 用户零运行时成本——主进程关闭时不创建 AcpAgentManager）。
-	// 迁移/update 均须 `=== true` 收窄，防旧数据里 truthy 字符串意外开启。
-	assert.match(settingsStore, /acpEnabled\s*:\s*false\b/, "SettingsStore 默认值应为 false（opt-in）");
-	assert.match(settingsStore, /this\.settings\.acpEnabled\s*=\s*parsed\.acpEnabled\s*===\s*true\b/, "迁移必须 === true 收窄");
-	assert.match(settingsStore, /safePatch\.acpEnabled\s*=\s*safePatch\.acpEnabled\s*===\s*true\b/, "update patch 必须 === true 收窄");
-	const sharedSettings = read("src/shared/types/settings.ts");
-	assert.match(sharedSettings, /acpEnabled\?:\s*boolean\s*;/, "Settings 需要 acpEnabled?: boolean");
-	// 主进程装配按开关门控注册 ACP 网关：关闭时零成本的关键路径。
-	const mainIndex = read("src/main/index.ts");
-	assert.doesNotMatch(mainIndex, /new AcpAgentManager/);
-	// 此发行版只使用 pi；会话栏加号直接创建当前工作区会话，不再提供后端/项目菜单。
-	const tabs = read("src/renderer/src/components/session/SessionTabsBar.tsx");
-	assert.doesNotMatch(tabs, /acpEnabledAtom|acpToolsAtom|onNewAcpSession/, "会话栏不应残留 ACP 新建菜单");
-});

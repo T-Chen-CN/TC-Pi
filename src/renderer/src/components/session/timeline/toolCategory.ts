@@ -1,14 +1,3 @@
-/**
- * 过程组「活动类别」归类（纯函数，零依赖，node 单测直接加载）。
- *
- * 学 DSH `conversation-nodes/process-activity.ts` 的类别表：过程组的组头用「做了哪类事」
- * 概括（「已读取文件并搜索代码」），而不是罗列工具名或堆计数——折叠态一眼能看出这组干过什么。
- *
- * 分类只依据工具名本身：不做语义猜测、不按参数推断、不查 provider。
- * 与 `toolKind.ts`（分 MCP/内置/扩展来源）口径不同，两者用途不同、互不替代。
- */
-
-/** 过程组活动类别（与 DSH 的 13 类对齐，按 pi 工具名裁剪）。 */
 export type ToolActivityCategory = "read" | "readImage" | "search" | "write" | "edit" | "commands" | "code" | "webSearch" | "webFetch" | "subagents" | "plan" | "questions" | "tools";
 
 /** 某类别在本组内出现的次数（按工具调用计）。 */
@@ -68,18 +57,6 @@ const PREFIX_CATEGORY: ReadonlyArray<readonly [string, ToolActivityCategory]> = 
 	["subagent_", "subagents"],
 ];
 
-/**
- * 工具名 → 活动类别。
- *
- * 命中顺序（与 DSH 表一致的关键点）：
- * 1. `*_inspect` 后缀优先于 `subagent_` 前缀（`subagent_inspect` 归 search 而非 subagents）；
- * 2. 精确名表优先于前缀表；
- * 3. 未知名一律归 `tools`，不猜语义（`mcp__fs__read`、`functions.read` 这类**带命名空间**的名字都落 `tools`）。
- *
- * 大小写：只做小写归一，不做别的变换。这与 PiDeck 既有口径一致
- * （`toolIcon` / `getToolPhrase` / `getToolKind` 都先 `toLowerCase()`），
- * 所以 `Read` 与 `read` 同类——DSH 那边不转大小写，此处刻意跟随本项目惯例。
- */
 export function toolActivityCategory(toolName: string): ToolActivityCategory {
 	const key = toolName.trim().toLowerCase();
 	if (!key) return "tools";

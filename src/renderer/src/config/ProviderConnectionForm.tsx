@@ -240,7 +240,7 @@ export function ProviderConnectionForm(props: {
 										...props.compat,
 										// 确保两个兼容性字段都显式写入，避免序列化后 JSON 为空导致 pi 后端无法正确判断
 										supportsDeveloperRole: checked === true,
-										supportsReasoningEffort: props.compat.supportsReasoningEffort || false,
+										supportsReasoningEffort: props.compat.supportsReasoningEffort,
 									})
 								}
 							/>
@@ -257,7 +257,7 @@ export function ProviderConnectionForm(props: {
 								onCheckedChange={(checked) =>
 									props.onChangeCompat({
 										...props.compat,
-										supportsDeveloperRole: props.compat.supportsDeveloperRole || false,
+										supportsDeveloperRole: props.compat.supportsDeveloperRole,
 										supportsReasoningEffort: checked === true,
 									})
 								}
@@ -276,8 +276,8 @@ export function ProviderConnectionForm(props: {
 									props.onChangeCompat({
 										// 展开保留未知 compat 子键（如手写的 openRouterRouting），只覆盖面板拥有的三项
 										...props.compat,
-										supportsDeveloperRole: props.compat.supportsDeveloperRole || false,
-										supportsReasoningEffort: props.compat.supportsReasoningEffort || false,
+										supportsDeveloperRole: props.compat.supportsDeveloperRole,
+										supportsReasoningEffort: props.compat.supportsReasoningEffort,
 										// 取消勾选也要显式写 false：它是「否决自动判定」的表态，
 										// 省略会被保存时的 DeepSeek 特征判定重新打开。
 										requiresReasoningContentOnAssistantMessages: checked === true,
@@ -314,8 +314,8 @@ export function ProviderConnectionForm(props: {
 								props.onChangeCompat({
 									// 展开保留未知 compat 子键（如手写的 openRouterRouting），只覆盖面板拥有的项
 									...props.compat,
-									supportsDeveloperRole: props.compat.supportsDeveloperRole || false,
-									supportsReasoningEffort: props.compat.supportsReasoningEffort || false,
+									supportsDeveloperRole: props.compat.supportsDeveloperRole,
+									supportsReasoningEffort: props.compat.supportsReasoningEffort,
 									supportsStrictMode: value === "follow" ? undefined : value === "on",
 								})
 							}

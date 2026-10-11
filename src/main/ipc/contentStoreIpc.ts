@@ -1,6 +1,6 @@
 import { ipcMain, shell } from "electron";
 import { ipcChannels } from "../../shared/ipc";
-import { BUILTIN_CONTENT_UPDATE_ALLOWED_BRANCHES, BUILTIN_CONTENT_UPDATE_DEFAULT_BRANCH, type BuiltinContentUpdater } from "../updates/builtinContentUpdater";
+import { BUILTIN_CONTENT_UPDATE_ALLOWED_BRANCHES, BUILTIN_CONTENT_UPDATE_DEFAULT_BRANCH } from "../updates/builtinContentUpdater";
 import type { PromptStoreUpdater } from "../prompts/promptStoreUpdater";
 import type { SkillStoreUpdater } from "../skills/skillStoreUpdater";
 

@@ -1,6 +1,6 @@
 import { cn } from "../../lib/utils";
 import { useAtom, useAtomValue } from "jotai";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { ChevronDown, ChevronRight, ChevronsDownUp, FileText, Folder, FolderOpen, FolderTree, LoaderCircle, RefreshCw, X } from "lucide-react";
 import { normalizeSessionPathForCompare } from "../../agentListDisplay";
 import { SessionSourceBadge } from "./SessionSourceBadge";
@@ -20,7 +20,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from ".
 import type { FileTreeNode, Project, SessionSummary } from "../../../../shared/types";
 import { Input } from "../ui-shadcn/input";
 import { PathTooltip } from "../ui-shadcn/PathTooltip";
-import { FileSearch, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useFileSearch } from "../../hooks/useFileSearch";
 import { FileSearchResults } from "./FileSearchResults";
 import { isEditableTarget, isFileSearchShortcut, isTypeToSearchKey } from "../../utils/fileSearchTrigger";

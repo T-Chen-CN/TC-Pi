@@ -88,7 +88,7 @@ test("moveProviderByStep 在完整列表上位移，跳过隐藏项且不打乱�
 	assert.equal(moveProviderByStep(full, visible, "d", 1), null);
 });
 
-test("契约完整性：供应商排序在主进程设置、配置页两处、DSH 页与选择器链路都接线到位", () => {
+test("契约完整性：供应商排序在主进程设置、配置页两处与选择器链路都接线到位", () => {
 	const read = (path) => readFileSync(path, "utf8");
 	const configModal = read("src/renderer/src/ConfigModal.tsx");
 	const settingsTypes = read("src/shared/types/settings.ts");
@@ -103,8 +103,7 @@ test("契约完整性：供应商排序在主进程设置、配置页两处、DS
 
 	// 持久化：两个字段都必须进 AppSettings 与 SettingsStore 的清洗名单（旧数据缺字段要有默认值）
 	assert.ok(settingsTypes.includes("providerOrder"));
-	assert.ok(settingsTypes.includes("dshProviderOrder"));
-	assert.ok(settingsStore.includes('"providerOrder", "dshProviderOrder"'));
+	assert.ok(settingsStore.includes('"providerOrder"'));
 	// 配置页：读设置进 state，重排后落盘；顺序同时喂给模型页、认证页与 DSH 页
 	assert.ok(configModal.includes("setProviderOrder(settings.providerOrder ?? [])"));
 	assert.ok(configModal.includes("api.settings.update({ providerOrder: next })"));

@@ -197,7 +197,7 @@ export const setSessionQuotesAtom = atom(
 
 export const setSessionComposerModeAtom = atom(null, (get, set, input: { sessionId: string; mode: SessionComposerMode }) => {
 	const modes = { ...get(sessionComposerModeByIdAtom) };
-	// 显式记下 normal：DSH 进行中的 goal 不能把「用户刚切回普通」再推导回目标模式。
+
 	modes[input.sessionId] = input.mode;
 	set(sessionComposerModeByIdAtom, modes);
 });
