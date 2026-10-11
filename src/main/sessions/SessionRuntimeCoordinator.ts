@@ -805,30 +805,6 @@ export class SessionRuntimeCoordinator {
 		);
 	}
 
-	/**
-	 * Apply a DSH permission preset through the active runtime command path.
-	 * The preset is persisted only after the host accepts it, so catalog state
-	 * cannot claim a restricted mode while the live host is still unrestricted.
-	 */
-	setRuntimePermission(target: SessionRuntimeTarget, preset: string): Promise<SessionCommandResult<SessionTargetedValue<AgentRuntimeState>>> {
-		return this.runTargetCommand(target, async (agentId) => {
-			if (typeof this.agents.setPermission !== "function") {
-				throw new SessionRuntimeCommandError("SESSION_COMMAND_FAILED", `backend "${this.agents.backend}" does not support permissions`);
-			}
-			await this.agents.setPermission(agentId, preset);
-			await this.catalog.update(target.sessionId, {
-				permissionPreset: preset,
-				updatedAt: Date.now(),
-			});
-			void this.logger?.info("session-runtime", "Runtime permission changed", {
-				sessionId: target.sessionId,
-				agentId,
-				preset,
-			});
-			return this.agents.getRuntimeState(agentId);
-		});
-	}
-
 	async stopRuntime(target: SessionRuntimeTarget): Promise<SessionCommandResult<SessionRuntimeTarget>> {
 		let reservation: RuntimeReplacement | undefined;
 		try {

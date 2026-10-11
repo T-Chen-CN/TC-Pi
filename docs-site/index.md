@@ -54,6 +54,11 @@ features:
     details: Windows、macOS、Linux 安装包通过 GitHub Releases 发布，源码开发支持 npm 命令，内置浏览器预览。
 ---
 
+::: info
+当前为二次开发工作区，功能以 [当前功能手册](/guide/feature-reference) 为准。本页继承的下载与发布信息指向上游；上游安装包不包含本工作区的修改。
+:::
+
+
 <figure class="home-showcase">
   <img src="/images/overview.png" alt="PiDeck 工作区与对话界面截图">
   <figcaption>工作区、会话、文件抽屉、Git 分支和工具调用集中在同一个桌面窗口中。</figcaption>

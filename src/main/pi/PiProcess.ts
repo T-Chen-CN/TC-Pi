@@ -3,18 +3,18 @@ import { EventEmitter } from "node:events";
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { PiRpcClient } from "./PiRpcClient";
-import { PiLocator } from "./PiLocator";
-import { createSpawnFailureError } from "./piSpawnFailure";
-import { parkBlockedExtensionsInDir, unparkBlockedExtensions, type ParkedExtension } from "./piExtensionFilter";
 import type { AppSettings } from "../../shared/types";
 import type { SessionProxyMode } from "../../shared/types/session";
-import { toWindowsHostPath, toWslLinuxPath } from "../wsl/WslPaths";
 import { appendBuiltInExtensionArgs } from "../extensions/builtInExtensions";
+import { parsePiVersion, piVersionAtLeast } from "../extensions/extensionVersionGate";
+import { killProcessTree } from "../git/gitProcess";
 import { getAppLogger } from "../logging/sharedLogger";
 import { applyPiProxyMode } from "../sessions/sessionProxyPolicy";
-import { killProcessTree } from "../git/gitProcess";
-import { parsePiVersion, piVersionAtLeast } from "../extensions/extensionVersionGate";
+import { toWindowsHostPath, toWslLinuxPath } from "../wsl/WslPaths";
+import { parkBlockedExtensionsInDir, unparkBlockedExtensions, type ParkedExtension } from "./piExtensionFilter";
+import { PiLocator } from "./PiLocator";
+import { PiRpcClient } from "./PiRpcClient";
+import { createSpawnFailureError } from "./piSpawnFailure";
 
 type PiProcessSettings = Pick<
 	AppSettings,
@@ -41,14 +41,6 @@ type PiProcessOptions = {
 	 * 注入 PIDECK_SESSION_ID 环境变量，扩展按它解析会话级等级覆盖。
 	 */
 	securitySessionId?: string;
-	/**
-	 * 当前会话是否已绑定飞书（PIDECK_FEISHU_LINKED=1）。
-	 * pi-deck-ask-question 扩展据此把 ask_question 换成禁用提示版：
-	 * 飞书端交互卡片体验差（按钮截断/选项上限），agent 应把问题直接写进回复。
-	 * 进程级标记，绑定发生在 runtime 启动前（FeishuBridge 先建 binding 再 activateRuntime），
-	 * 因此 spawn 时判断可靠；绑定后已运行的会话需重启才生效（解绑后同样持续到重启）。
-	 */
-	feishuLinked?: boolean;
 	/**
 	 * 会话级代理覆盖（单会话开关）：on = 强制启用（复用全局 piProxyUrl），
 	 * off = 强制直连；缺省/follow = 跟随全局设置。仅在本进程 spawn 时生效。
@@ -426,10 +418,6 @@ export class PiProcess extends EventEmitter {
 			}
 			if (this.options.securitySessionId) {
 				env.PIDECK_SESSION_ID = this.options.securitySessionId;
-			}
-			// 飞书绑定会话：ask_question 换成禁用提示版（扩展读取此标记，纯标志位无需路径转换）
-			if (this.options.feishuLinked) {
-				env.PIDECK_FEISHU_LINKED = "1";
 			}
 			// GUI 扩展桥：注入本机端点 URL + 每次 spawn 独享的 token，
 			// 以及 pi 自身的安装路径（桥据此定位与 pi 同实例的 pi-tui，见 pi-deck-gui-bridge-tui.ts）。

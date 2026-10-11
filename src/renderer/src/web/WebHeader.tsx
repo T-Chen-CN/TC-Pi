@@ -5,19 +5,17 @@
  * 模型与思考档位已迁往 composer 工具行（WebModelSelector/WebThinkingSelector）。
  * 运行态来自 useChat status（submitted/streaming）与轮询的 runtime.status 兜底。
  */
-import { useState } from "react";
-import { Check, ClipboardCopy, Copy, Download, EllipsisVertical, FileDown, FoldVertical, GitFork, Menu, Monitor, Moon, MoreHorizontal, PanelRight, Pencil, Puzzle, RefreshCw, RotateCw, Search, Sun, Target, Trash2 } from "lucide-react";
-import type { AgentBackend } from "../../../shared/types";
+import { SessionBackendMark } from "@/components/session/SessionSourceBadge";
 import { Button } from "@/components/ui-shadcn/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui-shadcn/dropdown-menu";
 import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { SessionBackendMark } from "@/components/session/SessionSourceBadge";
-import { DSH_PERMISSION_PRESETS } from "@/components/session/DshPermissionMenu";
-import { permissionStrengthIcon } from "@/utils/permissionLevelIcon";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui-shadcn/dropdown-menu";
+import { ClipboardCopy, Copy, Download, EllipsisVertical, FileDown, FoldVertical, GitFork, Menu, Monitor, Moon, MoreHorizontal, PanelRight, Pencil, Puzzle, RefreshCw, RotateCw, Search, Sun, Trash2 } from "lucide-react";
+import { useState } from "react";
+import type { AgentBackend } from "../../../shared/types";
 import { WebBottomSheet } from "./WebBottomSheet";
-import type { WebContextUsage } from "./webTypes";
 import type { ResolvedWebTheme, WebThemePreference } from "./webTheme";
+import type { WebContextUsage } from "./webTypes";
 
 export type WebHeaderStatus = "idle" | "starting" | "running" | "error";
 
@@ -34,7 +32,6 @@ export type WebHeaderActions = {
 	/** 手动从磁盘重拉当前会话消息（桌面端跑出的新输出不自动出现时的兜底入口）。 */
 	onRefreshMessages?: () => void;
 	onOpenWorkspace?: () => void;
-	onPermissionChange?: (preset: string) => void;
 };
 
 export function WebHeader(props: {
@@ -44,12 +41,8 @@ export function WebHeader(props: {
 	backend?: AgentBackend;
 	/** P2：上下文用量环数据（由 WebChatApp 随轮询拉取；无 runtime 时不渲染）。 */
 	contextUsage?: WebContextUsage;
-	/** P1：DSH 当前权限预设。 */
-	permissionPreset?: string;
 	/** P0-P3：会话/runtime/workspace 操作回调。 */
 	actions?: WebHeaderActions;
-	/** 第三批：模型/思考已迁 composer，不再由头部渲染。 */
-	onOpenDshTools?: () => void;
 	/** 第二批：全局入口（搜索/主题/PWA 安装/技能扩展面板）。 */
 	onOpenSearch?: () => void;
 	themePreference?: WebThemePreference;
@@ -59,14 +52,9 @@ export function WebHeader(props: {
 	onInstall?: () => void;
 	onOpenAssets?: () => void;
 }) {
-	const { title, status, onOpenSidebar, backend, contextUsage, permissionPreset, actions, onOpenDshTools, onOpenSearch, themePreference, onCycleTheme, canInstall, onInstall, onOpenAssets } = props;
+	const { title, status, onOpenSidebar, backend, contextUsage, actions, onOpenSearch, themePreference, onCycleTheme, canInstall, onInstall, onOpenAssets } = props;
 	// 上下文详情弹层：移动端无悬停 title 提示，环必须可点开详情（对齐桌面 SessionContextMeter 点开面板语义）。
 	const [contextSheetOpen, setContextSheetOpen] = useState(false);
-	// DSH 权限预设：图标按统一保护强度语义取（#214 与桌面 DshPermissionMenu 同源），
-	// 触发钮只显示一个盾牌 logo——宽 Select 曾在窄屏把标题挤没。
-	const knownPreset = DSH_PERMISSION_PRESETS.find((item) => item.id === permissionPreset);
-	const PermissionIcon = permissionStrengthIcon(knownPreset?.strength ?? "unknown");
-	const permissionLabel = permissionPreset ? (knownPreset ? t(knownPreset.labelKey) : t("dshPermission.custom")) : t("dshPermission.unknown");
 	// 头部固定单行：标题+状态占左侧，右侧动作收敛后窄屏不再换行错位（全局入口收进溢出菜单）。
 	return (
 		<>
@@ -91,31 +79,10 @@ export function WebHeader(props: {
 					{/* P2：上下文用量环（无窗口数据时隐藏；超限变红；点击开详情弹层） */}
 					{contextUsage && (contextUsage.contextWindow ?? 0) > 0 ? <ContextRing usage={contextUsage} onClick={() => setContextSheetOpen(true)} /> : null}
 					{/* S6.3：DSH 会话的 goals/subagents/skills 工具面板入口（仅 dsh 后端显示） */}
-					{backend === "dsh" && onOpenDshTools && (
-						<Button type="button" variant="ghost" size="sm" className="h-8 gap-1 px-2 text-caption text-muted-foreground hover:bg-muted/60 hover:text-foreground" onClick={onOpenDshTools} aria-label={t("web.dshTools")} title={t("web.dshTools")}>
-							<Target size={14} aria-hidden="true" />
-							<span className="hidden sm:inline">{t("web.dshTools")}</span>
-						</Button>
-					)}
+
 					{/* P1：DSH 权限预设——单盾牌图标（强度语义：read-only=ShieldAlert / workspace-write=ShieldCheck /
 						full-access=ShieldOff），下拉选档；与桌面 DshPermissionMenu 同一交互族。 */}
-					{backend === "dsh" && actions?.onPermissionChange ? (
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground" aria-label={t("web.permission")} title={`${t("web.permission")} · ${permissionLabel}`}>
-									<PermissionIcon className="size-4" aria-hidden="true" />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-56">
-								{DSH_PERMISSION_PRESETS.map((preset) => (
-									<DropdownMenuItem key={preset.id} onClick={() => actions?.onPermissionChange?.(preset.id)}>
-										<span className="min-w-0 flex-1 truncate">{t(preset.labelKey)}</span>
-										{preset.id === permissionPreset ? <Check className="size-4 shrink-0" aria-hidden="true" /> : null}
-									</DropdownMenuItem>
-								))}
-							</DropdownMenuContent>
-						</DropdownMenu>
-					) : null}
+
 					{/* P3：工作区抽屉（Git / 文件）入口 */}
 					{actions?.onOpenWorkspace ? (
 						<Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground" onClick={actions.onOpenWorkspace} aria-label={t("web.workspaceDrawer")} title={t("web.workspaceDrawer")}>

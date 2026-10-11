@@ -18,7 +18,7 @@ import { ProviderUsageInline } from "../app/ProviderUsageInline";
 import { useProviderUsageBatchRefresh } from "../../hooks/useProviderUsage";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui-shadcn/select";
 import { computeModelDisplay, formatModelRef, resolveComposerLiveModel, resolveGuideDisplayModel, type ModelPending } from "../../utils/modelPendingDisplay";
-import { WELCOME_DSH_MODEL_KEY, WELCOME_MODEL_KEY, isWelcomeModelLost, readWelcomeDshModelPreference, readWelcomeModelPreference, shouldClearWelcomePreference } from "../../utils/chatSessionBootstrap";
+import { WELCOME_MODEL_KEY, isWelcomeModelLost, readWelcomeModelPreference, shouldClearWelcomePreference } from "../../utils/chatSessionBootstrap";
 import { useBackendModelCatalog } from "../../hooks/useBackendModelCatalog";
 import { CommandPickerGroup, CommandPickerPanel, type CommandPickerFilter } from "../ui-shadcn/command-picker";
 import { computeModelPickerDefaultExpanded, groupModelsByProvider, modelPickerSearchFilter, modelRowLabel, modelRowName, orderProviderGroups, resolveModelPickerBody } from "./sessionPickerOptions";
@@ -219,7 +219,6 @@ export function ComposerBottomBar(props: {
 	backend?: AgentBackend;
 	/** 提示词增强域（hook 拥有状态，底栏只呈现）：缺省隐藏入口。 */
 	enhance?: { view: PromptEnhanceView; start: () => void; cancel: () => void };
-	feishuIndicator?: ReactNode;
 	/** 安全等级选择器（自包含组件，注入到左下角工具组） */
 	securityControl?: ReactNode;
 	/** 快捷消息入口（自包含组件，摆在安全控制位右侧，符合「权限右边」的固定习惯） */
@@ -234,23 +233,8 @@ export function ComposerBottomBar(props: {
 	overflowRecoveryTarget?: SessionRuntimeTarget;
 	onOverflowRecovery?: (target: SessionRuntimeTarget) => void;
 	onChangeMode: (mode: ComposerAgentMode) => void;
-	/** 会话已有生图消息时锁定生图模式，下拉不可切走。 */
-	imageGenLocked?: boolean;
 	onCancelPlan: () => void;
 	onAttachFile: () => void;
-	/** 生图模式底栏参数；非 imagegen 时不传。凭据来自独立 imagegen.json。 */
-	imageGenOptions?: {
-		config: ImageGenConfigFile;
-		providerId: string;
-		modelId: string;
-		size: string;
-		outputFormat: string;
-		watermark: boolean;
-		onSelectionChange: (providerId: string, modelId: string) => void;
-		onSizeChange: (size: string) => void;
-		onOutputFormatChange: (format: string) => void;
-		onWatermarkChange: (watermark: boolean) => void;
-	};
 }) {
 	// 真实会话以 runtime / catalog record 为准；只有无 record 的引导页虚拟会话
 	// 才读取 welcome localStorage。这样用户点选模型/思考档位后能立即看到结果，
@@ -259,16 +243,15 @@ export function ComposerBottomBar(props: {
 	// 引导页（无 record）模型目录：后端各自的目录都要加载，才能对各自的点选做存在性
 	// 校验（pi 读 models.json 列表，DSH 读 host catalog）。目录命中主进程全局缓存
 	//（模型选择器同源），通常不会额外 fork pi。
-	const isDsh = props.backend === "dsh";
 	const needsWelcomeCatalog = !props.record;
 	const { models: welcomeCatalogModels, report: welcomeCatalogReport } = useBackendModelCatalog({
 		sessionId: props.sessionId,
-		backend: isDsh ? "dsh" : "pi",
+		backend: "pi",
 		enabled: needsWelcomeCatalog,
 	});
 	// 引导页点选按后端读各自的存储（issue #253）：DSH 的模型是 host route 名，
-	// 存在 WELCOME_DSH_MODEL_KEY；读错会拿到 pi 的 model 去校验 DSH 目录（必然「失效」）。
-	const welcomeModel = needsWelcomeCatalog ? (isDsh ? readWelcomeDshModelPreference()?.model : readWelcomeModelPreference()?.model) : undefined;
+	// 存在 WELCOME_MODEL_KEY；读错会拿到 pi 的 model 去校验 DSH 目录（必然「失效」）。
+	const welcomeModel = needsWelcomeCatalog ? readWelcomeModelPreference()?.model : undefined;
 	const welcomeModelLost = isWelcomeModelLost(welcomeModel, welcomeCatalogModels);
 	// 删除不可逆，走保守判定：只有「一次成功的完整加载」才具备判死资格。
 	// 本组件不传 projectId → 目录恒为全局范围，与全局偏好的作用域一致。
@@ -282,17 +265,16 @@ export function ComposerBottomBar(props: {
 		// 失效偏好只清一次：下次引导页不再默认已删除的模型（创建时主进程也会兜底丢弃）。
 		if (clearWelcomePreference) {
 			try {
-				localStorage.removeItem(isDsh ? WELCOME_DSH_MODEL_KEY : WELCOME_MODEL_KEY);
+				localStorage.removeItem(WELCOME_MODEL_KEY);
 			} catch {
 				// localStorage 不可用时静默；展示层已忽略该偏好。
 			}
 		}
-	}, [clearWelcomePreference, isDsh]);
+	}, [clearWelcomePreference]);
 	const effectiveWelcomeModel = welcomeModelLost ? undefined : welcomeModel;
 	// 引导页（无 record）默认模型展示：与各后端创建时的真实套用同序（点选 > 默认）。
 	// 规则收拢到 resolveGuideDisplayModel，与 ComposerPickerHost 共用一份，避免两侧各自演化。
 	const guideDefaultModel = resolveGuideDisplayModel({
-		isDsh,
 		welcomeModel: effectiveWelcomeModel,
 		defaultModel: props.defaultModel,
 	});
@@ -311,7 +293,6 @@ export function ComposerBottomBar(props: {
 	// imagegen 仅 pi、imageGenLocked 锁定）由专用 hook 统一维护（原 ComposerModeSelect 逻辑）。
 	const { visibleModes, refreshAvailability } = useComposerModeAvailability({
 		backend: props.backend,
-		imageGenLocked: props.imageGenLocked,
 		value: props.composerAgentMode,
 		disabled: props.disabled,
 		onChange: props.onChangeMode,
@@ -338,13 +319,13 @@ export function ComposerBottomBar(props: {
 				<div className="composer-bottom-left flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
 					{/* 特殊模式退出×：模式选择器已常驻底栏，这里是进行中模式的快捷退出
 					    （imagegen 同样可退出；imageGenLocked 时无法切走故不显示；选择器被隐藏时它也是唯一逃生口）。 */}
-					{isSpecialMode && !props.imageGenLocked && (
+					{isSpecialMode && (
 						<div className="composer-mode-cluster inline-flex h-7 min-w-0 items-center rounded-md bg-bg-hover pr-0.5">
 							<button
 								type="button"
 								className="composer-mode-exit mr-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-text-tertiary transition-[color,background-color] duration-fast hover:bg-bg-active hover:text-text-secondary focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
-								aria-label={isGoalMode ? t("app.composerModeCancelGoal") : isImageGenMode ? t("app.composerModeCancelImagegen") : t("app.composerModeCancelPlan")}
-								title={isGoalMode ? t("app.composerModeCancelGoal") : isImageGenMode ? t("app.composerModeCancelImagegen") : t("app.composerModeCancelPlan")}
+								aria-label={isGoalMode ? t("app.composerModeCancelGoal") : t("app.composerModeCancelPlan")}
+								title={isGoalMode ? t("app.composerModeCancelGoal") : t("app.composerModeCancelPlan")}
 								disabled={props.disabled}
 								onClick={props.onCancelPlan}
 							>
@@ -410,26 +391,21 @@ export function ComposerBottomBar(props: {
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					{props.feishuIndicator}
 					{/* 生图模式无 pi/DSH runtime：安全等级（pi 安全门）与 DSH 权限预设都对图片生成无意义，
 					   且 SecurityControl 按 backend 分发时没有 imagegen 分支会误显示成 pi 安全等级菜单；
 					   快捷消息同理（正文是给对话模型的指令），两个控制位一起屏蔽。 */}
-					{isImageGenMode ? null : (
+					{
 						<>
 							{props.securityControl}
 							{props.quickMessagesControl}
 						</>
-					)}
+					}
 				</div>
-				<div
-					className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4 @max-[620px]:justify-start @max-[620px]:overflow-x-auto @max-[620px]:pb-px @max-[480px]:order-3 @max-[480px]:basis-full @max-[480px]:flex-none${isImageGenMode ? " overflow-x-auto overflow-y-hidden [scrollbar-width:none]" : " overflow-hidden"}`}
-				>
+				<div className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4 @max-[620px]:justify-start @max-[620px]:overflow-x-auto @max-[620px]:pb-px @max-[480px]:order-3 @max-[480px]:basis-full @max-[480px]:flex-none${" overflow-hidden"}`}>
 					{/* 生图模式用独立供应商/模型下拉，不展示会话 LLM chip，避免两套配置混用。
 					    ACP 同理：模型/思考由 agent CLI 自持（session/config options 或各自 /model 命令），
 					    PiDeck 维护的 models.json 对 agent CLI 无意义，隐藏 chip 防止两套语义混用。 */}
-					{isImageGenMode || props.backend === "acp" ? null : (
-						<ModelThinkingChip modelLabel={modelLabel} modelPendingTo={modelDisplay.pending && modelTo ? modelTo.modelName || modelTo.modelId : undefined} modelPendingTitle={modelPendingTitle} disabled={props.modelDisabled ?? props.disabled} onPickModel={props.onPickModel} thinkingControl={props.thinkingControl} />
-					)}
+					{<ModelThinkingChip modelLabel={modelLabel} modelPendingTo={modelDisplay.pending && modelTo ? modelTo.modelName || modelTo.modelId : undefined} modelPendingTitle={modelPendingTitle} disabled={props.modelDisabled ?? props.disabled} onPickModel={props.onPickModel} thinkingControl={props.thinkingControl} />}
 					{/* DSH 压缩入口与 pi 统一：上下文圆环（右侧）常驻并带压缩按钮。
 					    2026-12 兼容期：dsh runtime state 已由主进程提供 contextPercent 兜底
 					    （request/context 的 contextWindow + 消息估算），圆环不再因缺数据隐藏，
@@ -617,8 +593,8 @@ export function ModelPicker(props: {
 	const favoritesSet = new Set(props.favoriteModels ?? []);
 	// 隐藏开关：Pi 后端按 provider 与 model 过滤（DSH 的 route 名不参与隐藏列表）；
 	// 过滤后收藏/分组/搜索都基于可见模型，隐藏供应商与隐藏模型不出现在主选择区。
-	const hiddenProviderSet = new Set(props.backend === "dsh" ? [] : (props.hiddenProviders ?? []));
-	const hiddenModelSet = new Set(props.backend === "dsh" ? [] : (props.hiddenModels ?? []));
+	const hiddenProviderSet = new Set(props.hiddenProviders ?? []);
+	const hiddenModelSet = new Set(props.hiddenModels ?? []);
 	const visibleModels: AvailableModel[] = [];
 	const hiddenModelList: AvailableModel[] = [];
 	for (const model of props.models) {

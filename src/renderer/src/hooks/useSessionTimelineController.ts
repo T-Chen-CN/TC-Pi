@@ -1,33 +1,33 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { atom, useAtomValue, useSetAtom, useStore } from "jotai";
-import { latestUserMessageId, SendScrollPositioner } from "./timeline/sendScroll";
 import { selectAtom } from "jotai/utils";
-import { desktopApi } from "../desktopApi";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AgentRuntimeState, ChatMessage, SessionMessagePage, SessionRecord } from "../../../shared/types";
-import { t } from "../i18n";
-import { sessionHistoryUnavailableState } from "../utils/sessionHistoryAvailability";
 import {
 	cacheSessionMessagesAtom,
 	clearSessionHistoryAtom,
 	prependSessionHistoryPageAtom,
 	prependSessionMessagePageAtom,
+	saveSessionScrollAnchorAtom,
+	sessionMessageCacheBySessionIdAtomFamily,
 	sessionMessageLoadStateAtom,
 	sessionMessagesCacheAtom,
-	sessionMessageCacheBySessionIdAtomFamily,
 	sessionRecordByIdAtomFamily,
-	saveSessionScrollAnchorAtom,
 	sessionScrollAnchorByIdAtom,
 	setSessionMessageLoadStateAtom,
 	touchSessionMessagesAtom,
 	type SessionScrollAnchor,
 } from "../atoms";
 import type { MessageScrollerScrollApi } from "../components/agents/message-scroller";
-import { TURN_WINDOW_AUTO_EXPAND_THRESHOLD, resolveAutoExpandThreshold } from "./timeline/autoExpandThreshold";
-import { shouldAutoExpandRenderWindow, shouldApplyDelayedHistoryResult } from "./timeline/scrollHistoryPolicy";
-import { beginProgrammaticScroll, clearProgrammaticScroll, createProgrammaticScrollGuard, finishProgrammaticScrollFrame, isProgrammaticScrollActive } from "./timeline/programmaticScrollGuard";
-import { browsePinScrollTop, followBrowsePinAfterUserScroll, shouldCompensateBrowsePin, type BrowsePin } from "./timeline/browsePin";
-import { countUserTurns, TIMELINE_MOUNTED_TURN_LIMIT, TIMELINE_SCROLLED_TURN_LIMIT, TIMELINE_WINDOW_EXPAND_STEP } from "../components/session/timeline/turnRenderWindow";
 import { estimateJumpExpandTurns, resolveJumpPendingAction } from "../components/session/timeline/jumpWindowPolicy";
+import { countUserTurns, TIMELINE_MOUNTED_TURN_LIMIT, TIMELINE_SCROLLED_TURN_LIMIT, TIMELINE_WINDOW_EXPAND_STEP } from "../components/session/timeline/turnRenderWindow";
+import { desktopApi } from "../desktopApi";
+import { t } from "../i18n";
+import { sessionHistoryUnavailableState } from "../utils/sessionHistoryAvailability";
+import { resolveAutoExpandThreshold } from "./timeline/autoExpandThreshold";
+import { browsePinScrollTop, followBrowsePinAfterUserScroll, shouldCompensateBrowsePin, type BrowsePin } from "./timeline/browsePin";
+import { beginProgrammaticScroll, clearProgrammaticScroll, createProgrammaticScrollGuard, finishProgrammaticScrollFrame, isProgrammaticScrollActive } from "./timeline/programmaticScrollGuard";
+import { shouldApplyDelayedHistoryResult, shouldAutoExpandRenderWindow } from "./timeline/scrollHistoryPolicy";
+import { latestUserMessageId, SendScrollPositioner } from "./timeline/sendScroll";
 
 /** 滚动接近顶部自动加载历史的阈值（px，2026-11 轮次模型）：
  *  贴顶（≤8px）才触发翻页——「滑到底才翻」，避免在顶部附近任何滚动都连翻历史页。
@@ -341,11 +341,6 @@ export type SessionTimelineController = {
 	 * 绕过「已加载 + 有缓存就跳过」和 runtime 缓存守卫。
 	 */
 	reloadFromDisk: () => Promise<void>;
-	/**
-	 * DSH host 被手动停止时的恢复入口：先显式启动 host（唯一能解开手动停止标记的
-	 * 路径），再重载本会话历史。返回是否启动成功；false 时调用方给用户提示。
-	 */
-	startDshHostAndReload: () => Promise<boolean>;
 };
 
 export function useSessionTimelineController(options: { sessionId?: string; messages?: ChatMessage[] }): SessionTimelineController {
@@ -586,22 +581,6 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 			throw error;
 		}
 	}, [cacheMessages, options.sessionId, setLoadState]);
-
-	/**
-	 * DSH host 被手动停止时的恢复入口（时间线专态的「启动 host 并重试」）。
-	 *
-	 * 为什么不能只重试读盘：手动停止态不会自愈——预热 / 按需兜底 / 崩溃重启 /
-	 * runtime 安装恢复全被 isManualStopped 门控拒掉（见 dshManualStop），只有用户
-	 * 显式 startDshHost（主进程清标记后 boot）才能恢复。所以先启动、再重载。
-	 */
-	const startDshHostAndReload = useCallback(async () => {
-		// 启动失败不抛：保持专态等用户再点（真正原因会由后续读盘的错误态/日志暴露）。
-		const started = await desktopApi.sessions.startDshHost().catch(() => false);
-		if (!started) return false;
-		// reloadFromDisk 失败会自行写 error 态并 rethrow，这里不重复上报。
-		await reloadFromDisk().catch(() => undefined);
-		return true;
-	}, [reloadFromDisk]);
 
 	const diskPage = controllerEnabled && cachedEntry?.source === "disk" ? cachedEntry.page : undefined;
 	// ── 激活显示窗口（2026-08 激活分页）──
@@ -1623,6 +1602,5 @@ export function useSessionTimelineController(options: { sessionId?: string; mess
 		isSurfaceLoading,
 		knownEmpty,
 		reloadFromDisk,
-		startDshHostAndReload,
 	};
 }

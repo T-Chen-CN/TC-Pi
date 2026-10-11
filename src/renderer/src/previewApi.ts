@@ -1,11 +1,10 @@
 import type { PiDesktopApi } from "../../preload";
-import { createDefaultExternalEditorSettings, createDefaultSecurityConfig, createDefaultSoundAlertSettings, DEFAULT_PET_SCALE, DEFAULT_TOAST_DURATION_MS, emptyRemoteAccessState } from "../../shared/types";
-import { DEFAULT_VOICE_TRANSCRIPTION_CONFIG } from "../../shared/voiceTranscriptionConfig";
 import { SESSION_TAB_MAX_WIDTH_DEFAULT } from "../../shared/sessionTabWidth";
-import { ACP_TOOL_PRESETS } from "../../shared/acpToolPresets";
 import type { AppSettings, FileTreeNode, Project, SessionRecord, SessionSummary, TerminalDataEvent, TerminalExitEvent, TerminalTab } from "../../shared/types";
-import type { ResourceImportKind } from "../../shared/types/resourceImport";
+import { createDefaultExternalEditorSettings, createDefaultSecurityConfig, createDefaultSoundAlertSettings, DEFAULT_PET_SCALE, DEFAULT_TOAST_DURATION_MS, emptyRemoteAccessState } from "../../shared/types";
 import type { ReplyActionRule } from "../../shared/types/replyActions";
+import type { ResourceImportKind } from "../../shared/types/resourceImport";
+import { DEFAULT_VOICE_TRANSCRIPTION_CONFIG } from "../../shared/voiceTranscriptionConfig";
 import { t } from "./i18n";
 
 const now = Date.now();
@@ -544,44 +543,11 @@ export function createPreviewApi(): PiDesktopApi {
 		},
 		sessions: {
 			list: async () => getSessions(),
-			// 预览模式无 DSH host：空预设目录满足接口契约
-			listDshAgentPresets: async () => [],
-			getDshDefaultModel: async () => undefined,
 			// 预览模式无主进程配置可解析：无启动默认（底栏不预选，不影响其它功能）
 			resolveLaunchDefaults: async () => ({}),
-			getDshSessionPath: async () => undefined,
-			searchDshSessions: async () => [],
-			createDshGoal: async () => undefined,
-			runDshGoalAction: async () => undefined,
-			cancelDshQueuedMessage: async () => undefined,
-			listDshSubagents: async () => [],
-			readDshSubagentHistory: async () => ({ messages: [], hasMore: false }),
 			listSessionSubagents: async () => [],
 			listSessionFileChanges: async () => [],
 			listSessionTodo: async () => undefined,
-			listDshSkills: async () => [],
-			listDshOrphans: async () => [],
-			listDshForeignSessions: async () => [],
-			importDshForeignSession: async () => {
-				throw new Error("preview mode: DSH session import is not available");
-			},
-			syncDshForeignSessions: async () => ({ imported: 0, skipped: 0 }),
-			listArchivedDshSessions: async () => [],
-			unarchiveDshSession: async () => true,
-			deleteArchivedDshSession: async () => true,
-			listDshDynamicPlugins: async () => [],
-			listDshStaticPlugins: async () => [],
-			uninstallDshUserPlugin: async () => ({ rowRemoved: false, reason: "preview mode" }),
-			// 预览模式无主进程 npm/市场链路：搜索与安装拒绝、已装列表为空，满足接口契约
-			searchDshPluginMarket: async () => ({ entries: [], warnings: ["preview mode"] }),
-			installDshUserPlugin: async () => {
-				throw new Error("preview mode: DSH plugin install is not available");
-			},
-			listDshUserPlugins: async () => [],
-			installDshPlugin: async () => undefined,
-			runDshPlugin: async () => undefined,
-			stopDshPlugin: async () => undefined,
-			uninstallDshPlugin: async () => undefined,
 			listCatalog: async (projectId, _options?: { scan?: boolean }): Promise<SessionRecord[]> =>
 				getSessions().map((session) => ({
 					id: `preview-record:${session.id}`,
@@ -646,7 +612,6 @@ export function createPreviewApi(): PiDesktopApi {
 			deleteCatalogMessage: async () => ({ ok: true as const, value: undefined }),
 			prepareCatalogResend: async () => ({ ok: true as const, value: { text: "" } }),
 			readProcessEvents: async () => [],
-			readDshSystemPrompt: async () => undefined,
 			readMessageFullText: async () => ({ text: "" }),
 			readReferenceMessages: async () => [
 				{ role: "user", content: "Preview user message", timestamp: Date.now() - 60000 },
@@ -713,45 +678,6 @@ export function createPreviewApi(): PiDesktopApi {
 				ok: true,
 				value: { cancelled: false, text: "", targetSessionId: `${target.sessionId}:fork` },
 			}),
-			listDshModels: async () => [],
-			discoverDshModels: async () => [],
-			listDshProviders: async () => [],
-			getDshStatus: async () => ({
-				started: false,
-				homeDir: "",
-				bootError: null,
-			}),
-			detectDshRunnerNode: async () => ({
-				source: "not-found",
-				executable: "",
-				resolvedPath: "",
-				version: "",
-				error: null,
-				compatible: false,
-				system: null,
-			}),
-			chooseDshRunnerNode: async () => null,
-			installDshRunnerNode: async () => ({ ok: false, error: "unavailable in preview" }),
-			// 预览环境无 DSH 后端：按未安装处理（UI 走安装引导，不裸报错）。
-			getDshRuntimeStatus: async () => ({ state: "notInstalled" as const }),
-			onDshRuntimeStatusChanged: () => () => {},
-			installDshRuntime: async () => ({ ok: false, error: "unavailable in preview" }),
-			importDshRuntimeFile: async () => ({ ok: false, error: "unavailable in preview" }),
-			importDshRuntimeDir: async () => ({ ok: false, error: "unavailable in preview" }),
-			uninstallDshRuntime: async () => ({ ok: false, error: "unavailable in preview" }),
-			onDshRuntimeInstallProgress: () => () => {},
-			describeDshSettings: async () => ({ writable: false, hasDocument: false, namespaces: [] }),
-			updateDshSettings: async () => undefined,
-			mutateDshSettings: async () => undefined,
-			describeDshCredentials: async () => ({}),
-			setDshCredential: async () => undefined,
-			unsetDshCredential: async () => undefined,
-			readDshCredential: async () => undefined,
-			openDshDocument: async () => undefined,
-			// 预览模式无 host：stop/start 直接返回成功满足接口契约（UI 不渲染错误）。
-			stopDshHost: async () => true,
-			startDshHost: async () => true,
-			restartDshHost: async () => true,
 			setFocusedSession: async () => undefined,
 			getRuntimeState: async (target) => ({
 				ok: true,
@@ -808,10 +734,6 @@ export function createPreviewApi(): PiDesktopApi {
 			setRuntimeThinking: async (target, thinkingLevel) => ({
 				ok: true,
 				value: { target, value: { thinkingLevel } },
-			}),
-			setRuntimePermission: async (target) => ({
-				ok: true,
-				value: { target, value: {} },
 			}),
 			cloneRuntime: async (target) => ({
 				ok: true,
@@ -1363,17 +1285,6 @@ export function createPreviewApi(): PiDesktopApi {
 				enabled,
 			}),
 		},
-		acp: {
-			// 预览模式：无 ACP 工具数据，返回空表/恒过校验保持 PiDesktopApi 形状完整；
-			// 生命周期接口返回固定缺省值（无安装检测、无事件流）
-			listTools: async () => [],
-			saveTools: async () => [],
-			validateTool: async () => ({ ok: true as const }),
-			detectTool: async () => ({ presetId: ACP_TOOL_PRESETS[0]?.id ?? "gemini", state: "unknown" as const }),
-			installTool: async () => ({ ok: false, output: "preview" }),
-			uninstallTool: async () => ({ ok: false, output: "preview" }),
-			onLifecycleEvent: () => () => undefined,
-		},
 		settings: {
 			get: async (): Promise<AppSettings> => ({ ...previewSettings }),
 			update: async (patch): Promise<AppSettings> => {
@@ -1431,14 +1342,6 @@ export function createPreviewApi(): PiDesktopApi {
 			}),
 		},
 		config: {
-			previewProviderMigration: async () => ({ direction: "pi-to-dsh" as const, providers: [] }),
-			applyProviderMigration: async (direction, provider) => ({
-				ok: true,
-				provider,
-				direction,
-				copiedKey: false,
-				wroteViaHost: false,
-			}),
 			getModels: async () => ({
 				raw: '{"providers":{}}',
 				parsed: { providers: {} },
@@ -1507,15 +1410,6 @@ export function createPreviewApi(): PiDesktopApi {
 				tokens: { input: 8, output: 7 },
 				latencyMs: 320,
 			}),
-			visionGetConfig: async () => ({
-				config: null,
-				configDir: "/tmp/preview/.pi/agent",
-			}),
-			visionSaveConfig: async () => ({ ok: true }),
-			visionGetLog: async () => ({ exists: false, size: 0, content: "", truncated: false }),
-			visionClearLog: async () => ({ ok: true }),
-			visionGetEvents: async () => ({ exists: false, size: 0, events: [], truncated: false }),
-			visionClearEvents: async () => ({ ok: true }),
 			fetchUsage: async () => ({
 				success: false,
 				error: "preview",

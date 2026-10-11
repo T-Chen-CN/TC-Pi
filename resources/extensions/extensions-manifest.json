@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "version": "1.0.1",
-  "bundleSha256": "a221455576b42f03185a5a818a1c3b9fd2fe6f68612535fdf3bf94311a2b49a0",
+  "bundleSha256": "4b57252a853fc029be7e14bf8b6923444689d2e43d4ca6c691ffe6247b83a093",
   "fileCount": 25,
   "files": [
     {
       "name": "pi-deck-ask-question.ts",
-      "sha256": "b6b604c09feccece07ac7307882876f2d0071190051cdf3d2d03cef47e2cfb00",
-      "bytes": 13855
+      "sha256": "b7a06ce8162474fdd0fd8b669e9958e0e7a33a5992e9c8658f3bb84182dcf25f",
+      "bytes": 12305
     },
     {
       "name": "pi-deck-ext-points.ts",

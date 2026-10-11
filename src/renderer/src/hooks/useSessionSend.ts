@@ -1,15 +1,14 @@
 import { useSetAtom, useStore } from "jotai";
 import { useRef } from "react";
 import type { ComposerAgentMode, ImageContent, SendSessionPromptInput, SendSessionPromptResult, SessionRuntimeTarget } from "../../../shared/types";
-import { classifyComposerSlashCommand } from "../utils/composerSlashCommand";
 import {
 	bindSessionRuntimeAtom,
 	bumpNewTurnCollapseTickAtom,
 	cacheSessionMessagesAtom,
 	sessionAttachmentsByIdAtom,
-	sessionMessagesCacheAtom,
 	sessionComposerModeByIdAtom,
 	sessionDraftByIdAtom,
+	sessionMessagesCacheAtom,
 	sessionQuotesByIdAtom,
 	sessionRecordsAtom,
 	sessionRuntimeByIdAtom,
@@ -18,14 +17,11 @@ import {
 	setSessionQuotesAtom,
 	setSessionSendStateAtom,
 	upsertSessionAtom,
-	dshRuntimeStatusAtom,
-	openSettingsAtom,
 } from "../atoms";
-import { applyDshGoalSendTransform, buildComposerPromptSubmission, deriveComposerAgentMode, expandPromptTemplates } from "../composerBehavior";
 import { expandQuoteTokens, stripQuoteTokens } from "../components/session/composer/quoteChip";
+import { buildComposerPromptSubmission, deriveComposerAgentMode, expandPromptTemplates } from "../composerBehavior";
 import { t, translateI18nDescriptor } from "../i18n";
-import { DSH_INSTALL_SETTINGS_TARGET, maybeHintMissingDshRunnerNode, showDshRuntimeBlockHint } from "../utils/dshRuntimeHint";
-import { dshSendBlockReason } from "../../../shared/types/dshRuntime";
+import { classifyComposerSlashCommand } from "../utils/composerSlashCommand";
 
 export type EnqueuePromptSnapshot = {
 	displayText: string;
@@ -201,47 +197,21 @@ export function useSessionSend(options: UseSessionSendOptions) {
 			options.showError?.(t("app.quoteNeedsQuestion"), 4000);
 			return;
 		}
-
-		// DSH 会话在 runtime 不可用（未安装/损坏）时拦截发送：DSH host fork 依赖
-		// @deepseek-ai/dsh-base 产物，runtime 缺失时主进程只会抛模块解析的裸报错。
 		// 发送前给「去安装」提示（含直达入口），避免乐观气泡 + 失败回滚的体验；
 		// checking 不算拦截——状态未定时不误拦正常发送。
 		const recordAtEntry = store.get(sessionRecordsAtom)[sourceSessionId];
 		const runtimeAtEntry = store.get(sessionRuntimeByIdAtom)[sourceSessionId];
-		if (recordAtEntry?.backend === "dsh" || runtimeAtEntry?.backend === "dsh") {
-			const dshStatusAtEntry = store.get(dshRuntimeStatusAtom);
-			if (dshSendBlockReason(dshStatusAtEntry.state)) {
-				const blockMessage =
-					dshStatusAtEntry.state === "broken"
-						? t("dsh.runtime.sendBroken", { reason: dshStatusAtEntry.reason ?? "" })
-						: dshStatusAtEntry.state === "outdated"
-							? t("dsh.runtime.sendOutdated", {
-									installed: dshStatusAtEntry.runtimeVersion ?? "",
-									declared: dshStatusAtEntry.declaredRuntimeVersion ?? "",
-								})
-							: t("dsh.runtime.sendNotInstalled");
-				setSendState({
-					sessionId: sourceSessionId,
-					state: { status: "error", error: blockMessage },
-				});
-				showDshRuntimeBlockHint(() => store.set(openSettingsAtom, DSH_INSTALL_SETTINGS_TARGET), dshStatusAtEntry.state, dshStatusAtEntry.reason, {
-					installed: dshStatusAtEntry.runtimeVersion,
-					declared: dshStatusAtEntry.declaredRuntimeVersion,
-				});
+		{
+			if ((recordAtEntry?.backend && recordAtEntry.backend !== "pi") || (runtimeAtEntry?.backend && runtimeAtEntry.backend !== "pi")) {
+				options.showError?.(t("app.legacyBackendReadOnly"), 4000);
 				return;
 			}
-			maybeHintMissingDshRunnerNode(() => store.set(openSettingsAtom, { tab: "dev", section: "dsh-runner-node" }));
 		}
 
 		const resolveSendMode = (targetSessionId: string): ComposerAgentMode => {
 			const record = store.get(sessionRecordsAtom)[targetSessionId];
 			const liveRuntime = store.get(sessionRuntimeByIdAtom)[targetSessionId];
-			return deriveComposerAgentMode({
-				backend: record?.backend === "dsh" || liveRuntime?.backend === "dsh" ? "dsh" : "pi",
-				localMode: store.get(sessionComposerModeByIdAtom)[targetSessionId],
-				planModeActive: liveRuntime?.state?.planModeActive === true,
-				goalPhase: liveRuntime?.state?.goal?.phase,
-			});
+			return deriveComposerAgentMode({ backend: "pi", localMode: store.get(sessionComposerModeByIdAtom)[targetSessionId] });
 		};
 
 		sendingSessionIdsRef.current.add(sourceSessionId);
@@ -453,22 +423,12 @@ export function useSessionSend(options: UseSessionSendOptions) {
 		}
 		const record = store.get(sessionRecordsAtom)[sessionId];
 		const liveRuntime = store.get(sessionRuntimeByIdAtom)[sessionId];
-		const isDshSend = record?.backend === "dsh" || liveRuntime?.backend === "dsh";
 		const sendMode: ComposerAgentMode = deriveComposerAgentMode({
-			backend: isDshSend ? "dsh" : "pi",
+			backend: "pi",
 			localMode: store.get(sessionComposerModeByIdAtom)[sessionId],
-			planModeActive: liveRuntime?.state?.planModeActive === true,
-			goalPhase: liveRuntime?.state?.goal?.phase,
 		});
-		// DSH 拒绝 agentMessage：首次目标改写成 /goal；已有目标则原文推进。
-		const visibleMessage = isDshSend
-			? applyDshGoalSendTransform({
-					message: expandedMessage,
-					mode: sendMode,
-					goal: liveRuntime?.state?.goal,
-				})
-			: expandedMessage;
-		const submission = buildComposerPromptSubmission(visibleMessage, isDshSend ? "normal" : sendMode);
+		const visibleMessage = expandedMessage;
+		const submission = buildComposerPromptSubmission(visibleMessage, sendMode);
 
 		try {
 			const result = await options.sendPrompt({
@@ -494,10 +454,9 @@ export function useSessionSend(options: UseSessionSendOptions) {
 
 			const record = store.get(sessionRecordsAtom)[sessionId];
 			if (record && result.accepted) {
-				// DSH 的 sessionPath 是 host zstd，不能当 pi JSONL 写进 filePath。
 				upsertSession({
 					...record,
-					...(record.backend === "dsh" || !result.sessionPath ? {} : { filePath: result.sessionPath }),
+					...(!result.sessionPath ? {} : { filePath: result.sessionPath }),
 					status: "active",
 					updatedAt: Date.now(),
 				});

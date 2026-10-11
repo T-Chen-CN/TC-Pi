@@ -12,40 +12,62 @@
  * UI 层与桌面端对齐：WebSidebar / WebHeader / WebTimeline / WebComposer，
  * 复用桌面设计 token、shadcn 组件、lucide 图标与 timeline/surfaces 样式类。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import type { UIMessage } from "ai";
-import type { AgentBackend, AvailableModel } from "../../../shared/types";
-import { createSessionModelPreference } from "../../../shared/modelDisplayName";
-import { t } from "@/i18n";
-import { WebSidebar, type WebSessionRowAction } from "./WebSidebar";
-import { WebHeader, type WebHeaderStatus } from "./WebHeader";
-import { WebTimeline } from "./WebTimeline";
-import { WebComposer } from "./WebComposer";
-import { WebBranchBar } from "./WebBranchBar";
-import { sessionFromPath, sessionPath } from "./webSessionRoute";
-import { WebWorkspaceDrawer } from "./WebWorkspaceDrawer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui-shadcn/alert-dialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui-shadcn/dialog";
 import { Button } from "@/components/ui-shadcn/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui-shadcn/dialog";
 import { Input } from "@/components/ui-shadcn/input";
-import { chatMessagesToUiMessages, createProject, createSession, deleteProject, fetchMessagePage, fetchModels, fetchState, getWebAuthHeaders, respondToUi, setRuntimeModel, setRuntimeThinking, updateSessionRecord } from "./webApi";
-import { abortRuntime, cloneRuntime, compactRuntime, copySession, deleteSession, downloadSessionHtml, editRuntimeMessage, deleteRuntimeMessage, prepareResend, renameSession, restartRuntime } from "./webApi";
-import { fetchRuntimeContextUsage, setRuntimePermission } from "./webApi";
+import { t } from "@/i18n";
+import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createSessionModelPreference } from "../../../shared/modelDisplayName";
+import type { AgentBackend, AgentUiResponse, AvailableModel } from "../../../shared/types";
+import {
+	abortRuntime,
+	chatMessagesToUiMessages,
+	cloneRuntime,
+	compactRuntime,
+	copySession,
+	createProject,
+	createSession,
+	deleteProject,
+	deleteRuntimeMessage,
+	deleteSession,
+	downloadSessionHtml,
+	editRuntimeMessage,
+	fetchMessagePage,
+	fetchModels,
+	fetchRuntimeContextUsage,
+	fetchState,
+	getWebAuthHeaders,
+	prepareResend,
+	renameSession,
+	respondToUi,
+	restartRuntime,
+	setRuntimeModel,
+	setRuntimeThinking,
+	updateSessionRecord,
+} from "./webApi";
+import { WebBranchBar } from "./WebBranchBar";
+import { WebComposer } from "./WebComposer";
+import { useExternalSessionStream } from "./webExternalStream";
+import { WebFilePreview, type WebFilePreviewTarget } from "./WebFilePreview";
+import { WebHeader, type WebHeaderStatus } from "./WebHeader";
 import { sessionUiMessagesToMarkdown } from "./webMarkdown";
 import { removeMessageOptimistic, replaceMessageTextOptimistic } from "./webMessageOptimistic";
-import { WebSessionStrips } from "./WebSessionStrips";
-import { WebFilePreview, type WebFilePreviewTarget } from "./WebFilePreview";
-import { WebSearchDialog } from "./WebSearchDialog";
-import { WebSkillsExtensionsDialog } from "./WebSkillsExtensionsDialog";
-import { applyWebTheme, readStoredWebTheme, resolveWebTheme, storeWebTheme, systemPrefersDark, type ResolvedWebTheme, type WebThemePreference } from "./webTheme";
 import { registerWebServiceWorker, usePwaInstall } from "./webPwa";
-import { decideStreamRecovery } from "./webStreamRecovery";
-import { useExternalSessionStream } from "./webExternalStream";
+import { WebSearchDialog } from "./WebSearchDialog";
+import { sessionFromPath, sessionPath } from "./webSessionRoute";
+import { WebSessionStrips } from "./WebSessionStrips";
+import { WebSidebar, type WebSessionRowAction } from "./WebSidebar";
+import { WebSkillsExtensionsDialog } from "./WebSkillsExtensionsDialog";
 import { useWebStateEvents } from "./webStateEvents";
-import type { AgentUiResponse } from "../../../shared/types";
-import type { WebProject, WebRuntime, WebState, WebContextUsage } from "./webTypes";
+import { decideStreamRecovery } from "./webStreamRecovery";
+import { applyWebTheme, readStoredWebTheme, resolveWebTheme, storeWebTheme, systemPrefersDark, type ResolvedWebTheme, type WebThemePreference } from "./webTheme";
+import { WebTimeline } from "./WebTimeline";
+import type { WebContextUsage, WebProject, WebRuntime, WebState } from "./webTypes";
+import { WebWorkspaceDrawer } from "./WebWorkspaceDrawer";
 
 /** 分页元数据：已加载消息总数 + 更早一页的游标。 */
 type HistoryMeta = {
@@ -85,8 +107,6 @@ export function WebChatApp() {
 	// 手机端默认把聊天作为主画面，项目树通过抽屉按需打开，避免列表占满首屏。
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 	const [uiResponding, setUiResponding] = useState(false);
-	// S6.3：DSH 工具面板（goals/subagents/skills）开关
-	const [dshToolsOpen, setDshToolsOpen] = useState(false);
 	// P1：workspace 抽屉 / 重命名 / 删除确认
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
 	const [renameDraft, setRenameDraft] = useState<{ sessionId: string; title: string } | null>(null);
@@ -444,26 +464,6 @@ export function WebChatApp() {
 		void sendMessage({ text }, { body: { images, ...(agentMessage ? { agentMessage } : {}) } });
 	};
 
-	// 草稿期后端切换：无会话 → 暂存随下次新建生效；有会话 → 仅「本页新建零消息草稿」可写
-	// catalog（历史/复制/克隆/fork 会话自带消息记录，切后端会让历史错位，一律拒绝）。
-	// 切后端同时清空模型/思考偏好（pi 与 dsh/生图的模型目录不同，跨后端偏好无效）。
-	const handleBackendChange = async (backend: AgentBackend) => {
-		if (activeSession && (activeRuntime || backendSwitchLocked(activeSession.id))) return;
-		if (!activeSession) {
-			setPendingBackend(backend);
-			setPendingModel(null);
-			setPendingThinkingLevel(null);
-			return;
-		}
-		setCommandError(null);
-		try {
-			await updateSessionRecord(activeSession.id, { backend, model: null, thinkingLevel: null });
-			await refreshNow();
-		} catch (error) {
-			setCommandError(error instanceof Error ? error.message : String(error));
-		}
-	};
-
 	// 首页直发流程：优先内置 chat 项目（未配置项目时的兜底），否则取第一个项目；
 	// 创建期间复用 creatingProjectId 短暂禁用输入，防止重复提交。
 	const sendFromHome = async (text: string, images: string[], agentMessage?: string) => {
@@ -503,10 +503,6 @@ export function WebChatApp() {
 		messagesBySessionRef.current[id] = [];
 		historyMetaRef.current[id] = { total: 0, nextBefore: null };
 	};
-
-	// 后端切换锁定：仅「本页新建且尚无任何消息」的草稿可切。已激活 runtime 的会话由调用方
-	// 叠加锁定；历史会话（pi/DSH/生图）与复制/克隆/fork 出的会话一律锁死。
-	const backendSwitchLocked = (sessionId: string) => !webDraftSessionsRef.current.has(sessionId) || (messagesBySessionRef.current[sessionId]?.length ?? 0) > 0 || (historyMetaRef.current[sessionId]?.total ?? 0) > 0;
 
 	const handleCreateSession = async (projectId: string) => {
 		setCreatingProjectId(projectId);
@@ -870,18 +866,6 @@ export function WebChatApp() {
 		}
 	};
 
-	const handlePermissionChange = async (preset: string) => {
-		if (!activeTarget || !activeSessionId) return;
-		setCommandError(null);
-		try {
-			await setRuntimePermission(activeTarget, preset);
-			// 先乐观更新本地记录，事件流确认后由轮询收敛
-			setState((current) => ({ ...current, sessions: current.sessions.map((session) => (session.id === activeSessionId ? { ...session, permissionPreset: preset } : session)) }));
-		} catch (error) {
-			setCommandError(error instanceof Error ? error.message : String(error));
-		}
-	};
-
 	// P2：上下文用量随主轮询节奏拉取（活跃 runtime 存在时；无 runtime 清空圆环）
 	useEffect(() => {
 		if (!activeTarget) {
@@ -952,9 +936,7 @@ export function WebChatApp() {
 					onOpenSidebar={() => setMobileSidebarOpen(true)}
 					backend={activeSession?.backend}
 					contextUsage={contextUsage}
-					permissionPreset={contextUsage?.permissionPreset ?? activeSession?.permissionPreset}
 					actions={{
-						onPermissionChange: activeSession?.backend === "dsh" ? (preset) => void handlePermissionChange(preset) : undefined,
 						onOpenWorkspace: activeSession ? () => setWorkspaceOpen(true) : undefined,
 						onRename: activeSessionId ? () => void runSessionAction("rename", activeSessionId) : undefined,
 						onDuplicate: activeSessionId ? () => void runSessionAction("duplicate", activeSessionId) : undefined,
@@ -966,7 +948,6 @@ export function WebChatApp() {
 						onClone: activeTarget ? () => void runRuntimeAction("clone") : undefined,
 						onDelete: activeSessionId ? () => void runSessionAction("delete", activeSessionId) : undefined,
 					}}
-					onOpenDshTools={() => setDshToolsOpen(true)}
 					onOpenSearch={() => setSearchOpen(true)}
 					themePreference={themePreference}
 					resolvedTheme={resolvedTheme}
@@ -1008,8 +989,6 @@ export function WebChatApp() {
 					onSend={handleSend}
 					onStop={handleStop}
 					backend={activeSession?.backend ?? pendingBackend ?? "pi"}
-					backendLocked={activeSession ? Boolean(activeRuntime) || backendSwitchLocked(activeSession.id) : false}
-					onBackendChange={(backend) => void handleBackendChange(backend)}
 					model={activeSession?.model ?? pendingModel ?? undefined}
 					models={models}
 					refreshingModels={modelsRefreshing}

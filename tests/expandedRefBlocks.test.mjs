@@ -36,25 +36,6 @@ test("shared expandedRefBlocks leaves plain text untouched (zero-cost fast path)
 });
 
 /**
- * 纯文本出口契约（回归）：消息文本里的自包含块是给模型读的上下文，任何面向人的
- * 文本出口都必须先折叠，否则会露出 <quoted_context …> 原文。
- * 气泡 / 复制 / 队列预览已覆盖；这里锁住其余五个曾漏出的出口。
- */
-test("every plain-text surface folds self-contained reference blocks", () => {
-	const surfaces = {
-		"子代理转录（pi）": "src/renderer/src/components/session/SessionSubagentsStrip.tsx",
-		"子代理转录（DSH）": "src/renderer/src/components/session/DshAgentToolsPanel.tsx",
-		会话定位轴标题: "src/renderer/src/components/app/AppUtils.ts",
-		"侧栏会话 preview（主进程）": "src/main/sessions/SessionScanner.ts",
-		"Web 端消息渲染（主进程）": "src/main/web/WebServiceManager.ts",
-	};
-	for (const [label, file] of Object.entries(surfaces)) {
-		const source = readFileSync(file, "utf8");
-		assert.match(source, /replaceExpandedRefBlocksWithLabels/, `${label} must fold reference blocks before rendering plain text (${file})`);
-	}
-});
-
-/**
  * 会话标题清洗（textForSessionTitle）。
  * 回归 2026-10 #250：首条消息用 /模板 时，标题链路把展开后的 `<prompt_template …>` 当用户第一句话，
  * 占位标题显示 XML 原文；总结旁路又因 1600 字截断只看到模板正文，标题变成模板里的章节名。
@@ -92,19 +73,4 @@ test("looksLikeExpandedRefBlockTitle flags dirty titles written by the old bug",
 	assert.equal(looksLikeExpandedRefBlockTitle("<skill> 是什么意思"), false);
 	assert.equal(looksLikeExpandedRefBlockTitle("a < b 的边界处理"), false);
 	assert.equal(looksLikeExpandedRefBlockTitle(undefined), false);
-});
-
-test("session title surfaces strip reference block bodies", () => {
-	// 标题是纯文本出口：占位标题（主进程）与异步总结（内置扩展）都必须剥块。
-	// 扩展是 pi 用 -e 加载的独立文件，不能 import shared，因此断言各自的入口函数名。
-	const surfaces = {
-		"占位标题（主进程）": ["src/main/pi/agentUtils.ts", /textForSessionTitle/],
-		"历史扫描回退（主进程）": ["src/main/sessions/SessionScanner.ts", /textForSessionTitle/],
-		"catalog 脏标题识别": ["src/main/sessions/SessionCatalog.ts", /looksLikeExpandedRefBlockTitle/],
-		"异步总结标题（内置扩展）": ["resources/extensions/pi-deck-session-title.ts", /titleTextFromUserInput/],
-	};
-	for (const [label, [file, pattern]] of Object.entries(surfaces)) {
-		const source = readFileSync(file, "utf8");
-		assert.match(source, pattern, `${label} must strip expanded reference blocks before deriving a title (${file})`);
-	}
 });

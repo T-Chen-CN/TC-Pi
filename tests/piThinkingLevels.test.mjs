@@ -88,11 +88,8 @@ test("thinking picker immediately uses cache or compatibility levels while Pi ru
 	// 统一标准：cache 是唯一展示源；两者同时存在（runtime 探测后 cache 才刷新）时以 cache 为准。
 	assert.deepEqual(values({ backend: "pi", cachedPiLevels: ["off", "high", "max"], runtimePiLevels: ["off"] }), ["off", "high", "max"]);
 });
-
-test("DSH missing reasoning metadata falls back to selectable full levels", () => {
+test("pi thinking menu loads independently of runtime probes", () => {
 	const values = (input) => Array.from(resolveThinkingPickerLevels(input), (level) => level.value);
-	assert.deepEqual(values({ backend: "dsh" }), ["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-	assert.deepEqual(values({ backend: "dsh", dshReasoningEfforts: [{ id: "off" }, { id: "high" }] }), ["off", "high"]);
 	// 运行中只在 idle 时做没有缓存的后台探测；探测不再是弹窗 loading 的前置条件。
 	assert.match(pickerSource, /runtime\?\.status !== "idle"/);
 	assert.match(pickerSource, /cachedModel\?\.thinkingLevels !== undefined/);

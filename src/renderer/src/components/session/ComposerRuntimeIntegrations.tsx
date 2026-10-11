@@ -12,10 +12,3 @@ export function sameRuntimeHandle(left: RuntimeHandle | undefined, right: Runtim
 export function isCoherentComposerRuntimeUi(runtime: RuntimeHandle | undefined, runtimeUi: { agentId: string; runtimeGeneration: number } | undefined): boolean {
 	return Boolean(runtime && runtimeUi && runtimeUi.agentId === runtime.agentId && runtimeUi.runtimeGeneration === runtime.runtimeGeneration);
 }
-
-export type ComposerRuntimeSlots = {
-	feishuIndicator: ReactNode;
-};
-export function ComposerRuntimeIntegrations(props: { sessionId: string; children: (slots: ComposerRuntimeSlots) => ReactNode }) {
-	return <>{props.children({ feishuIndicator: null })}</>;
-}

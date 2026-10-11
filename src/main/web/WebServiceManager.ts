@@ -168,7 +168,6 @@ type WebServiceDependencies = {
 	prepareSessionRuntimeResend: (target: SessionRuntimeTarget, messageId: string) => Promise<SessionCommandResult<SessionTargetedValue<{ text: string; images?: ImageContent[] }>>>;
 	setSessionRuntimeModel: (target: SessionRuntimeTarget, provider: string, modelId: string, modelName?: string) => Promise<SessionCommandResult<SessionTargetedValue<SessionRuntimeModelSelection>>>;
 	setSessionRuntimeThinking: (target: SessionRuntimeTarget, level: string) => Promise<SessionCommandResult<SessionTargetedValue<AgentRuntimeState>>>;
-	setSessionRuntimePermission: (target: SessionRuntimeTarget, preset: string) => Promise<SessionCommandResult<SessionTargetedValue<AgentRuntimeState>>>;
 	cloneSessionRuntime: (target: SessionRuntimeTarget) => Promise<
 		SessionCommandResult<{
 			cancelled?: boolean;
@@ -185,33 +184,6 @@ type WebServiceDependencies = {
 	listSessionTodo?: (sessionId: string) => Promise<SessionTodoSnapshot | undefined>;
 	listPendingUiRequests: () => PendingUiRequestSnapshot[];
 	respondToUi: (input: SessionUiResponseInput) => Promise<void>;
-	/** DSH 子代理列表（S6.3：web 端工具面板；未装配 DSH 时缺省）。 */
-	listDshSubagents?: (agentId: string) => Promise<
-		Array<{
-			id: string;
-			label?: string;
-			activity: "running" | "inactive";
-			hasChildren: boolean;
-			mode: "one-shot" | "continuable";
-			kind: "child" | "diagnostic";
-		}>
-	>;
-	/** DSH 子代理历史（S6.3：只读 transcript）。 */
-	readDshSubagentHistory?: (agentId: string, childSessionId: string, beforeSeq?: number, maxMessages?: number) => Promise<{ messages: ChatMessage[]; hasMore: boolean }>;
-	/** DSH 技能目录（S6.3：skill.list 只读）。 */
-	listDshSkills?: (agentId: string) => Promise<import("../../shared/types").DshSkillView[]>;
-	/** DSH 动态插件清单（S6.5：进程内临时扩展；未装配 DSH 时缺省）。 */
-	listDshDynamicPlugins?: () => Promise<import("../../shared/types").DshPluginView[]>;
-	/** DSH 静态 Loader 条目清单（S6.5：origin 标注 user/builtin 来源）。 */
-	listDshStaticPlugins?: () => Promise<import("../../shared/types").DshStaticPluginView[]>;
-	/** DSH 用户自装静态插件卸载（移除用户补丁层行 + 可选回收插件目录）。 */
-	uninstallDshUserPlugin?: (input: import("../../shared/types").DshUserPluginUninstallInput) => Promise<import("../../shared/types").DshUserPluginUninstallResult>;
-	/** DSH 动态插件安装（define：定义源码包，不运行；按会话归属）。 */
-	installDshPlugin?: (input: import("../../shared/types").DshPluginInstallInput) => Promise<unknown>;
-	/** DSH 动态插件生命周期（run/stop/uninstall；面板手势无需审批）。 */
-	runDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
-	stopDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
-	uninstallDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
 };
 
 function serializePublicWebPayload(body: unknown): string {
@@ -873,9 +845,6 @@ export class WebServiceManager {
 					break;
 				case "thinking":
 					result = await this.deps.setSessionRuntimeThinking(target, body.level ?? "");
-					break;
-				case "permission":
-					result = await this.deps.setSessionRuntimePermission(target, body.preset ?? "");
 					break;
 				case "clone":
 					result = await this.deps.cloneSessionRuntime(target);

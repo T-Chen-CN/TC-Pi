@@ -1,19 +1,16 @@
 import { memo, useEffect, useState } from "react";
-import { useAtomValue } from "jotai";
 import type { AppSettings } from "../../../../../shared/types";
-import { dshUiVisibilityFor } from "../../../../../shared/types/dshRuntime";
-import { dshRuntimeStatusAtom } from "../../../atoms";
-import { t } from "../../../i18n";
 import { desktopApi } from "../../../desktopApi";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui-shadcn/select";
+import { t } from "../../../i18n";
 import { Input } from "../../ui-shadcn/input";
-import { SettingsSection } from "./SettingsStorageTab";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui-shadcn/select";
 import { PromptEnhanceSettingsSection } from "./PromptEnhanceSettingsSection";
-import { DirtyMarker, SettingBox, SettingRow, SettingSwitchRow } from "./SettingRows";
-import { VoiceTranscriptionSettingsSection } from "./VoiceTranscriptionSettingsSection";
-import { QuickTaskMenuSetting } from "./QuickTaskMenuSetting";
 import { QuickMessagesSetting } from "./QuickMessagesSetting";
+import { QuickTaskMenuSetting } from "./QuickTaskMenuSetting";
 import { ReplyActionsSetting } from "./ReplyActionsSetting";
+import { DirtyMarker, SettingBox, SettingRow, SettingSwitchRow } from "./SettingRows";
+import { SettingsSection } from "./SettingsStorageTab";
+import { VoiceTranscriptionSettingsSection } from "./VoiceTranscriptionSettingsSection";
 
 type CommonTabProps = {
 	draft: AppSettings;
@@ -30,10 +27,6 @@ type SelectOption = { value: string; label: string; disabled?: boolean };
  */
 export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 	const { draft, updateDraft, isDirty } = props;
-	// DSH runtime 安装态：runtime 不可用时 dsh 选项禁选，
-	// 否则用户能选到一个「保存成功但新建会话必失败」的后端。
-	const dshRuntimeStatus = useAtomValue(dshRuntimeStatusAtom);
-	const dshAvailable = dshUiVisibilityFor(dshRuntimeStatus.state).canCreateDshSession;
 	const languageOptions: SelectOption[] = [
 		{ value: "system", label: t("settings.languageSystem") },
 		{ value: "zh-CN", label: t("settings.languageZh") },

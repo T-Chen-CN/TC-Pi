@@ -51,7 +51,7 @@ function loadConfigManager() {
 			}
 			if (id === "../../shared/i18n/mainProcessCopy") return { mainProcessT: () => "" };
 			if (id === "./parseProviderModels") return { parseProviderModelsResponse: () => [] };
-			if (id === "./providerMigration") {
+			if (id === "./piProviderConfig") {
 				return { isSafeProviderName: () => true };
 			}
 			// 配置写盘留痕（ConfigManager.writeJsonFile 调 getAppLogger()?.info）；trust 测试不关心日志，未安装 logger 时返回 undefined。

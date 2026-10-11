@@ -116,6 +116,6 @@ test("npm install installs the hook automatically", () => {
 
 test("atomgit URL has a single source of truth", () => {
 	assert.equal(DEFAULT_ATOMGIT_URL, "https://atomgit.com/ayuayue/PiDeck.git");
-	// README 对外声明的 AtomGit 地址必须与脚本自愈写入的地址一致
-	assert.match(readme, /https:\/\/atomgit\.com\/ayuayue\/PiDeck/);
+	// 二次开发说明保留上游 GitHub 归属；镜像默认值仍由脚本契约验证
+	assert.match(readme, /https:\/\/github\.com\/ayuayue\/PiDeck/);
 });

@@ -1,9 +1,9 @@
-import { ARCHIVED_SESSION_TOAST_MS, archivedSessionToastMessage } from "../useSessionActions";
+import type { SessionSummary } from "../../../../shared/types";
 import { isSameSessionPath } from "../../agentListDisplay";
 import { desktopApi as api } from "../../desktopApi";
 import { t } from "../../i18n";
-import type { SessionSummary } from "../../../../shared/types";
 import type { NoticeKind } from "../../utils/notice";
+import { ARCHIVED_SESSION_TOAST_MS, archivedSessionToastMessage } from "../useSessionActions";
 
 /** 确认弹窗的最小切片（宿主 overlays 只需要这两个方法） */
 export interface ArchiveConfirmOverlay {
@@ -63,14 +63,6 @@ export function useSidebarArchiveActions({ activeProjectId, showToast, overlays,
 		if (projectId) await refreshProjectSessions(projectId);
 	}
 
-	/** 恢复 DSH 归档会话：host 目录移回 sessions 树并由主进程重建 catalog 记录 */
-	async function unarchiveDshSidebarSession(dshSessionId: string, projectId = activeProjectId) {
-		await api.sessions.unarchiveDshSession(dshSessionId);
-		showToast(t("app.sessionRestored"), 2200);
-		// 恢复目标项目由主进程按 manifest 的 cwd 决定；刷新当前弹窗项目即可让 catalog 快照更新。
-		if (projectId) await refreshProjectSessions(projectId);
-	}
-
 	/** 列出已归档会话（会话管理弹窗恢复视图用） */
 	function listArchivedSidebarSessions() {
 		return api.sessions.listArchived();
@@ -81,19 +73,6 @@ export function useSidebarArchiveActions({ activeProjectId, showToast, overlays,
 		await api.sessions.deleteArchivedRecord(archivedPath);
 		showToast(t("app.sessionDeletedFromArchive"), 2200);
 		// 归档删除不影响常规目录；刷新当前项目只是让 catalog 快照与磁盘一致。
-		const projectId = activeProjectId;
-		if (projectId) await refreshProjectSessions(projectId);
-	}
-
-	/** 列出 DSH 归档会话（会话管理弹窗归档视图用；与 pi 归档合并展示） */
-	function listArchivedDshSidebarSessions() {
-		return api.sessions.listArchivedDshSessions();
-	}
-
-	/** 永久删除已归档 DSH 会话（host 目录移入回收站） */
-	async function deleteArchivedDshSidebarSession(dshSessionId: string) {
-		await api.sessions.deleteArchivedDshSession(dshSessionId);
-		showToast(t("app.sessionDeletedFromArchive"), 2200);
 		const projectId = activeProjectId;
 		if (projectId) await refreshProjectSessions(projectId);
 	}
@@ -123,11 +102,8 @@ export function useSidebarArchiveActions({ activeProjectId, showToast, overlays,
 		deleteSidebarSession,
 		archiveSidebarSession,
 		unarchiveSidebarSession,
-		unarchiveDshSidebarSession,
 		listArchivedSidebarSessions,
 		deleteArchivedSidebarSession,
-		listArchivedDshSidebarSessions,
-		deleteArchivedDshSidebarSession,
 		requestDeleteSidebarSession,
 	};
 }

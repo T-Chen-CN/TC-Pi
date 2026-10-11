@@ -51,7 +51,6 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 
 	// 当前生效模式：会话记录覆盖 > 跟随全局（缺省）
 	const currentMode: SessionProxyMode = record?.proxy?.mode ?? "follow";
-	const isDsh = record?.backend === "dsh";
 	const provider = record?.model?.provider;
 	/** 该会话当前是否有存活进程：决定「保存即生效」还是「下次启动生效」。 */
 	const isSessionLive = isLiveRuntimeStatus(liveRuntime?.status);
@@ -158,9 +157,9 @@ export function SessionProxyDialog(props: { sessionId: string; onClose: () => vo
 					{/* 按供应商过滤的生效提示：仅当 follow 时才会被白名单覆盖，显式 on/off 最高优 */}
 					{globalProxy && globalProxy.providers.length > 0 && currentMode === "follow" && provider && (globalProxy.providers.includes(provider) ? <p className="text-primary/80">{t("sessionProxy.providerFilterMatched", { provider })}</p> : <p>{t("sessionProxy.providerFilterNotMatched", { provider })}</p>)}
 					{globalProxy && globalProxy.providers.length > 0 && <p className="text-muted-foreground/60">{t("sessionProxy.providerFilterHint")}</p>}
-					{isDsh && <p className="text-muted-foreground/70">{t("sessionProxy.dshShareHint")}</p>}
+
 					{/* pi 会话运行中：保存即自动重启进程让代理生效，提前告知避免用户以为要手动重启 */}
-					{!isDsh && isSessionLive && <p className="text-primary/80">{t("sessionProxy.autoRestartHint")}</p>}
+					{isSessionLive && <p className="text-primary/80">{t("sessionProxy.autoRestartHint")}</p>}
 				</div>
 			</DialogContent>
 		</Dialog>

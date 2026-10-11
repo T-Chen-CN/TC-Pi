@@ -4,8 +4,6 @@ import test from "node:test";
 import ts from "typescript";
 import vm from "node:vm";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
-
-const { dshSendBlockReason } = loadTsCommonJs("src/shared/types/dshRuntime.ts");
 // 斜杠命令分类是纯函数：注入真实实现（而不是替身），避免测试里的判定与生产漂移。
 const { classifyComposerSlashCommand } = loadTsCommonJs("src/renderer/src/utils/composerSlashCommand.ts");
 
@@ -158,18 +156,9 @@ function createSendHarness(initial = {}) {
 			t: (key) => key,
 		},
 		// DSH 发送拦截：真实纯函数 + 提示替身（记录调用，不真弹 sonner toast）。
-		"../../../shared/types/dshRuntime": { dshSendBlockReason },
+
 		// `/login` 拦截后的入口：记录调用参数，断言「没被当普通消息发出去」。
 		"../utils/composerSlashCommand": { classifyComposerSlashCommand },
-		"../utils/dshRuntimeHint": {
-			// useSessionSend 顶部还解构了 DSH_INSTALL_SETTINGS_TARGET / maybeHintMissingDshRunnerNode
-			// （后者在 DSH 会话放行后调用，探测本机 Node）；测试环境 desktopApi 不存在，桩为 no-op。
-			DSH_INSTALL_SETTINGS_TARGET: { tab: "common", pane: "config", backendPane: "dsh" },
-			showDshRuntimeBlockHint: (_openSettings, state, reason) => {
-				hints.push({ state, reason });
-			},
-			maybeHintMissingDshRunnerNode: () => {},
-		},
 	});
 	return {
 		state,
@@ -557,78 +546,6 @@ test("a bare /login without provider still opens the dialog", async () => {
 	assert.deepEqual(opened, [undefined]);
 });
 
-test("DSH session send is blocked with a friendly hint when runtime is missing", async () => {
-	const harness = createSendHarness({
-		drafts: { "session-a": "hello dsh" },
-		records: { "session-a": { id: "session-a", backend: "dsh" } },
-	});
-	harness.state.set(harness.atoms.dshRuntimeStatusAtom, { state: "notInstalled" });
-	let sendPromptCalls = 0;
-	const send = harness.send({
-		sessionId: "session-a",
-		templates: [],
-		compact: async () => undefined,
-		sendPrompt: async () => {
-			sendPromptCalls += 1;
-			return { accepted: true };
-		},
-	});
-	await send();
-	// 拦截发生在发送前：不发 RPC、不发布乐观气泡、不占发送锁，草稿保留供装好重试。
-	assert.equal(sendPromptCalls, 0, "runtime-missing dsh send must not reach sendPrompt");
-	assert.equal(harness.state.get("sendStates")["session-a"].status, "error");
-	assert.equal(harness.hints.length, 1, "must show the install hint");
-	assert.equal(harness.hints[0].state, "notInstalled");
-	assert.equal(harness.state.get(harness.atoms.sessionDraftByIdAtom)["session-a"], "hello dsh", "draft must survive the block for retry after install");
-});
-
-test("DSH session send blocks with broken reason when runtime is broken", async () => {
-	const harness = createSendHarness({
-		drafts: { "session-a": "ping" },
-		records: { "session-a": { id: "session-a", backend: "dsh" } },
-	});
-	harness.state.set(harness.atoms.dshRuntimeStatusAtom, {
-		state: "broken",
-		reason: "version mismatch",
-	});
-	let sendPromptCalls = 0;
-	const send = harness.send({
-		sessionId: "session-a",
-		templates: [],
-		compact: async () => undefined,
-		sendPrompt: async () => {
-			sendPromptCalls += 1;
-			return { accepted: true };
-		},
-	});
-	await send();
-	assert.equal(sendPromptCalls, 0);
-	assert.deepEqual(harness.hints[0], { state: "broken", reason: "version mismatch" });
-});
-
-test("DSH session send passes through when runtime is installed or checking", async () => {
-	for (const state of ["installed", "checking"]) {
-		const harness = createSendHarness({
-			drafts: { "session-a": "hello dsh" },
-			records: { "session-a": { id: "session-a", backend: "dsh" } },
-		});
-		harness.state.set(harness.atoms.dshRuntimeStatusAtom, { state });
-		let sendPromptCalls = 0;
-		const send = harness.send({
-			sessionId: "session-a",
-			templates: [],
-			compact: async () => undefined,
-			sendPrompt: async () => {
-				sendPromptCalls += 1;
-				return { accepted: true };
-			},
-		});
-		await send();
-		assert.equal(sendPromptCalls, 1, `${state} must not block the send`);
-		assert.equal(harness.hints.length, 0, `${state} must not show the install hint`);
-	}
-});
-
 test("/compact releases the send lock so a follow-up prompt can send", async () => {
 	const harness = createSendHarness({
 		drafts: { "session-a": "/compact" },
@@ -663,4 +580,25 @@ test("quote tokens expand at the send entry before any snapshot is published", (
 	// 且「只有引用没有正文」在发送前被拦截
 	assert.match(source, /expandQuoteTokens\(rawDraft, \(id\) => quoteMap\?\.\[id\]\)/);
 	assert.match(source, /!stripQuoteTokens\(rawDraft\)\.trim\(\) && !imageSnapshot/);
+});
+
+test("retired backend history cannot send or start a runtime", async () => {
+	for (const backend of ["dsh", "acp", "imagegen"]) {
+		const h = createSendHarness({ drafts: { legacy: "keep draft" }, records: { legacy: { id: "legacy", backend } } });
+		let sends = 0;
+		const errors = [];
+		const send = h.send({
+			sessionId: "legacy",
+			templates: [],
+			sendPrompt: async () => {
+				sends++;
+				throw Error("unexpected RPC");
+			},
+			showError: (message) => errors.push(message),
+		});
+		await send();
+		assert.equal(sends, 0);
+		assert.equal(h.state.get(h.atoms.sessionDraftByIdAtom).legacy, "keep draft");
+		assert.deepEqual(errors, ["app.legacyBackendReadOnly"]);
+	}
 });

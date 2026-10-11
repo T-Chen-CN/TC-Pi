@@ -2,7 +2,6 @@ import { test as base, expect, _electron as electron, type ElectronApplication, 
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { ImageGenConfigFile } from "../src/shared/types/imagegen";
 import { armStartupOverlayDismissal } from "./startupOverlays";
 import { ensureWindowsProfileSkeleton } from "./win-profile";
 import { mockPiShim } from "./mockPiShim";
@@ -19,9 +18,6 @@ export type MockPiFixture = {
 
 /** 测试文件可通过 test.use({ seedProjects }) 预置项目列表（写入 projects.json） */
 export type SeedProject = { id: string; name: string; path: string; pinned?: boolean };
-
-/** 测试文件可通过 test.use({ seedFeishuBots }) 预置飞书 Bot 配置（写入 pi-desktop/feishu.json） */
-export type SeedFeishuBot = { id: string; name: string; appId: string };
 
 /** 测试文件可通过 test.use({ seedSessionFiles }) 预置历史会话文件（未启动 agent 场景）：
  *  写入 <projectPath>/.pi/sessions/<encode>.jsonl + .pi/settings.json（sessionDir 配置），
@@ -48,9 +44,6 @@ function encodeSessionDir(cwd: string): string {
 /** 测试文件可通过 test.use({ seedSettings }) 追加预置设置项（合并进 settings.json） */
 export type SeedSettings = Record<string, unknown>;
 
-/** 测试文件可预置独立 imagegen.json，使首帧 Composer 读取真实供应商配置。 */
-export type SeedImageGenConfig = ImageGenConfigFile;
-
 const repoRoot = resolve(__dirname, "..");
 
 /**
@@ -75,22 +68,17 @@ function normalizeSeeds<T>(name: string, value: readonly T[] | T | undefined, re
 	throw new Error(`${name} 只收到单个对象（不是数组）——这几乎一定是 Playwright 把 >=2 元素的数组当成 [value, options] 元组截断了。${requirement} 多个种子请用函数式覆盖：test.use({ ${name}: async ({}, use) => use([a, b]) })`);
 }
 
-export const test = base.extend<
-	MockPiFixture & { seedProjects: SeedProject[] | undefined; seedFeishuBots: SeedFeishuBot[] | undefined; seedSessionFiles: SeedSessionFile[] | undefined; seedSettings: SeedSettings | undefined; seedImageGenConfig: SeedImageGenConfig | undefined; launchArgs: string[]; mockSessionInProject: boolean }
->({
+export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | undefined; seedSessionFiles: SeedSessionFile[] | undefined; seedSettings: SeedSettings | undefined; launchArgs: string[]; mockSessionInProject: boolean }>({
 	seedProjects: [undefined, { option: true }],
-	seedFeishuBots: [undefined, { option: true }],
 	seedSessionFiles: [undefined, { option: true }],
 	seedSettings: [undefined, { option: true }],
-	seedImageGenConfig: [undefined, { option: true }],
 	// Exercise real startup intents with the same isolated profile and mock RPC backend.
 	launchArgs: [[], { option: true }],
 	mockSessionInProject: [false, { option: true }],
-	app: async ({ seedProjects, seedFeishuBots, seedSessionFiles, seedSettings, seedImageGenConfig, launchArgs, mockSessionInProject }, use) => {
+	app: async ({ seedProjects, seedSessionFiles, seedSettings, launchArgs, mockSessionInProject }, use) => {
 		// 先归一化（元组陷阱见 normalizeSeeds 注释）：非法值在启动 Electron 之前就报错，
 		// 避免用例因「种子项目凭空消失」在后面超时。
 		const projects = normalizeSeeds("seedProjects", seedProjects, "项目需含 id / name / path（用 makeSeedProject 生成）。");
-		const feishuBots = normalizeSeeds("seedFeishuBots", seedFeishuBots, "Bot 需含 id / name / appId。");
 		const sessionFiles = normalizeSeeds("seedSessionFiles", seedSessionFiles, "会话文件需含 projectPath / entries。");
 		const userDataRoot = mkdtempSync(join(tmpdir(), "pideck-mockpi-"));
 		try {
@@ -110,9 +98,6 @@ export const test = base.extend<
 			// %APPDATA%/pi-desktop-dev；但命令行显式传 --user-data-dir 时尊重该路径
 			// （见 main/index.ts「开发态与正式版隔离 userData」注释），
 			// 因此这里预置文件直接写到 --user-data-dir 指定的 profile 目录。
-			// dshHomeDir：DSH_HOME 优先读用户真实 ~/.dsh（DshHost 设计），隔离 userData
-			// 也挡不住它——本机若配过 DSH，foreign sync 会把真实会话的 cwd 注册成项目，
-			// 污染侧栏断言（2026-11 修）。这里指向临时目录下不存在的位置，让 DSH 走全新 home。
 			mkdirSync(join(userDataRoot, "profile"), { recursive: true });
 			writeFileSync(
 				join(userDataRoot, "profile", "settings.json"),
@@ -120,13 +105,9 @@ export const test = base.extend<
 					customPiPath: shimPath,
 					piEnvironmentChecked: true,
 					enableGitManagement: true,
-					dshHomeDir: join(userDataRoot, "dsh-home"),
 					...(seedSettings ?? {}),
 				}),
 			);
-			if (seedImageGenConfig) {
-				writeFileSync(join(userDataRoot, "profile", "imagegen.json"), JSON.stringify(seedImageGenConfig));
-			}
 
 			// 可选：预置项目列表。ProjectStore.load 会保留种子项目并追加内置聊天项目。
 			if (projects.length > 0) {
@@ -139,25 +120,6 @@ export const test = base.extend<
 							...project,
 						})),
 					),
-				);
-			}
-			// 可选：预置飞书 Bot 配置（FeishuConfig 读 userData/pi-desktop/feishu.json）。
-			// appSecret 用 base64（encryptSecret 的简化格式），空串即可——e2e 不真连飞书。
-			if (feishuBots.length > 0) {
-				mkdirSync(join(userDataRoot, "profile", "pi-desktop"), { recursive: true });
-				writeFileSync(
-					join(userDataRoot, "profile", "pi-desktop", "feishu.json"),
-					JSON.stringify({
-						version: 2,
-						bots: feishuBots.map((bot) => ({
-							id: bot.id,
-							name: bot.name,
-							appId: bot.appId,
-							appSecret: "",
-							enabled: true,
-						})),
-						deletedBotIdsByAppId: {},
-					}),
 				);
 			}
 

@@ -14,7 +14,7 @@
  * TokenDance 等外部供应商由用户确认写入 models.json 后走第一段命中，无需特判。
  */
 import type { PiAuthFile, PiModelsFile, PiProviderConfig } from "./ConfigManager";
-import { resolvePiApiKey } from "./providerMigration";
+import { resolvePiApiKey } from "./piProviderConfig";
 
 /** 从 PiProviderConfig 的安全抽出 headers（index signature 实为 unknown，需收窄为对象）。 */
 export function safeProviderHeaders(config: PiProviderConfig | undefined): Record<string, string> | undefined {

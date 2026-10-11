@@ -54,6 +54,11 @@ features:
     details: Windows, macOS, and Linux installers via GitHub Releases. Source install supported via npm.
 ---
 
+::: info
+This is a development fork. See the [current feature reference](/en/guide/feature-reference). Inherited release and download information refers to upstream builds, which do not include changes in this workspace.
+:::
+
+
 <figure class="home-showcase">
   <img src="/images/overview.png" alt="PiDeck workspace and conversation UI">
   <figcaption>Workspace, sessions, file drawer, Git branches, and tool calls — all in one desktop window.</figcaption>

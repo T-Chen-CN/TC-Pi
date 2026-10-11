@@ -79,7 +79,7 @@ test("both provider entries share ProviderConnectionForm (no per-entry divergenc
 	assert.match(endpointsSource, /config\.field\.baseUrl/);
 	assert.match(endpointsSource, /config\.field\.apiType/);
 	assert.match(endpointsSource, /config\.field\.apiKey/);
-	assert.match(endpointsSource, /config\.dsh\.baseUrlHint/);
+	assert.match(endpointsSource, /config\.baseUrlHint/);
 	assert.match(formSource, /config\.field\.userAgent/);
 	assert.match(formSource, /config\.compatibility/);
 	assert.match(formSource, /config\.testModel/);

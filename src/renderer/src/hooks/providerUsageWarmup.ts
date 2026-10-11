@@ -32,11 +32,9 @@ export function selectWarmupProviders(states: Record<string, UsageProbeProviderS
 	const targets: ProviderUsageWarmupTarget[] = [];
 	for (const [cacheKey, state] of Object.entries(states)) {
 		if (!state?.enabled) continue;
-		if (cacheKey.startsWith(DSH_CACHE_PREFIX)) {
-			targets.push({ provider: cacheKey.slice(DSH_CACHE_PREFIX.length), backend: "dsh" });
-		} else {
-			targets.push({ provider: cacheKey, backend: "pi" });
-		}
+		// Old cache entries must not resurrect requests for a retired backend.
+		if (cacheKey.startsWith(DSH_CACHE_PREFIX)) continue;
+		targets.push({ provider: cacheKey, backend: "pi" });
 	}
 	return targets.sort((a, b) => {
 		if (a.backend !== b.backend) return a.backend === "pi" ? -1 : 1;

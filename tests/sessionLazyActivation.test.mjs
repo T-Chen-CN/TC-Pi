@@ -350,19 +350,6 @@ test("deriveSessionSurfaceRuntime hides loading for idle non-activating Session"
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 6. Project toggle behavior
-// ════════════════════════════════════════════════════════════════════
-
-test("ProjectTree selects and toggles a project from its primary row", () => {
-	const projectTreeSource = readFileSync("src/renderer/src/components/sidebar/ProjectTree.tsx", "utf8");
-
-	// The whole project row is the accordion control. This makes the state
-	// discoverable and keeps projects with lazily loaded sessions operable.
-	assert.match(projectTreeSource, /onClick=\{\(\) => \{[\s\S]*?props\.controller\.toggleProject\(project\.id\);[\s\S]*?props\.actions\.projects\.select\(project\.id\);[\s\S]*?\}\}/);
-	assert.match(projectTreeSource, /onClick=\{\(\) => props\.controller\.toggleProject\(project\.id\)\}/);
-});
-
-// ════════════════════════════════════════════════════════════════════
 // 7. Routing: no setCurrentSessionId in App
 // ════════════════════════════════════════════════════════════════════
 

@@ -1,56 +1,66 @@
-import { registerLegacyImages } from "./images/legacyImages";
-import { requireSupportedBackend } from "../shared/productFeatures";
-import { createNetDownloader, createTarExtractor } from "./utils/runtimeIo";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, safeStorage, screen, session, shell, Tray, Notification } from "electron";
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { basename, dirname, join } from "node:path";
-import { homedir, release as osRelease } from "node:os";
-import { createWriteStream, existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { is } from "@electron-toolkit/utils";
-import { downgradeRunningStartedBefore, downgradeStaleRunning } from "./pi/derivedSubagents";
-import { SoundAlertService } from "./sounds/SoundAlertService";
-import { registerSoundIpc } from "./ipc/soundIpc";
-import { registerSoundProtocol } from "./sounds/soundProtocol";
-import { AutomationStore } from "./automation/AutomationStore";
-import { AutomationScheduler } from "./automation/AutomationScheduler";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, protocol, safeStorage, screen, session, shell, Tray } from "electron";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { homedir, release as osRelease } from "node:os";
+import { dirname, join } from "node:path";
+import { requireSupportedBackend } from "../shared/productFeatures";
+import { isShortcutInput, refreshShortcutBindings } from "./appShortcuts";
 import { AutomationRunCoordinator } from "./automation/AutomationRunCoordinator";
+import { AutomationScheduler } from "./automation/AutomationScheduler";
+import { AutomationStore } from "./automation/AutomationStore";
+import { toggleMainWindowDevTools } from "./devTools";
+import { registerLegacyImages } from "./images/legacyImages";
 import { registerAutomationIpc } from "./ipc/automationIpc";
+import { registerSoundIpc } from "./ipc/soundIpc";
 import { applyLinuxDisplayBackendWorkaround, isUsingLinuxXWaylandWorkaround } from "./linuxDisplayBackend";
+import { downgradeRunningStartedBefore, downgradeStaleRunning } from "./pi/derivedSubagents";
 import { readBootPreferences } from "./settings/SettingsStore";
 import { acquireVersionSingleInstance, type FocusPayload } from "./singleInstance";
+import { SoundAlertService } from "./sounds/SoundAlertService";
+import { registerSoundProtocol } from "./sounds/soundProtocol";
+import { createNetDownloader, createTarExtractor } from "./utils/runtimeIo";
 import { mainProcessJsFlags, rendererHeapAdditionalArguments } from "./v8HeapLimits";
-import { isDevToolsShortcut, toggleMainWindowDevTools } from "./devTools";
-import { isShortcutInput, refreshShortcutBindings } from "./appShortcuts";
 // 主进程复用共享的接管型扩展识别规则（与渲染层横幅单一来源；纯函数无依赖）。
 import { detectThirdPartyMcpExtensions } from "../shared/mcpThirdParty";
-import { PiResourceConfigService } from "./config/PiResourceConfigService";
-import { isPackageSource, projectExtensionEnabled } from "./config/PiResourceConfigService";
-import { runPackageRootRuleRepair, type PackageRootRuleRepairDeps } from "./config/piPackageRootRuleRepair";
-import { projectResourceEnabled } from "./config/piResourceRules";
+import type { StartupWindowMode } from "../shared/types";
+import type { DataEnvMode } from "../shared/types/dataEnv";
+import type { PiResourceScope } from "../shared/types/piResources";
+import { isPackageSource, PiResourceConfigService, projectExtensionEnabled } from "./config/PiResourceConfigService";
 import { PiResourceStateStore } from "./config/PiResourceStateStore";
 import { readPiConfigFile } from "./config/piConfigFileStore";
-import { runGlobalResourceMigration, runProjectResourceMigration } from "./config/piResourceMigrationRunner";
+import { runPackageRootRuleRepair, type PackageRootRuleRepairDeps } from "./config/piPackageRootRuleRepair";
 import type { ResolvedMigrationResource } from "./config/piResourceMigration";
-import type { PiResourceScope } from "../shared/types/piResources";
-import { createWindowZoomShortcutHandler } from "./windowZoom";
-import { DEFAULT_DEV_USER_DATA_NAME, isSharedDevBranch, readDevGitBranch, resolveDevUserDataDirName, sanitizeDevBranchSegment } from "./devIsolation";
-import { KEEP_DEV_HTTP_CACHE_ENV, clearDevRendererCache } from "./devRendererCache";
-import { isPortablePackagedEnv, resolveAppUserDataDir, resolveChannelDevDataDir, resolvePackagedUserDataDir } from "./portableUserData";
+import { runGlobalResourceMigration, runProjectResourceMigration } from "./config/piResourceMigrationRunner";
+import { projectResourceEnabled } from "./config/piResourceRules";
 import { readDataEnvDecision, validateStartupDataEnv, writeDataEnvDecision } from "./dataEnv/dataEnvMarker";
-import { registerDataEnvIpc } from "./ipc/dataEnvIpc";
-import { ChannelSwitchService } from "./update/ChannelSwitchService";
+import { DEFAULT_DEV_USER_DATA_NAME, isSharedDevBranch, readDevGitBranch, resolveDevUserDataDirName, sanitizeDevBranchSegment } from "./devIsolation";
+import { clearDevRendererCache, KEEP_DEV_HTTP_CACHE_ENV } from "./devRendererCache";
 import { registerChannelSwitchIpc } from "./ipc/channelSwitchIpc";
+import { registerDataEnvIpc } from "./ipc/dataEnvIpc";
+import { isPortablePackagedEnv, resolveAppUserDataDir, resolveChannelDevDataDir, resolvePackagedUserDataDir } from "./portableUserData";
+import { ChannelSwitchService } from "./update/ChannelSwitchService";
 import { resolveUpdateChannel } from "./update/channelIdentity";
 import { APP_DEEP_LINK_SCHEME } from "./utils/deepLinkScheme";
 import { extractFocusTargetFromArgv } from "./utils/focusTarget";
-import type { Project, StartupWindowMode } from "../shared/types";
-import type { DataEnvMode } from "../shared/types/dataEnv";
+import { createWindowZoomShortcutHandler } from "./windowZoom";
 // 使用 ?asset 后缀导入图标，electron-vite 会在构建时将其复制到输出目录并提供正确的运行时路径
 // 这解决了打包后 build/ 目录不在 asar 中导致托盘图标丢失的问题
 import iconPath from "../../build/icon.png?asset";
-import { applyTrayLogoStyle, applyWindowLogoStyle, resolveLogoImage } from "./appWindowLogo";
+import { mainProcessT, normalizeMainProcessLocale, type MainProcessLocale, type MainProcessTranslationKey } from "../shared/i18n/mainProcessCopy";
+import { ipcChannels } from "../shared/ipc";
+import { buildSessionOriginKey, canonicalizeSessionPath, toAbsoluteSessionPath } from "../shared/sessionIdentity";
+import { msUntilNextThemeBoundary, resolveAppColorScheme } from "../shared/themeSchedule";
+import type { AgentTab, AgentUiRequest, AppLogLevel, AppSettings, SendPromptInput, SendPromptResult, SessionCommandError, SessionCommandResult, SessionRecord, SessionRuntimeEvent, SessionRuntimeTarget } from "../shared/types";
+import { applyWindowLogoStyle, resolveLogoImage } from "./appWindowLogo";
+import { FileSystemService } from "./fs/FileSystemService";
+import { AgentManager } from "./pi/AgentManager";
+import { PiModelCapabilityCache, watchPiConfigDirectory } from "./pi/PiModelCapabilityCache";
+import { PiProcess } from "./pi/PiProcess";
+import { getBridgeServer, stopBridgeServer } from "./pi/bridge/BridgeServer";
+import { ProjectStore } from "./projects/ProjectStore";
+import { recordUserDataNameMigrationNotice, runUserDataNameMigration, type UserDataNameMigration } from "./projects/userDataNameMigration";
 
 // 构建标记：npm run dist:*:dev 打包时由 vite define 注入 true（构建期替换，非运行时环境变量）。
 declare const __PIDECK_DEV_BUILD__: boolean;
@@ -199,186 +209,135 @@ process.on("unhandledRejection", (reason) => {
 	void appLogger?.error("process", "Unhandled rejection", reason);
 	console.error("Unhandled rejection:", reason);
 });
-import { ipcChannels } from "../shared/ipc";
-import { mainProcessT, normalizeMainProcessLocale, type MainProcessLocale, type MainProcessTranslationKey } from "../shared/i18n/mainProcessCopy";
-import { buildSessionOriginKey, canonicalizeSessionPath, toAbsoluteSessionPath } from "../shared/sessionIdentity";
-import type {
-	AgentTab,
-	AgentUiRequest,
-	AppSettings,
-	AppLogLevel,
-	AppLogQuery,
-	AvailableModel,
-	ExternalEditor,
-	ExternalEditorId,
-	ExternalEditorSetting,
-	CreateSessionDraftInput,
-	UpdateSessionRecordInput,
-	FeishuBotConfig,
-	FeishuBridgeStatus,
-	FeishuConnectInput,
-	FeishuTestResult,
-	SendPromptInput,
-	SendPromptResult,
-	SendSessionPromptInput,
-	SessionRecord,
-	SessionCommandError,
-	SessionCommandResult,
-	SessionRuntimeEvent,
-	SessionRuntimeTarget,
-	SessionUiResponseInput,
-	PiPromptTemplateSummary,
-	PromptStoreSearchResult,
-	PromptStoreSearchResponse,
-	PromptStoreRawItem,
-	PromptStoreItem,
-	YaoPromptListResult,
-	YaoPromptDetailResult,
-} from "../shared/types";
-import { msUntilNextThemeBoundary, resolveAppColorScheme } from "../shared/themeSchedule";
-import { ProjectStore } from "./projects/ProjectStore";
-import { runUserDataNameMigration, recordUserDataNameMigrationNotice, type UserDataNameMigration } from "./projects/userDataNameMigration";
-import { shouldAutoRegisterForeignCwd } from "./projects/projectPathPolicy";
-import { defaultPathCheck } from "./projects/projectPresence";
-import { FileSystemService } from "./fs/FileSystemService";
-import { AgentManager } from "./pi/AgentManager";
-import { PiProcess } from "./pi/PiProcess";
-import { getBridgeServer, stopBridgeServer } from "./pi/bridge/BridgeServer";
-import { PiModelCapabilityCache, watchPiConfigDirectory } from "./pi/PiModelCapabilityCache";
 // 生图消息不走 Agent 消息流，改名前需判断标题是否仍是占位名
-import { isDefaultAgentTitle } from "./pi/agentUtils";
+import { createSessionModelPreference } from "../shared/modelDisplayName";
+import { QUICK_MESSAGES_DEFAULT_RESOURCE_NAME, QUICK_MESSAGES_FILE_NAME, REPLY_ACTIONS_DEFAULT_RESOURCE_NAME, REPLY_ACTIONS_FILE_NAME } from "../shared/quickMessages";
+import { TOKENDANCE_PROVIDER } from "../shared/tokendance";
+import { getWhisperModelDef } from "../shared/types/whisperRuntime";
 import { CompositeAgentGateway } from "./agents/CompositeAgentGateway";
-import { resolveDshRuntimeIndexUrl } from "../shared/types/dshRuntimeManifest";
+import { BROWSER_PANEL_PARTITION as BROWSER_PANEL_PARTITION_SHARED, isAllowedBrowserPanelUrl as isAllowedBrowserPanelUrlShared } from "./browser/browserSecurity";
+import { ConfigBackupManager } from "./config/ConfigBackupManager";
+import { ConfigManager } from "./config/ConfigManager";
+import { TokendanceAuthStore } from "./config/tokendanceAuth";
+import { TokendanceCatalogStore } from "./config/tokendanceCatalog";
+import { installTokendanceProvider } from "./config/tokendanceInstaller";
+import { TokendancePaymentStore } from "./config/tokendancePayment";
+import { usageProbeRequest } from "./config/usageProbeTransport";
+import { DiagnosticsMonitor } from "./diagnostics/DiagnosticsMonitor";
+import { detectExternalEditors, mergeDetectedExternalEditors } from "./editors/EditorDetector";
+import { ExtensionManager } from "./extensions/ExtensionManager";
+import { PluginDevService } from "./extensions/PluginDevService";
+import { resolveBuiltInExtensionsDir, resolveBuiltInExtensionsOverlayDir, resolveVendorNodeModulesDir, type BuiltInExtensionPathRoots } from "./extensions/builtInExtensions";
+import { BuiltInExtensionsUpdater } from "./extensions/builtInExtensionsUpdater";
+import { createPiProcessExtensionResolvers } from "./extensions/piProcessExtensionResolvers";
+import { GitRefsWatcher } from "./git/GitRefsWatcher";
+import { GitService } from "./git/GitService";
+import { WorktreeService } from "./git/WorktreeService";
+import { registerBackgroundImageProtocol, registerBackgroundsIpc } from "./ipc/backgroundsIpc";
+import { registerBackupIpc } from "./ipc/backupIpc";
+import { registerBuiltInExtensionIpc } from "./ipc/builtInExtensionIpc";
+import { registerCatalogIpc } from "./ipc/catalogIpc";
+import { registerClipboardIpc } from "./ipc/clipboardIpc";
+import { PROMPTS_STORE_CHANNELS, registerContentStoreIpc, SKILLS_STORE_CHANNELS } from "./ipc/contentStoreIpc";
+import { registerEditorsIpc } from "./ipc/editorsIpc";
+import { registerEnhanceIpc } from "./ipc/enhanceIpc";
+import { registerFilesIpc } from "./ipc/filesIpc";
+import { registerGitIpc } from "./ipc/gitIpc";
+import { registerHostPluginsIpc } from "./ipc/hostPluginsIpc";
+import { registerNoticeHistoryIpc } from "./ipc/noticeHistoryIpc";
+import { registerPasteFilesIpc } from "./ipc/pasteFilesIpc";
+import { registerPiAuthIpc } from "./ipc/piAuthIpc";
+import { registerPluginDevIpc } from "./ipc/pluginDevIpc";
+import { registerProjectsIpc } from "./ipc/projectsIpc";
+import { registerQuickMessagesIpc } from "./ipc/quickMessagesIpc";
+import { registerQuickTaskIpc } from "./ipc/quickTaskIpc";
+import { registerReplyActionsIpc } from "./ipc/replyActionsIpc";
+import { registerResourceImportIpc } from "./ipc/resourceImportIpc";
+import { registerScratchPadIpc } from "./ipc/scratchPadIpc";
+import { registerSecurityIpc } from "./ipc/securityIpc";
+import { registerSessionIpc, scheduleCatalogBackgroundScan } from "./ipc/sessionIpc";
+import { registerShellMenuIpc } from "./ipc/shellMenuIpc";
+import { registerStoreIpc } from "./ipc/storeIpc";
+import { registerSystemIpc } from "./ipc/systemIpc";
+import { registerTerminalIpc } from "./ipc/terminalIpc";
+import { registerThemesIpc } from "./ipc/themesIpc";
+import { registerUsageStatsIpc } from "./ipc/usageStatsIpc";
+import { registerVoiceTranscriptionIpc } from "./ipc/voiceTranscriptionIpc";
+import { registerWebRemoteAccessIpc } from "./ipc/webRemoteAccessIpc";
+import { QuitCleanupRegistry } from "./lifecycle/QuitCleanupRegistry";
+import { AppLogger } from "./logging/AppLogger";
+import { RpcLogLiveBroadcaster } from "./logging/RpcLogLiveBroadcaster";
+import { RpcLogger } from "./logging/RpcLogger";
+import { setAppLogger } from "./logging/sharedLogger";
+import { isMemoryProfileEnabled, startMemoryProfile, type MemoryProfileHandle } from "./memory/MemoryMonitor";
+import { NoticeHistoryStore } from "./notices/NoticeHistoryStore";
+import { PiAiCatalogUpdater } from "./pi/PiAiCatalogUpdater";
 import { PiLocator } from "./pi/PiLocator";
+import { testPiProxy } from "./pi/PiProxyTester";
 import { PiAuthService } from "./pi/auth/PiAuthService";
 import { resolvePiAuthHostLaunch } from "./pi/auth/piAuthHostLaunch";
 import { EnhancePromptService, PI_ENHANCE_HOST_FILENAME } from "./pi/enhance/EnhancePromptService";
-import { testPiProxy } from "./pi/PiProxyTester";
-import { SessionScanner } from "./sessions/SessionScanner";
-import { resolveLaunchDefaultOptions, isModelInModelsConfig } from "./sessions/launchDefaults";
-import { createSessionModelPreference } from "../shared/modelDisplayName";
-import { modelThinkingLevelOf } from "../shared/modelThinkingLevels";
-import { SessionCatalog, canAttachRuntimeMetadata } from "./sessions/SessionCatalog";
-import { aggregateDshProxyMode, buildHostProxyEnvPatch, resolveDshHostProxyMode, resolveEffectiveSessionProxyMode } from "./sessions/sessionProxyPolicy";
-import { SessionRuntimeCoordinator, type SessionRuntimeBinding } from "./sessions/SessionRuntimeCoordinator";
-import { IdleAgentReleaser } from "./sessions/IdleAgentReleaser";
-import { StaleDraftReaper } from "./sessions/StaleDraftReaper";
-import { SessionCommandIpcError } from "./sessions/SessionCommandIpcError";
-import { appendSessionForkSuffix } from "./sessions/sessionForkTitle";
-import { CodexSessionImporter } from "./sessions/CodexSessionImporter";
-import { ClaudeSessionImporter } from "./sessions/ClaudeSessionImporter";
-import { QoderSessionImporter } from "./sessions/QoderSessionImporter";
-import { OpenCodeSessionImporter } from "./sessions/OpenCodeSessionImporter";
-import { ZCodeSessionImporter } from "./sessions/ZCodeSessionImporter";
-import { WorkBuddySessionImporter } from "./sessions/WorkBuddySessionImporter";
-import { CursorSessionImporter } from "./sessions/CursorSessionImporter";
-import { KimiSessionImporter } from "./sessions/KimiSessionImporter";
-import { KimiWorkSessionImporter } from "./sessions/KimiWorkSessionImporter";
-import { MinimaxSessionImporter } from "./sessions/MinimaxSessionImporter";
-import { DirectorySessionImporter } from "./sessions/DirectorySessionImporter";
-import { normalizeSessionPathKey } from "./sessions/directorySessionImport";
-import { SettingsStore } from "./settings/SettingsStore";
-import { SecurityStore } from "./security/SecurityStore";
-import { applyDesktopProxy } from "./settings/DesktopProxy";
-import { GitService } from "./git/GitService";
-import { GitRefsWatcher } from "./git/GitRefsWatcher";
-import { WorktreeService } from "./git/WorktreeService";
-import { ConfigManager } from "./config/ConfigManager";
-import { ConfigBackupManager } from "./config/ConfigBackupManager";
-import { TokendanceCatalogStore } from "./config/tokendanceCatalog";
-import { installTokendanceProvider } from "./config/tokendanceInstaller";
-import { TokendanceAuthStore } from "./config/tokendanceAuth";
-import { TokendancePaymentStore } from "./config/tokendancePayment";
-import { usageProbeRequest } from "./config/usageProbeTransport";
-import { TOKENDANCE_PROVIDER } from "../shared/tokendance";
-import { TerminalSessionManager } from "./terminal/TerminalSessionManager";
-import { startTrayRegistrationVerify, type TrayRegistrationVerify } from "./tray/trayRegistrationVerify";
-import { buildTrayMenuTemplate, TRAY_RECENT_PROJECTS_LIMIT } from "./tray/trayMenuTemplate";
-import { TelemetryService } from "./telemetry/TelemetryService";
-import { collectTelemetrySnapshot } from "./telemetry/telemetrySnapshot";
-import { PromptManager } from "./prompts/PromptManager";
-import { SkillManager } from "./skills/SkillManager";
-import { readSkillContent } from "./skills/readSkillContent";
-import { ExtensionManager } from "./extensions/ExtensionManager";
-import { BuiltInExtensionsUpdater } from "./extensions/builtInExtensionsUpdater";
-import { resolveBuiltInExtensionsDir, resolveBuiltInExtensionsOverlayDir, resolveVendorNodeModulesDir, type BuiltInExtensionPathRoots } from "./extensions/builtInExtensions";
-import { createPiProcessExtensionResolvers } from "./extensions/piProcessExtensionResolvers";
-import { registerBuiltInExtensionIpc } from "./ipc/builtInExtensionIpc";
-import { PROMPTS_STORE_CHANNELS, SKILLS_STORE_CHANNELS, registerContentStoreIpc } from "./ipc/contentStoreIpc";
-import { PromptStoreUpdater } from "./prompts/promptStoreUpdater";
-import { SkillStoreUpdater } from "./skills/skillStoreUpdater";
-import { ProjectResourceManager } from "./projects/ProjectResourceManager";
-import { ResourceImportManager } from "./resourceImport/ResourceImportManager";
-import { toWslLinuxPath, toWindowsHostPath } from "./wsl/WslPaths";
-import { registerProjectsIpc } from "./ipc/projectsIpc";
-import { registerUsageStatsIpc } from "./ipc/usageStatsIpc";
-import { UsageStatsService } from "./usageStats/UsageStatsService";
-import { constrainWindowBoundsToWorkArea, type LastWindowBounds, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, readLastWindowBounds, saveLastWindowBounds } from "./windowState";
-import { createRendererCrashRecoveryGuard } from "./window/rendererCrashRecovery";
-import { registerBackgroundImageProtocol, registerBackgroundsIpc } from "./ipc/backgroundsIpc";
-import { registerThemesIpc } from "./ipc/themesIpc";
-import { registerPluginDevIpc } from "./ipc/pluginDevIpc";
-import { registerHostPluginsIpc } from "./ipc/hostPluginsIpc";
+import { fetchModelList, refreshModelCatalogIfStale, refreshModelList } from "./pi/modelListCache";
+import { getPiAiCatalogIndex, lookupPiAiCatalogEntry, setPiAiCatalogUserDataDir } from "./pi/piAiBuiltinCatalog";
 import { HostPluginService } from "./plugins/HostPluginService";
 import { HOST_PLUGIN_SCHEME } from "./plugins/hostPluginPolicy";
 import { hostPluginPartitionId, hostPluginWebviewBridge } from "./plugins/hostPluginWebviewPolicy";
-import { PluginDevService } from "./extensions/PluginDevService";
-import { registerGitIpc } from "./ipc/gitIpc";
-import { registerStoreIpc } from "./ipc/storeIpc";
-import { registerTerminalIpc } from "./ipc/terminalIpc";
-import { registerScratchPadIpc } from "./ipc/scratchPadIpc";
-import { registerPasteFilesIpc } from "./ipc/pasteFilesIpc";
-import { registerSecurityIpc } from "./ipc/securityIpc";
-import { registerVoiceTranscriptionIpc } from "./ipc/voiceTranscriptionIpc";
-import { VoiceTranscriptionConfigStore } from "./voice/VoiceTranscriptionConfigStore";
-import { VoiceTranscriptionService } from "./voice/VoiceTranscriptionService";
-import { createVolcStreamSocket } from "./voice/volcStreamSocket";
-import { fetchWhisperReleaseDigests, WhisperRuntimeManager } from "./voice/WhisperRuntimeManager";
-import { getWhisperModelDef } from "../shared/types/whisperRuntime";
-import { WhisperTranscriber } from "./voice/WhisperTranscriber";
-import { WhisperServerPool } from "./voice/WhisperServerPool";
-import { registerSessionIpc, scheduleCatalogBackgroundScan } from "./ipc/sessionIpc";
-import { registerWebRemoteAccessIpc } from "./ipc/webRemoteAccessIpc";
-import { RemoteAccessManager } from "./web/remoteAccess/RemoteAccessManager";
-import { registerSystemIpc } from "./ipc/systemIpc";
-import { registerResourceImportIpc } from "./ipc/resourceImportIpc";
-import { registerBackupIpc } from "./ipc/backupIpc";
-import { registerCatalogIpc } from "./ipc/catalogIpc";
-import { registerQuickMessagesIpc } from "./ipc/quickMessagesIpc";
-import { registerNoticeHistoryIpc } from "./ipc/noticeHistoryIpc";
-import { NoticeHistoryStore } from "./notices/NoticeHistoryStore";
-import { registerReplyActionsIpc } from "./ipc/replyActionsIpc";
+import { preparePreloadPath } from "./preloadPath";
+import { ProjectResourceManager } from "./projects/ProjectResourceManager";
+import { PromptManager } from "./prompts/PromptManager";
+import { PromptStoreUpdater } from "./prompts/promptStoreUpdater";
+import { QuickTaskWindowChrome } from "./quickTask/quickTaskWindowChrome";
 import { QuickMessageStore } from "./quickmessages/QuickMessageStore";
 import { ReplyActionRuleStore } from "./replyactions/ReplyActionRuleStore";
-import { QUICK_MESSAGES_DEFAULT_RESOURCE_NAME, QUICK_MESSAGES_FILE_NAME, REPLY_ACTIONS_DEFAULT_RESOURCE_NAME, REPLY_ACTIONS_FILE_NAME } from "../shared/quickMessages";
-import { getPiAiCatalogIndex, lookupPiAiCatalogEntry, setPiAiCatalogUserDataDir } from "./pi/piAiBuiltinCatalog";
-import { PiAiCatalogUpdater } from "./pi/PiAiCatalogUpdater";
-import { fetchModelList, refreshModelCatalogIfStale, refreshModelList, getCachedModelList } from "./pi/modelListCache";
-import { registerFilesIpc } from "./ipc/filesIpc";
-import { registerClipboardIpc } from "./ipc/clipboardIpc";
-import { registerShellMenuIpc } from "./ipc/shellMenuIpc";
-import { QuickTaskWindowChrome } from "./quickTask/quickTaskWindowChrome";
-import { registerQuickTaskIpc } from "./ipc/quickTaskIpc";
-import { BROWSER_PANEL_PARTITION as BROWSER_PANEL_PARTITION_SHARED, isAllowedBrowserPanelUrl as isAllowedBrowserPanelUrlShared } from "./browser/browserSecurity";
+import { ResourceImportManager } from "./resourceImport/ResourceImportManager";
+import { SecurityStore } from "./security/SecurityStore";
+import { ClaudeSessionImporter } from "./sessions/ClaudeSessionImporter";
+import { CodexSessionImporter } from "./sessions/CodexSessionImporter";
+import { CursorSessionImporter } from "./sessions/CursorSessionImporter";
+import { DirectorySessionImporter } from "./sessions/DirectorySessionImporter";
+import { IdleAgentReleaser } from "./sessions/IdleAgentReleaser";
+import { KimiSessionImporter } from "./sessions/KimiSessionImporter";
+import { KimiWorkSessionImporter } from "./sessions/KimiWorkSessionImporter";
+import { MinimaxSessionImporter } from "./sessions/MinimaxSessionImporter";
+import { OpenCodeSessionImporter } from "./sessions/OpenCodeSessionImporter";
+import { QoderSessionImporter } from "./sessions/QoderSessionImporter";
+import { canAttachRuntimeMetadata, SessionCatalog } from "./sessions/SessionCatalog";
+import { SessionCommandIpcError } from "./sessions/SessionCommandIpcError";
+import { SessionRuntimeCoordinator, type SessionRuntimeBinding } from "./sessions/SessionRuntimeCoordinator";
+import { SessionScanner } from "./sessions/SessionScanner";
+import { StaleDraftReaper } from "./sessions/StaleDraftReaper";
+import { WorkBuddySessionImporter } from "./sessions/WorkBuddySessionImporter";
+import { ZCodeSessionImporter } from "./sessions/ZCodeSessionImporter";
+import { normalizeSessionPathKey } from "./sessions/directorySessionImport";
+import { appendSessionForkSuffix } from "./sessions/sessionForkTitle";
+import { resolveEffectiveSessionProxyMode } from "./sessions/sessionProxyPolicy";
+import { applyDesktopProxy } from "./settings/DesktopProxy";
+import { SettingsStore } from "./settings/SettingsStore";
+import { SkillManager } from "./skills/SkillManager";
+import { readSkillContent } from "./skills/readSkillContent";
+import { SkillStoreUpdater } from "./skills/skillStoreUpdater";
+import { TelemetryService } from "./telemetry/TelemetryService";
+import { collectTelemetrySnapshot } from "./telemetry/telemetrySnapshot";
+import { TerminalSessionManager } from "./terminal/TerminalSessionManager";
+import { buildTrayMenuTemplate, TRAY_RECENT_PROJECTS_LIMIT } from "./tray/trayMenuTemplate";
+import { startTrayRegistrationVerify, type TrayRegistrationVerify } from "./tray/trayRegistrationVerify";
+import { UpdateService } from "./update/UpdateService";
+import { installAtomgitNoCacheBypass, UPDATER_PARTITION_NAME } from "./update/atomgitNoCacheBypass";
+import { createRealAutoUpdater } from "./update/createAutoUpdater";
+import { createMacManualUpdateChecker } from "./update/macManualUpdate";
+import { UsageStatsService } from "./usageStats/UsageStatsService";
+import { VoiceTranscriptionConfigStore } from "./voice/VoiceTranscriptionConfigStore";
+import { VoiceTranscriptionService } from "./voice/VoiceTranscriptionService";
+import { fetchWhisperReleaseDigests, WhisperRuntimeManager } from "./voice/WhisperRuntimeManager";
+import { WhisperServerPool } from "./voice/WhisperServerPool";
+import { WhisperTranscriber } from "./voice/WhisperTranscriber";
+import { createVolcStreamSocket } from "./voice/volcStreamSocket";
 import { WebServiceManager } from "./web/WebServiceManager";
 import { WebWorkspaceRoutes } from "./web/WebWorkspaceRoutes";
-import { preparePreloadPath } from "./preloadPath";
-import { AppLogger } from "./logging/AppLogger";
-import { setAppLogger } from "./logging/sharedLogger";
-import { RpcLogger } from "./logging/RpcLogger";
-import { RpcLogLiveBroadcaster } from "./logging/RpcLogLiveBroadcaster";
-import { registerEditorsIpc } from "./ipc/editorsIpc";
-import { registerPiAuthIpc } from "./ipc/piAuthIpc";
-import { registerEnhanceIpc } from "./ipc/enhanceIpc";
-import { detectExternalEditors, listConfiguredExternalEditors, mergeDetectedExternalEditors, openProjectInEditor, validateExternalEditorCommand } from "./editors/EditorDetector";
-import { startMemoryProfile, isMemoryProfileEnabled, type MemoryProfileHandle } from "./memory/MemoryMonitor";
-import { DiagnosticsMonitor } from "./diagnostics/DiagnosticsMonitor";
-import { QuitCleanupRegistry } from "./lifecycle/QuitCleanupRegistry";
-import type { FeishuChatBinding } from "../shared/types";
-import { createRealAutoUpdater } from "./update/createAutoUpdater";
-import { installAtomgitNoCacheBypass, UPDATER_PARTITION_NAME } from "./update/atomgitNoCacheBypass";
-import { createMacManualUpdateChecker } from "./update/macManualUpdate";
-import { UpdateService } from "./update/UpdateService";
+import { RemoteAccessManager } from "./web/remoteAccess/RemoteAccessManager";
+import { createRendererCrashRecoveryGuard } from "./window/rendererCrashRecovery";
+import { constrainWindowBoundsToWorkArea, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, readLastWindowBounds, saveLastWindowBounds, type LastWindowBounds } from "./windowState";
+import { toWindowsHostPath, toWslLinuxPath } from "./wsl/WslPaths";
 
 let mainWindow: BrowserWindow | null = null;
 // 紧凑模式（右键小任务）与主窗口几何的接线统一收在 quickTaskWindowChrome：
@@ -2624,7 +2583,7 @@ app
 			}
 		});
 		// 提示词商店官方模板 / 内置技能热更新：与内置扩展同一套「resources 只读 → userData 覆盖层」机制。
-		// 覆盖层供查询侧（XuePromptManager / SkillManager）叠加解析：远端新增/修改的模板与技能免发版生效。
+		// 覆盖层供查询侧（PromptManager / SkillManager）叠加解析：远端新增/修改的模板与技能免发版生效。
 		const promptStoreUpdater = new PromptStoreUpdater({
 			userDataDir: app.getPath("userData"),
 			// 随包根与 skills/xueprompts.db 同一约定：dev 读 app.getAppPath()/resources，
@@ -2802,7 +2761,6 @@ app
 			securityStore,
 			// spawn pi 前预检修复会话文件（旧版私有 sessionName 头行会让 pi 拒绝加载，见 #114）
 			(filePath) => sessionScanner.repairCorruptSessionHeader(filePath),
-			() => false,
 			// 通知点击跳转需要 record.id（renderer 按它索引会话）；agentId → record.id 由 coordinator 维护。
 			(agentId) => sessionRuntimeCoordinator.getSessionId(agentId),
 			// 会话级代理覆盖（含按模型/供应商两级白名单过滤）：
@@ -3037,7 +2995,6 @@ app
 			prepareSessionRuntimeResend: (target, messageId) => sessionRuntimeCoordinator.prepareRuntimeResend(target, messageId),
 			setSessionRuntimeModel: (target, provider, modelId, modelName) => sessionRuntimeCoordinator.setRuntimeModel(target, provider, modelId, modelName),
 			setSessionRuntimeThinking: (target, level) => sessionRuntimeCoordinator.setRuntimeThinking(target, level),
-			setSessionRuntimePermission: (target, preset) => sessionRuntimeCoordinator.setRuntimePermission(target, preset),
 			cloneSessionRuntime: async (target) => {
 				const validated = sessionRuntimeCoordinator.validateTarget(target);
 				if (!validated.ok) return validated;

@@ -13,13 +13,6 @@ const SUCCESS_BLOCK = (n, desc) => `[图片 #${n}（视觉桥已查看，以下�
 const FAILED_BLOCK = (n, reason) => `[图片 #${n} 视觉桥转换失败：${reason}。请检查视觉桥设置（模型/接口地址/API Key）后重试，此图片内容不可见]`;
 const SKIPPED_BLOCK = (n, reason) => `[图片 #${n} 未发送给模型：${reason}]`;
 
-test("图片轮询必须先确认视觉桥已开启", () => {
-	// 关闭视觉桥或使用原生多模态模型时，普通图片不能显示视觉桥转换动画。
-	assert.match(surfaceComponents, /visionBridgeEnabled !== true/);
-	assert.match(surfaceComponents, /visionGetConfig\(\)/);
-	assert.match(surfaceComponents, /visionBridgeExpected === false/);
-});
-
 test("无视觉桥标记时原样返回文本", () => {
 	const result = extractVisionBridgeBlocks("看看这张图，帮我分析一下");
 	assert.equal(result.blocks.length, 0);

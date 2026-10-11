@@ -60,7 +60,7 @@ function ImageGenMessage(props: { meta: ImageGenMeta; images?: ImageContent[]; o
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1600);
 		} catch {
-			showNotice(t("imagegen.copyFailed"), 2000, "error");
+			showNotice(t("image.copyFailed"), 2000, "error");
 		}
 	};
 	const saveImage = () => {

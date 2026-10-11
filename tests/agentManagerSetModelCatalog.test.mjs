@@ -60,7 +60,6 @@ function createManager({ configManager = configWithoutModels(), resolveModelInCa
 		undefined, // onBeforeAgentSpawn
 		undefined, // securityStore
 		undefined, // repairSessionFile
-		undefined, // isFeishuSession
 		undefined, // resolveSessionId
 		undefined, // resolveSessionProxy
 		resolveModelInCatalog, // 目录回调（新增，见构造函数注释）

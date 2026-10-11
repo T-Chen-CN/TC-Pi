@@ -211,7 +211,7 @@ test("offscreen devtools window is repositioned to primary display center on ope
 test("main window and webview guest both route devtools shortcuts through the shared module", () => {
 	const main = readFileSync("src/main/index.ts", "utf8");
 	const systemIpc = readFileSync("src/main/ipc/systemIpc.ts", "utf8");
-	assert.match(main, /import \{ isDevToolsShortcut, toggleMainWindowDevTools \} from "\.\/devTools"/);
+	assert.match(main, /import\s*\{[^}]*\btoggleMainWindowDevTools\b[^}]*\} from "\.\/devTools"/);
 	// 主窗口 before-input-event 统一走共享匹配（注册表 + 用户覆盖）+ 开关
 	assert.match(main, /mainWindow\.webContents\.on\("before-input-event"/);
 	assert.match(main, /isShortcutInput\("toggleDevTools", input\)/);

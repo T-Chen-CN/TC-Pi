@@ -51,8 +51,8 @@ test("paste-file chips expose system open and copy-path alongside remove", () =>
 });
 
 test("image action copy keys exist in both locales", () => {
-	assert.match(zhCopy, /"imagegen\.copyFailed":\s*"[^"]+"/);
-	assert.match(zhCopy, /"imagegen\.saveFailed":\s*"[^"]+"/);
-	assert.match(enCopy, /"imagegen\.copyFailed":\s*"[^"]+"/);
-	assert.match(enCopy, /"imagegen\.saveFailed":\s*"[^"]+"/);
+	assert.match(zhCopy, /"image\.copyFailed":\s*"[^"]+"/);
+	assert.match(zhCopy, /"image\.saveFailed":\s*"[^"]+"/);
+	assert.match(enCopy, /"image\.copyFailed":\s*"[^"]+"/);
+	assert.match(enCopy, /"image\.saveFailed":\s*"[^"]+"/);
 });

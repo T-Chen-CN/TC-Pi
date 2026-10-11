@@ -249,8 +249,6 @@ test("picker flow loads models on welcome page (no record)", () => {
 	assert.match(preferenceController, /useBackendModelCatalog\(\{[\s\S]*?enabled: catalogEnabled/);
 	// 后端分支收敛在 hook 内：DSH 走 host 目录，pi 走诊断报告通道（含失败原因分类）
 	assert.match(hook, /listModelsReport\(options\.projectId, force\)/);
-	assert.match(hook, /desktopApi\.sessions\.listDshModels\(\)/);
-	assert.match(hook, /options\.backend === "dsh"/);
 });
 
 test("welcome page explicit model/thinking selections persist and are promoted into the first session", () => {
@@ -263,7 +261,7 @@ test("welcome page explicit model/thinking selections persist and are promoted i
 	// 并同时贯通「选择后立即显示」与「首次发送创建真实会话」两条链路。
 	// setItem 的 key 实参可能被格式化换行：容忍 ( 与 key 之间的空白。
 	// 模型偏好按后端写到各自的键（issue #253）：DSH 的 route 名不能进 pi 的偏好。
-	assert.match(picker, /localStorage\.setItem\(\s*isDshSession \? WELCOME_DSH_MODEL_KEY : WELCOME_MODEL_KEY/);
+	assert.match(picker, /localStorage\.setItem\(\s*WELCOME_MODEL_KEY/);
 	assert.match(picker, /localStorage\.setItem\(WELCOME_THINKING_KEY, level\)/);
 	// 思考展示直接消费唯一偏好 owner；底栏不再自己计算另一份默认值。
 	assert.match(pickerHost, /current=\{preference\.currentThinkingLevel\}/);

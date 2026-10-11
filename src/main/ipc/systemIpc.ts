@@ -6,66 +6,65 @@
 import { app, dialog, ipcMain, shell } from "electron";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { ipcChannels } from "../../shared/ipc";
-import { resolveUpdateChannel } from "../update/channelIdentity";
-import { UPDATE_REPO, UPDATE_REPO_OWNER } from "../update/releaseRepo";
-import { probeAllMirrors, type MirrorHealthResult } from "../update/mirrorHealth";
-import { ChangelogService, type ChangelogLanguage } from "../update/ChangelogService";
-import { normalizeUpdateSource } from "../update/updateSources";
-import type { RpcLogEntry } from "../../shared/types/rpcLog";
-import { resolveAppTimes } from "../utils/appInfoTimes";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { PiMcpCli } from "../pi/piMcpCli";
-import { piChangelogService } from "../pi/PiChangelogService";
-import { validateMcpConfigFile } from "../config/mcpConfig";
+import { ipcChannels } from "../../shared/ipc";
+import type { AppInfo, AppLogLevel, AppLogQuery, AppSettings, ChangelogPayload, CreatePiSkillInput, ModelListReport, ModelsVerifyResult, SessionCommandResult, SessionRuntimeTarget } from "../../shared/types";
+import { isValidWebTokenShape, WEB_TOKEN_EXPIRES_IN_CHOICES, type NpmAvailabilityResult, type PiInstallExecResult, type PiRuntimeNodeInstallResult, type PiRuntimeNodeStatus, type WebServiceStatusInfo } from "../../shared/types";
+import type { ConfigProxyMode } from "../../shared/types/fetchedModel";
+import type { RpcLogEntry } from "../../shared/types/rpcLog";
+import { refreshShortcutBindings } from "../appShortcuts";
+import { applyTrayLogoStyle, applyWindowLogoStyle } from "../appWindowLogo";
+import type { ConfigManager } from "../config/ConfigManager";
 import { PiResourceConfigService } from "../config/PiResourceConfigService";
 import { PiResourceStateStore } from "../config/PiResourceStateStore";
-import { tmpdir } from "node:os";
-import { installPiRuntimeNode, piRuntimeNodeBinDir, probeNodeVersion, detectPiRuntimeNode } from "../pi/runtimeNodeInstall";
-import { runPiGlobalInstall } from "../pi/piGlobalInstall";
-import { isValidWebTokenShape, WEB_TOKEN_EXPIRES_IN_CHOICES, type NpmAvailabilityResult, type PiInstallExecResult, type PiInstallStatus, type PiRuntimeNodeInstallResult, type PiRuntimeNodeStatus, type WebServiceStatusInfo } from "../../shared/types";
-import type { AppInfo, AppLogLevel, AppLogQuery, AppSettings, AvailableModel, ChangelogPayload, CreatePiSkillInput, ModelListReport, ModelsVerifyResult, SessionCommandResult, SessionRuntimeTarget } from "../../shared/types";
-import { invalidatePiInstallationCache, type PiLocator } from "../pi/PiLocator";
-import { validateInstallCommand } from "../pi/installCommandPolicy";
-import { resolvePiInstallGuard } from "../pi/piInstallGuard";
-import { sanitizePiCustomPaths } from "../pi/piCustomPaths";
-import type { SettingsStore } from "../settings/SettingsStore";
-import type { ConfigManager } from "../config/ConfigManager";
-import type { AgentManager } from "../pi/AgentManager";
-import type { AppLogger } from "../logging/AppLogger";
-import type { RpcLogger } from "../logging/RpcLogger";
-import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";
-import { resolveConfigProxyTarget } from "../sessions/sessionProxyPolicy";
-import { setConfiguredGitPath } from "../git/gitExecutable";
-import { applyTrayLogoStyle, applyWindowLogoStyle } from "../appWindowLogo";
-import { refreshShortcutBindings } from "../appShortcuts";
-import type { ConfigProxyMode } from "../../shared/types/fetchedModel";
-import type { SkillManager } from "../skills/SkillManager";
-import { fetchModelList, getCachedModelList, invalidateModelListCache, modelsFromPiConfig, refreshModelCatalogStore, refreshModelList, resolveModelListReport } from "../pi/modelListCache";
+import { validateMcpConfigFile } from "../config/mcpConfig";
+import type { TokendanceAuthMode, TokendanceAuthStore } from "../config/tokendanceAuth";
 import { TokendanceCatalogStore } from "../config/tokendanceCatalog";
 import type { TokendanceInstallResult } from "../config/tokendanceInstaller";
-import type { TokendanceAuthMode, TokendanceAuthStore } from "../config/tokendanceAuth";
 import type { TokendancePaymentStore } from "../config/tokendancePayment";
+import { setConfiguredGitPath } from "../git/gitExecutable";
+import type { AppLogger } from "../logging/AppLogger";
+import type { RpcLogger } from "../logging/RpcLogger";
+import type { AgentManager } from "../pi/AgentManager";
+import { piChangelogService } from "../pi/PiChangelogService";
+import { invalidatePiInstallationCache, type PiLocator } from "../pi/PiLocator";
+import { validateInstallCommand } from "../pi/installCommandPolicy";
+import { fetchModelList, getCachedModelList, invalidateModelListCache, modelsFromPiConfig, refreshModelCatalogStore, refreshModelList, resolveModelListReport } from "../pi/modelListCache";
+import { sanitizePiCustomPaths } from "../pi/piCustomPaths";
+import { runPiGlobalInstall } from "../pi/piGlobalInstall";
+import { resolvePiInstallGuard } from "../pi/piInstallGuard";
+import { PiMcpCli } from "../pi/piMcpCli";
+import { detectPiRuntimeNode, installPiRuntimeNode, piRuntimeNodeBinDir, probeNodeVersion } from "../pi/runtimeNodeInstall";
 import type { ProjectResourceManager } from "../projects/ProjectResourceManager";
+import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";
+import { resolveConfigProxyTarget } from "../sessions/sessionProxyPolicy";
+import type { SettingsStore } from "../settings/SettingsStore";
+import type { SkillManager } from "../skills/SkillManager";
+import { ChangelogService, type ChangelogLanguage } from "../update/ChangelogService";
+import { resolveUpdateChannel } from "../update/channelIdentity";
+import { probeAllMirrors, type MirrorHealthResult } from "../update/mirrorHealth";
+import { UPDATE_REPO, UPDATE_REPO_OWNER } from "../update/releaseRepo";
+import { normalizeUpdateSource } from "../update/updateSources";
+import { resolveAppTimes } from "../utils/appInfoTimes";
 
-import { probePiModel } from "../pi/PiModelProber";
-import { PROBE_AGENT_DIR_ENV, buildProbeDraftFiles, toWslAccessiblePath } from "../pi/probeDraftConfig";
-import type { PiModelCapabilityCache } from "../pi/PiModelCapabilityCache";
-import { getPiAiCatalogIndex, readBuiltinPiAiCatalogVersion } from "../pi/piAiBuiltinCatalog";
-import { resolveModelSpecFromCatalogs } from "../pi/modelCapabilityResolver";
-import { getProcessSnapshot } from "../process/ProcessMonitor";
 import type { AgentProcessMetric, ArchStatus, DiagnosticsSnapshot, ProcessMetricsSnapshot } from "../../shared/types";
-import type { DiagnosticsMonitor } from "../diagnostics/DiagnosticsMonitor";
-import { getWslExe, decodeWslOutput, parseWslDistroList } from "../wsl/wslExe";
-import { listWebNetworkAddresses } from "../web/WebNetwork";
-import { toggleMainWindowDevTools } from "../devTools";
+import type { McpConfigFile, McpServerDefinition } from "../../shared/types/mcp";
+import type { UsageProbeProviderConfig, UsageProbeTestInput } from "../../shared/types/providerUsage";
 import { USAGE_PROBE_CANDIDATES } from "../config/providerUsageProbe";
 import { saveUsageProbeForProvider } from "../config/userUsageProbes";
-import type { UsageProbeProviderConfig, UsageProbeTestInput } from "../../shared/types/providerUsage";
-import type { ProviderMigrationDirection } from "../../shared/types/providerMigration";
-import type { McpConfigFile, McpServerDefinition } from "../../shared/types/mcp";
+import { toggleMainWindowDevTools } from "../devTools";
+import type { DiagnosticsMonitor } from "../diagnostics/DiagnosticsMonitor";
+import type { PiModelCapabilityCache } from "../pi/PiModelCapabilityCache";
+import { probePiModel } from "../pi/PiModelProber";
+import { resolveModelSpecFromCatalogs } from "../pi/modelCapabilityResolver";
+import { getPiAiCatalogIndex, readBuiltinPiAiCatalogVersion } from "../pi/piAiBuiltinCatalog";
+import { buildProbeDraftFiles, PROBE_AGENT_DIR_ENV, toWslAccessiblePath } from "../pi/probeDraftConfig";
+import { getProcessSnapshot } from "../process/ProcessMonitor";
+import { listWebNetworkAddresses } from "../web/WebNetwork";
+import { decodeWslOutput, getWslExe, parseWslDistroList } from "../wsl/wslExe";
 
 /**
  * IPC 边界校验：RPC 日志条目必须字段齐全，防止渲染层传伪造对象写盘。
@@ -159,14 +158,6 @@ export type SystemIpcDeps = {
 	isProjectTrusted?: (projectId: string, projectRoot: string) => Promise<boolean>;
 	/** pi 环境引导：便携 Node 安装器（下载/解压 IO 由 index.ts 装配 DSH 同源实现）；未装配 = 引导入口降级不可用。 */
 	piRuntimeNodeInstaller?: import("../pi/runtimeNodeInstall").RuntimeNodeInstallerDeps;
-	/** DSH 后端判定（G17：RPC 日志按 backend 分流）。 */
-	isDshAgent?: (agentId: string) => boolean;
-	/** DSH RPC 日志开关（G17；未装配 = 无 DSH 后端）。 */
-	setDshRpcLogging?: (agentId: string, enabled: boolean) => void;
-	/** DSH RPC 日志状态查询（G17）。 */
-	isDshRpcLogging?: (agentId: string) => boolean;
-	/** DSH 实时日志观看登记（面板挂载/卸载成对调用；未装配 = 无 DSH 后端）。 */
-	setDshRpcLogWatching?: (agentId: string, watching: boolean) => void;
 	/** 开发诊断采样（设置开关热启停） */
 	diagnosticsMonitor?: DiagnosticsMonitor;
 	/** 进程监控停止 agent：按 agentId 走完整会话停止链路（含 detach 推送），装配层注入 */
@@ -225,23 +216,12 @@ export type SystemIpcDeps = {
 	restartWebService?: (settings: AppSettings) => Promise<void>;
 	/** Session catalog set identity context */
 	setSessionCatalogIdentityContext?: (ctx: { wslDistro?: string; wslUser?: string }) => void;
-	/** DSH host 重启（改 runner node 路径后写入 fork env）。 */
-	restartDshHost?: () => Promise<boolean>;
-	/** host 是否已 fork；未启动时改路径不必立刻重启。 */
-	dshHostIsStarted?: () => boolean;
 	/** Configure WSL for various services — null 表示切回本机路径 */
 	configureSkillManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
 	configurePromptManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
 	configureExtensionManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
 	configureConfigManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
-	configureXuePromptManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
 	configureAgentManagerWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
-	/**
-	 * DSH host 的 WSL 环境：DSH host 是 Windows 原生进程，workspace 解析与会话目录
-	 * 编码都必须是 Windows 主机路径。WSL 模式下项目记录是 /mnt/... 形式，缺了这层转换
-	 * 会让 workspace.resolve 直接失败（会话建不出来）。
-	 */
-	configureDshHostWsl?: (env: import("../wsl/WslPaths").WslEnvironment | null) => void;
 	/** Session command IPC error converter */
 	sessionCommandIpcError?: (error: import("../../shared/types").SessionCommandError) => Error;
 	/** 读取技能 SKILL.md 正文（装配层注入：路径白名单校验由 readSkillContent 完成）。 */
@@ -340,10 +320,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		rpcLogger,
 		sessionRuntimeCoordinator,
 		isProjectTrusted,
-		isDshAgent,
-		setDshRpcLogging,
-		isDshRpcLogging,
-		setDshRpcLogWatching,
 		getMainWindow,
 		getTray,
 		mainCopy,
@@ -367,15 +343,11 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		applyWebServiceSettings,
 		restartWebService,
 		setSessionCatalogIdentityContext,
-		restartDshHost,
-		dshHostIsStarted,
 		configureSkillManagerWsl,
 		configurePromptManagerWsl,
 		configureExtensionManagerWsl,
 		configureConfigManagerWsl,
-		configureXuePromptManagerWsl,
 		configureAgentManagerWsl,
-		configureDshHostWsl,
 		sessionCommandIpcError,
 		readSkillContent,
 		extensionManager,
@@ -1215,7 +1187,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	});
 
 	ipcMain.handle(ipcChannels.processMetrics, async (): Promise<ProcessMetricsSnapshot> => {
-		const agents: Array<Pick<AgentProcessMetric, "agentId" | "pid" | "kind" | "sessionId" | "sessionTitle" | "sessionTitles">> = deps.agentManager.listAgentPids().map((agent) => {
+		const agents: Array<Pick<AgentProcessMetric, "agentId" | "pid" | "kind" | "sessionId" | "sessionTitle">> = deps.agentManager.listAgentPids().map((agent) => {
 			// 进程监控表展示会话身份：按 agentId 反查关联的会话 id/标题，
 			// 让用户知道每个 agent 对应哪个会话（而不是只看到内部 id）
 			const sessionInfo = deps.sessionRuntimeCoordinator.getSessionInfoForAgent(agent.agentId);
@@ -1304,9 +1276,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		// 弹「RPC 日志已打开」提醒框，实际主进程从未开启记录，导致弹窗永远无数据。
 		if (!agentId) return false;
 		// G17：DSH 会话的 RPC 日志走 DshAgentManager（领域调用记录），pi 走 AgentManager。
-		if (isDshAgent?.(agentId)) {
-			setDshRpcLogging?.(agentId, enabled);
-		} else {
+		{
 			agentManager.setRpcLogging(agentId, enabled);
 		}
 		return enabled;
@@ -1314,9 +1284,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	ipcMain.handle(ipcChannels.rpcLoggingGet, async (_event, target: SessionRuntimeTarget) => {
 		const agentId = resolveRpcRuntimeAgent(target);
 		if (!agentId) return false;
-		if (isDshAgent?.(agentId)) {
-			return isDshRpcLogging?.(agentId) ?? false;
-		}
+
 		return agentManager.isRpcLogging(agentId);
 	});
 	// 实时日志面板挂载/卸载登记观看状态：没有观看者时主进程跳过广播（落盘与环形缓冲不受影响），
@@ -1325,9 +1293,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	// RpcLogLiveBroadcaster，pi 走 AgentManager 自带的实时广播。
 	ipcMain.handle(ipcChannels.rpcLogsSetWatching, async (_event, agentId?: unknown, watching?: unknown) => {
 		if (typeof agentId !== "string" || !agentId || typeof watching !== "boolean") return false;
-		if (isDshAgent?.(agentId)) {
-			setDshRpcLogWatching?.(agentId, watching);
-		} else {
+		{
 			agentManager.setRpcLogWatching(agentId, watching);
 		}
 		return true;
@@ -1490,7 +1456,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		if (!win || win.isDestroyed()) return;
 		win.close();
 	});
-	let runnerNodeInstallInflight: Promise<import("../../shared/types/dshRunnerNode").DshRunnerNodeInstallResult> | null = null;
 
 	ipcMain.handle(ipcChannels.settingsGet, () => settingsStore.get());
 
@@ -1504,16 +1469,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		// Git 可执行文件路径：立即同步给 git 子进程解析器，保存后无需重启即生效。
 		if ("gitExecutablePath" in patch) {
 			setConfiguredGitPath(settings.gitExecutablePath);
-		}
-		// DSH runner 的 node 路径写入 host fork env：已运行的 host 必须重启才生效。
-		if ("dshRunnerNodePath" in patch && prevSettings.dshRunnerNodePath !== settings.dshRunnerNodePath) {
-			if (restartDshHost && dshHostIsStarted?.()) {
-				void restartDshHost().catch((error) => {
-					void appLogger.warn("dsh", "Failed to restart DSH host after runner node path change", {
-						error: error instanceof Error ? error.message : String(error),
-					});
-				});
-			}
 		}
 		// 自动下载更新开关：立即下发到 electron-updater（含检查期间的 autoDownload 切换）。
 		if ("autoDownloadUpdates" in patch) {
@@ -1588,18 +1543,14 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 				if (configurePromptManagerWsl) configurePromptManagerWsl(environment);
 				if (configureExtensionManagerWsl) configureExtensionManagerWsl(environment);
 				if (configureConfigManagerWsl) configureConfigManagerWsl(environment);
-				if (configureXuePromptManagerWsl) configureXuePromptManagerWsl(environment);
 				if (configureAgentManagerWsl) configureAgentManagerWsl(environment);
-				if (configureDshHostWsl) configureDshHostWsl(environment);
 			} else {
 				if (clearSessionScannerWsl) clearSessionScannerWsl();
 				if (configureSkillManagerWsl) configureSkillManagerWsl(null);
 				if (configurePromptManagerWsl) configurePromptManagerWsl(null);
 				if (configureExtensionManagerWsl) configureExtensionManagerWsl(null);
 				if (configureConfigManagerWsl) configureConfigManagerWsl(null);
-				if (configureXuePromptManagerWsl) configureXuePromptManagerWsl(null);
 				if (configureAgentManagerWsl) configureAgentManagerWsl(null);
-				if (configureDshHostWsl) configureDshHostWsl(null);
 			}
 		}
 		if ("customPiPath" in patch || "wslEnabled" in patch || "wslDistro" in patch || "wslUser" in patch) {

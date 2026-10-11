@@ -6,7 +6,7 @@ import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 const timeline = readFileSync("src/renderer/src/components/session/SessionMessageTimeline.tsx", "utf8");
 
 test("history load failure displays the actual error without requiring a tooltip", () => {
-	const errorState = timeline.match(/\{messageLoadState\?\.status\s*===\s*"error"\s*&&\s*activeMessages\.length\s*===\s*0\s*&&\s*!dshHostStopped\s*&&\s*\([\s\S]*?\n[\t ]*\)\}/)?.[0];
+	const errorState = timeline.match(/\{messageLoadState\?\.status\s*===\s*"error"\s*&&\s*activeMessages\.length\s*===\s*0\s*&&\s*\([\s\S]*?\n[\t ]*\)\}/)?.[0];
 	assert.ok(errorState, "the non-DSH history error state must remain available");
 	assert.match(errorState, /\{messageLoadState\.error\s*&&\s*<p\b[^>]*>\s*\{messageLoadState\.error\}\s*<\/p>\}/);
 	assert.doesNotMatch(errorState, /title=\{messageLoadState\.error/);

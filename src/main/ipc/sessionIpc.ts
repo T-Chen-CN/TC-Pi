@@ -4,60 +4,64 @@ import { requireSupportedBackend } from "../../shared/productFeatures";
  * Phase 3.7: extracted from src/main/index.ts registerIpc().
  */
 
+import { ipcMain, type BrowserWindow } from "electron";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { dialog, ipcMain, type BrowserWindow } from "electron";
 import { ipcChannels } from "../../shared/ipc";
-import { isDshPermissionPreset } from "../../shared/types/agent";
-import { isRewindRestoreScope } from "../../shared/types/rewind";
-import { canonicalizeSessionPath } from "../../shared/sessionIdentity";
 import { createSessionModelPreference } from "../../shared/modelDisplayName";
 import { modelThinkingLevelOf } from "../../shared/modelThinkingLevels";
+import { canonicalizeSessionPath } from "../../shared/sessionIdentity";
 import type {
 	CreateSessionDraftInput,
-	UpdateSessionRecordInput,
-	SendSessionPromptInput,
-	SessionUiResponseInput,
-	SessionRuntimeTarget,
-	SessionRuntimeInfo,
-	SessionRuntimeReplacement,
-	SessionRuntimeEvent,
-	SessionCommandError,
-	SessionCommandResult,
-	SendPromptInput,
-	SendPromptResult,
-	SessionRecord,
-	SessionProcessEvent,
-	DshModelDiscoveryInput,
-	FetchedModel,
-	SessionBranchTree,
-	SessionMessagePage,
-	SessionModelPreference,
-	RewindCheckpointPageParams,
 	ResolveLaunchDefaultsInput,
 	ResolvedLaunchDefaults,
-	ArchivedDshSession,
+	RewindCheckpointPageParams,
+	SendSessionPromptInput,
+	SessionBranchTree,
+	SessionCommandError,
+	SessionCommandResult,
+	SessionMessagePage,
+	SessionModelPreference,
+	SessionProcessEvent,
+	SessionRecord,
+	SessionRuntimeInfo,
+	SessionRuntimeTarget,
+	SessionUiResponseInput,
+	UpdateSessionRecordInput,
 } from "../../shared/types";
 import type { BridgeEventInput, BridgeResyncInput } from "../../shared/types/bridge";
-import { parseSessionProcessEventsFromFile } from "../sessions/sessionProcessEventsFile";
-import { dshUnavailablePageFor } from "../compatibility/legacyBackendStatus";
+import { isRewindRestoreScope } from "../../shared/types/rewind";
+import type { WorkspaceRuntimeSwitchInput } from "../../shared/types/workspaceRuntime";
+import type { ConfigManager } from "../config/ConfigManager";
+import type { AppLogger } from "../logging/AppLogger";
+import type { AgentManager } from "../pi/AgentManager";
 import { downgradeRunningStartedBefore, downgradeStaleRunning } from "../pi/derivedSubagents";
 import { getCachedModelList } from "../pi/modelListCache";
-import { resolveLaunchDefaultOptions, isModelInModelsConfig } from "../sessions/launchDefaults";
+import type { ProjectStore } from "../projects/ProjectStore";
 import { BackgroundScanCoordinator } from "../sessions/BackgroundScanCoordinator";
+import type { ClaudeSessionImporter } from "../sessions/ClaudeSessionImporter";
+import type { CodexSessionImporter } from "../sessions/CodexSessionImporter";
+import type { CursorSessionImporter } from "../sessions/CursorSessionImporter";
 import { DIRECTORY_IMPORT_MAX_SUMMARIES } from "../sessions/directorySessionImport";
 import type { DirectorySessionImporter } from "../sessions/DirectorySessionImporter";
-import { registerSessionImageMutationIpc } from "./sessionImageMutationIpc";
+import type { KimiSessionImporter } from "../sessions/KimiSessionImporter";
+import type { KimiWorkSessionImporter } from "../sessions/KimiWorkSessionImporter";
+import { isModelInModelsConfig, resolveLaunchDefaultOptions } from "../sessions/launchDefaults";
+import type { MinimaxSessionImporter } from "../sessions/MinimaxSessionImporter";
+import type { OpenCodeSessionImporter } from "../sessions/OpenCodeSessionImporter";
+import type { QoderSessionImporter } from "../sessions/QoderSessionImporter";
+import type { SessionCatalog } from "../sessions/SessionCatalog";
+import { SessionCommandIpcError } from "../sessions/SessionCommandIpcError";
+import { appendSessionForkSuffix } from "../sessions/sessionForkTitle";
+import { parseSessionProcessEventsFromFile } from "../sessions/sessionProcessEventsFile";
+import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";
+import type { SessionScanner } from "../sessions/SessionScanner";
+import type { WorkBuddySessionImporter } from "../sessions/WorkBuddySessionImporter";
 import { switchWorkspaceRuntimes } from "../sessions/WorkspaceRuntimeSwitch";
-import type { WorkspaceRuntimeSwitchInput } from "../../shared/types/workspaceRuntime";
-
-function isDshModelDiscoveryInput(input: unknown): input is DshModelDiscoveryInput {
-	if (!isRecord(input) || typeof input.settingsNs !== "string" || !input.settingsNs.trim()) return false;
-	return ["provider", "baseURL", "api", "apiKey"].every((key) => {
-		const value = input[key];
-		return value === undefined || typeof value === "string";
-	});
-}
+import type { ZCodeSessionImporter } from "../sessions/ZCodeSessionImporter";
+import type { SettingsStore } from "../settings/SettingsStore";
+import type { TerminalSessionManager } from "../terminal/TerminalSessionManager";
+import { registerSessionImageMutationIpc } from "./sessionImageMutationIpc";
 
 function isRecord(input: unknown): input is Record<string, unknown> {
 	return typeof input === "object" && input !== null && !Array.isArray(input);
@@ -88,225 +92,6 @@ export function scheduleCatalogBackgroundScan(projectId: string, task: () => Pro
 	scannedProjects.add(projectId);
 	return catalogScanCoordinator.schedule(projectId, task);
 }
-import type { ProjectStore } from "../projects/ProjectStore";
-import type { SettingsStore } from "../settings/SettingsStore";
-import type { SessionScanner } from "../sessions/SessionScanner";
-import type { SessionCatalog } from "../sessions/SessionCatalog";
-import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";
-import { SessionCommandIpcError } from "../sessions/SessionCommandIpcError";
-import { appendSessionForkSuffix } from "../sessions/sessionForkTitle";
-import type { AgentManager } from "../pi/AgentManager";
-import type { ConfigManager } from "../config/ConfigManager";
-import type { TerminalSessionManager } from "../terminal/TerminalSessionManager";
-import type { CodexSessionImporter } from "../sessions/CodexSessionImporter";
-import type { ClaudeSessionImporter } from "../sessions/ClaudeSessionImporter";
-import type { QoderSessionImporter } from "../sessions/QoderSessionImporter";
-import type { OpenCodeSessionImporter } from "../sessions/OpenCodeSessionImporter";
-import type { ZCodeSessionImporter } from "../sessions/ZCodeSessionImporter";
-import type { WorkBuddySessionImporter } from "../sessions/WorkBuddySessionImporter";
-import type { CursorSessionImporter } from "../sessions/CursorSessionImporter";
-import type { KimiSessionImporter } from "../sessions/KimiSessionImporter";
-import type { KimiWorkSessionImporter } from "../sessions/KimiWorkSessionImporter";
-import type { MinimaxSessionImporter } from "../sessions/MinimaxSessionImporter";
-import type { AppLogger } from "../logging/AppLogger";
-
-/**
- * DSH 后端专用 IPC 依赖（C1 分组）：按后端收敛可选注入，为「后端注册表」铺路——
- * 未来新增后端时各自提供一份 BackendIpcDeps，装配层按 backendId 查注册表注入，
- * 而不是在 SessionIpcDeps 上继续堆可选字段。未装配（dshBackend undefined）= 无 DSH
- * 后端，相关通道降级返回空/错误。
- */
-export type DshBackendIpcDeps = {
-	/** DSH host 级模型目录；未装配时返回空列表。 */
-	listDshModels?: () => Promise<import("../../shared/types").AvailableModel[]>;
-	/** DSH 配置页模型发现（llm.discoverModels；只返回候选，不写配置）。 */
-	discoverDshModels?: (input: DshModelDiscoveryInput) => Promise<FetchedModel[]>;
-	/** DSH 可配置提供方目录（内置 catalog + 已注册路由）；未装配时返回空列表。 */
-	listDshProviders?: () => Promise<
-		Array<{
-			provider: string;
-			displayName: string;
-			active: boolean;
-			declared?: boolean;
-		}>
-	>;
-	/** DSH agent 预设目录（agentPreset.list）；未装配时返回空列表。 */
-	listDshAgentPresets?: () => Promise<
-		Array<{
-			id: string;
-			isDefault: boolean;
-			name?: string;
-			description?: string;
-			broken?: string;
-		}>
-	>;
-	/** DSH 部署默认模型选择（settings.yaml agent-default-model）；未装配/不可读时 undefined。 */
-	getDshDefaultModel?: () => Promise<
-		| {
-				provider: string;
-				model: string;
-				reasoningEffort?: string;
-		  }
-		| undefined
-	>;
-	/** DSH 配置管理页状态；未装配时返回空状态。 */
-	getDshStatus?: () => Promise<{
-		started: boolean;
-		homeDir: string;
-		/** 最近一次 host boot 失败的真实原因；无失败/未启动为 null。 */
-		bootError?: string | null;
-		/** DSH_HOME 共享/冲突状态（issue #189：与 dsh CLI 共用目录会互相覆盖状态）。 */
-		sharing?: import("../../shared/types/dshHome").DshHomeSharingState;
-	}>;
-	/**
-	 * DSH runtime 安装态（AgentRuntimeProvider 阶段 1）：installed/notInstalled/broken。
-	 * 未装配 = 无 DSH 后端，按 notInstalled 处理（UI 走安装引导，新建 dsh 会话被拒）。
-	 */
-	getDshRuntimeStatus?: () => import("../../shared/types/dshRuntime").DshRuntimeStatus;
-	/** DSH runtime 是否允许新建 dsh 会话（门控判定收敛在这里，避免各 handler 比对枚举）。 */
-	canCreateDshSession?: () => boolean;
-	/** 按需安装 DSH runtime（按下载源索引挑兼容版本）；进度经 dsh-runtime:install-progress 推送。 */
-	installDshRuntime?: () => Promise<{ ok: boolean; error?: string }>;
-	/** 从本地导入 runtime（.tgz 归档或已解压目录；离线兜底）；文件路径由主进程对话框给出。 */
-	importDshRuntime?: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
-	/** 卸载当前启用的 runtime（先停 host 释放文件锁，故为异步）。 */
-	uninstallDshRuntime?: () => Promise<{ ok: boolean; error?: string }>;
-	/** DSH settings.describe（脱敏 namespace 视图 + schema）。 */
-	describeDshSettings?: () => Promise<{
-		writable: boolean;
-		hasDocument: boolean;
-		namespaces: Array<{
-			ns: string;
-			applies: string;
-			revision: number;
-			value: unknown;
-			base?: unknown;
-			user?: unknown;
-			secrets: Array<{ path: string[]; set: boolean }>;
-			schema: unknown;
-		}>;
-	}>;
-	/** DSH settings.update。 */
-	updateDshSettings?: (ns: string, patch: Record<string, unknown>, expectedRevision?: number) => Promise<unknown>;
-	/** DSH settings.mutate（路径级操作；删除 provider/字段用 unset op）。 */
-	mutateDshSettings?: (ns: string, ops: Array<{ op: "set"; path: string[]; value: unknown } | { op: "unset"; path: string[] }>, expectedRevision?: number) => Promise<unknown>;
-	/** DSH credentials.describe。 */
-	describeDshCredentials?: (refs: string[]) => Promise<
-		Record<
-			string,
-			{
-				configured: boolean;
-				source?: string;
-				writable: boolean;
-			}
-		>
-	>;
-	/** DSH credentials.set。 */
-	setDshCredential?: (ref: string, value: string) => Promise<void>;
-	/** DSH credentials.unset。 */
-	unsetDshCredential?: (ref: string) => Promise<void>;
-	/** DSH 凭证明文读取（渲染层点「眼睛」时按 ref 取一次；无值返回 undefined）。 */
-	readDshCredential?: (ref: string) => Promise<string | undefined>;
-	/** DSH settings.openDocument（平台打开配置文档）。 */
-	openDshDocument?: () => Promise<void>;
-	/** DSH host 重启；返回 false 表示有活跃 DSH 会话被拒绝。 */
-	restartDshHost?: () => Promise<boolean>;
-	/**
-	 * DSH host 手动停止：停活跃 DSH 会话 + dispose host + 持久化手动停止标记。
-	 * 返回 stopAll/dispose 是否顺利完成（false 时标记仍会写入，保证「停止后不再自动启动」语义优先）。
-	 */
-	stopDshHost?: () => Promise<boolean>;
-	/** DSH host 显式启动：清除手动停止标记并 boot；返回 host 是否就绪。 */
-	startDshHost?: () => Promise<boolean>;
-	/**
-	 * DSH 历史分页（session.history 事件流翻页）；未装配时返回空页。
-	 * 第三个参数二选一：`turnCount` = 渲染层契约的轮数（首屏 9 / 加载更多 3，由 main 侧
-	 * 按 24 条/轮换算成 host 的消息预算）；`maxMessages` = 显式消息窗口（Web/工具结果回读）。
-	 */
-	readDshHistoryPage?: (dshSessionId: string, beforeSeq: number | undefined, options: { turnCount?: number; maxMessages?: number }) => Promise<{ messages: import("../../shared/types").ChatMessage[]; total: number; nextBefore: number | null }>;
-	/** ACP 会话消息回读（运行时内存投影；未激活返回空数组）；未装配时返回空数组。 */
-	readAcpMessages?: (acpSessionId: string) => import("../../shared/types").ChatMessage[];
-	/** DSH 轨迹过程事件（运行时会话按 mux/重放收集；历史会话从 host history 推导；未装配时返回空数组）。 */
-	readDshProcessEvents?: (agentId: string | undefined, dshSessionId: string | undefined) => Promise<import("../../shared/types/trajectory").SessionProcessEvent[]>;
-	/** DSH 轨迹系统提示（运行时会话读投影缓存；历史会话从 host history 折叠 request/header；未装配返回 undefined）。 */
-	readDshSystemPrompt?: (agentId: string | undefined, dshSessionId: string | undefined) => Promise<string | undefined>;
-	/** DSH 「查看完整输出」（工具结果全文随投影消息存 meta.fullText）；未装配时抛错。 */
-	readDshMessageFullText?: (agentId: string, messageId: string) => Promise<{ text: string }>;
-	/** DSH 会话文件路径推导（按 catalog entry 的 dshSessionId + cwd）；未装配/不可推导返回 undefined。 */
-	resolveDshSessionFilePath?: (sessionId: string) => Promise<string | undefined>;
-	/** DSH 会话内容搜索（session.search）；未装配时返回空列表。 */
-	searchDshSessions?: (query: string) => Promise<Array<{ sessionId: string; snippet: string }>>;
-	/** DSH 创建目标（G5）；未装配时抛错。 */
-	createDshGoal?: (agentId: string, objective: string, maxGoalRounds?: number) => Promise<void>;
-	/** DSH 目标操作（G5：pause/resume/complete/clear）；未装配时抛错。 */
-	runDshGoalAction?: (agentId: string, action: "pause" | "resume" | "complete" | "clear") => Promise<void>;
-	/** DSH 取消 host 侧排队消息（session/updateQueue remove）；未装配时抛错。 */
-	cancelDshQueuedMessage?: (agentId: string, itemId: string) => Promise<void>;
-	/** DSH 子代理列表（G6）；未装配时返回空列表。 */
-	listDshSubagents?: (agentId: string) => Promise<
-		Array<{
-			id: string;
-			label?: string;
-			activity: "running" | "inactive";
-			hasChildren: boolean;
-			mode: "one-shot" | "continuable";
-			kind: "child" | "diagnostic";
-		}>
-	>;
-	/** DSH 子代理历史（G6）；未装配时返回空页。 */
-	readDshSubagentHistory?: (agentId: string, childSessionId: string, beforeSeq?: number, maxMessages?: number) => Promise<{ messages: import("../../shared/types").ChatMessage[]; hasMore: boolean }>;
-	/** DSH 技能目录（G7：skill.list 只读）；未装配时返回空列表。 */
-	listDshSkills?: (agentId: string) => Promise<import("../../shared/types").DshSkillView[]>;
-	/** DSH 孤儿会话 id 列表（G3/D11：host 有但 catalog 无映射）；未装配时返回空列表。 */
-	listDshOrphans?: () => Promise<string[]>;
-	/** DSH 外部会话清单（dsh-web 等其他工具创建的 host 根会话）；未装配时返回空列表。 */
-	listDshForeignSessions?: () => Promise<
-		Array<{
-			dshSessionId: string;
-			title?: string;
-			cwd?: string;
-			updatedAt?: number;
-		}>
-	>;
-	/** DSH 外部会话导入：按 host 会话 id 映射进 catalog（返回新 SessionRecord）。 */
-	importDshForeignSession?: (dshSessionId: string) => Promise<import("../../shared/types").SessionRecord>;
-	/** DSH 外部会话全量同步（磁盘扫描：catalog 未映射的根会话全部导入）；未装配时返回空统计。 */
-	syncDshForeignSessions?: () => Promise<{ imported: number; skipped: number }>;
-	/** DSH 会话归档（G14：host 目录移入 .pideck-archive + manifest，title 随归档写入）；未装配时抛错。 */
-	archiveDshSession?: (dshSessionId: string, cwd: string, title?: string) => Promise<string | undefined>;
-	/** DSH 会话恢复（G14：目录按 manifest 移回 sessions 树，返回恢复路径、原 cwd 与标题）；未装配时抛错。 */
-	unarchiveDshSession?: (dshSessionId: string) => Promise<{ restoredPath: string; cwd: string; title?: string } | undefined>;
-	/** DSH 归档区会话清单（G14：恢复入口用；含标题，旧归档由日志折叠补全）；未装配时返回空列表。 */
-	listArchivedDshSessions?: () => Array<ArchivedDshSession>;
-	/** DSH 永久删除已归档会话（G14：归档目录移入系统回收站）；未装配时抛错。 */
-	deleteArchivedDshSession?: (dshSessionId: string) => Promise<boolean>;
-	/** DSH 动态插件清单（G13 深化）；未装配时返回空列表。 */
-	listDshDynamicPlugins?: () => Promise<import("../../shared/types").DshPluginView[]>;
-	/** DSH 静态 Loader 条目清单（origin 标注 user/builtin 来源）；未装配时返回空列表。 */
-	listDshStaticPlugins?: () => Promise<import("../../shared/types").DshStaticPluginView[]>;
-	/** DSH 用户自装静态插件卸载（移除用户补丁层行 + 可选回收插件目录）；未装配时抛错。 */
-	uninstallDshUserPlugin?: (input: import("../../shared/types").DshUserPluginUninstallInput) => Promise<import("../../shared/types").DshUserPluginUninstallResult>;
-	/** DSH 插件市场搜索（官方目录 + npm 双源）；未装配时抛错。 */
-	searchDshPluginMarket?: (keyword: string) => Promise<import("../../shared/types").DshPluginMarketSearchResult>;
-	/** DSH 用户自装静态插件安装（npm pack → 受管目录 → 用户补丁层行；幂等）；未装配时抛错。 */
-	installDshUserPlugin?: (spec: string) => Promise<import("../../shared/types").DshUserPluginInstallResult>;
-	/** DSH 用户补丁层清单（安装服务视角）；未装配时返回空列表。 */
-	listDshUserPlugins?: () => Promise<import("../../shared/types").DshUserPluginListEntry[]>;
-	/** DSH 动态插件安装（define）；未装配时抛错。 */
-	installDshPlugin?: (input: import("../../shared/types").DshPluginInstallInput) => Promise<unknown>;
-	/** DSH 动态插件运行（面板手势）；未装配时抛错。 */
-	runDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
-	/** DSH 动态插件停止；未装配时抛错。 */
-	stopDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
-	/** DSH 动态插件卸载（undefine）；未装配时抛错。 */
-	uninstallDshPlugin?: (input: import("../../shared/types").DshPluginLifecycleInput) => Promise<unknown>;
-	/** 判断 agentId 是否属于 DSH 后端（fork 等 pi 专属命令按 backend 分流）。 */
-	isDshAgent: (agentId: string) => boolean;
-	/** DSH fork：session.fork 裁剪 + runtime 换绑 + catalog dshSessionId 回写。 */
-	forkDshAgentSession?: (target: SessionRuntimeTarget, entryId: string) => Promise<Record<string, unknown> & { targetSessionId?: string }>;
-	/** DSH clone：fork 无锚点（完整副本）+ runtime 换绑 + catalog dshSessionId 回写。 */
-	cloneDshAgentSession?: (target: SessionRuntimeTarget) => Promise<Record<string, unknown> & { targetSessionId?: string }>;
-};
 
 export type SessionIpcDeps = {
 	projectStore: ProjectStore;
@@ -347,8 +132,6 @@ export type SessionIpcDeps = {
 	copyCatalogSession: (sessionId: string) => Promise<{ cancelled: boolean; targetSessionId?: string }>;
 	exportCatalogSessionHtml: (sessionId: string) => Promise<Record<string, unknown> & { path: string }>;
 	replaceAgentSession: (agentId: string, fn: () => Promise<unknown>, options?: { markForked?: boolean; markSuperseded?: boolean }) => Promise<unknown>;
-	/** DSH 后端专用 IPC 依赖（C1 分组；未装配 = 无 DSH 后端）。 */
-	dshBackend?: DshBackendIpcDeps;
 };
 
 function sessionCommandIpcError(error: SessionCommandError, appLogger: Pick<AppLogger, "warn">, mainCopy: (key: string, params?: Record<string, string | number>) => string): SessionCommandIpcError {
@@ -418,67 +201,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		copyCatalogSession,
 		exportCatalogSessionHtml,
 		replaceAgentSession,
-		dshBackend,
 	} = deps;
-	// C1：DSH 后端依赖从 dshBackend 分组解构（未装配 = 空对象，相关通道降级）。
-	const {
-		listDshModels,
-		discoverDshModels,
-		listDshProviders,
-		listDshAgentPresets,
-		getDshDefaultModel,
-		getDshStatus,
-		getDshRuntimeStatus,
-		canCreateDshSession,
-		installDshRuntime,
-		importDshRuntime,
-		uninstallDshRuntime,
-		describeDshSettings,
-		updateDshSettings,
-		mutateDshSettings,
-		describeDshCredentials,
-		setDshCredential,
-		unsetDshCredential,
-		readDshCredential,
-		openDshDocument,
-		restartDshHost,
-		stopDshHost,
-		startDshHost,
-		readDshHistoryPage,
-		readAcpMessages,
-		readDshProcessEvents,
-		readDshSystemPrompt,
-		readDshMessageFullText,
-		resolveDshSessionFilePath,
-		searchDshSessions,
-		createDshGoal,
-		runDshGoalAction,
-		cancelDshQueuedMessage,
-		listDshSubagents,
-		readDshSubagentHistory,
-		listDshSkills,
-		listDshOrphans,
-		listDshForeignSessions,
-		importDshForeignSession,
-		syncDshForeignSessions,
-		archiveDshSession,
-		unarchiveDshSession,
-		listArchivedDshSessions,
-		deleteArchivedDshSession,
-		listDshDynamicPlugins,
-		listDshStaticPlugins,
-		uninstallDshUserPlugin,
-		searchDshPluginMarket,
-		installDshUserPlugin,
-		listDshUserPlugins,
-		installDshPlugin,
-		runDshPlugin,
-		stopDshPlugin,
-		uninstallDshPlugin,
-		isDshAgent = () => false,
-		forkDshAgentSession,
-		cloneDshAgentSession,
-	} = dshBackend ?? {};
 
 	/**
 	 * 历史页读取后把文件里的最后模型/思考档位补回 catalog。
@@ -615,17 +338,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 
 		const project = projectStore.get(input.projectId);
 		if (!project) throw new Error(mainCopy("project.notFound"));
-		// DSH runtime 门控（AgentRuntimeProvider 阶段 1）：runtime 不可用时拒绝新建
-		// dsh 会话——渲染层已按安装态隐藏入口，这里是边界防御（设置残留 dsh /
-		// 渲染层旧版本）。既有 dsh 会话不受影响（打开/发送走运行时链路，不在此处）。
-		if (input.backend === "dsh" && canCreateDshSession?.() !== true) {
-			// outdated（版本不一致）单独给文案：不是「没装」，是装了但不配套，
-			// 用户需要的是重装而不是困惑于「明明装了却说未安装」。
-			if (getDshRuntimeStatus?.().state === "outdated") {
-				throw new Error(mainCopy("session.dshRuntimeOutdated"));
-			}
-			throw new Error(mainCopy("session.dshRuntimeNotInstalled"));
-		}
 		// Auto-fill model / thinkingLevel from pi config when the caller hasn't
 		// provided them, so the composer bar shows the effective default.
 		// DSH 后端不适用 pi 的模型配置（模型路由由 DSH host 自己的 settings 决定）：
@@ -641,7 +353,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		// 新会话的思考按钮只显示「思考」而非实际默认档位。
 		let model = normalizeSessionModelPreference(input.model);
 		let thinkingLevel = input.thinkingLevel;
-		const nonPiBackend = input.backend === "dsh" || input.backend === "acp";
+		const nonPiBackend = false;
 		if ((!nonPiBackend && !model) || !thinkingLevel) {
 			try {
 				const [settingsResult, modelsResult] = await Promise.all([configManager.getSettingsConfig(), configManager.getModelsConfig()]);
@@ -671,7 +383,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 				// 「欢迎页点选 > 显式默认 > enabledModels > 上次使用 > 空」参与解析；
 				// explicit model（用户主动指名）仍优先于一切（input.model，见上方校验）。
 				const defaults = resolveLaunchDefaultOptions({
-					backend: input.backend,
 					settings: settingsResult.parsed,
 					models: modelsResult.parsed,
 					// pi 目录快照（同步，冷时 null）：lastUsed/welcomeModel 的存在性校验
@@ -700,10 +411,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			projectId: input.projectId,
 			title: input.title?.trim() || mainCopy("session.newTitle"),
 			environment: settingsStore.get().wslEnabled ? "wsl" : "native",
-			// 后端透传：仅接受白名单枚举，其余视为 pi（渲染层不可信输入校验在边界）。
-			backend: input.backend === "dsh" ? "dsh" : input.backend === "acp" ? "acp" : undefined,
-			// ACP 工具预选（AcpToolConfig.id）：backend=acp 草稿期选哪个 CLI。
-			acpToolId: input.backend === "acp" && typeof input.acpToolId === "string" ? input.acpToolId : undefined,
 			model,
 			thinkingLevel,
 		});
@@ -720,7 +427,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	});
 	ipcMain.handle(ipcChannels.sessionsResolveLaunchDefaults, async (_event, input?: ResolveLaunchDefaultsInput): Promise<ResolvedLaunchDefaults> => {
 		requireSupportedBackend(input?.backend);
-		const backend = input?.backend === "dsh" ? "dsh" : input?.backend === "acp" ? "acp" : undefined;
+		const backend = undefined;
 		try {
 			const [settingsResult, modelsResult] = await Promise.all([configManager.getSettingsConfig(), configManager.getModelsConfig()]);
 			return resolveLaunchDefaultOptions({
@@ -756,11 +463,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		// 已 active 或已有 runtime 的会话拒绝 backend 变更（渲染层已隐藏入口，这里是边界防御）。
 		if (patch.backend !== undefined && patch.backend !== entry.backend && (entry.status === "active" || sessionRuntimeCoordinator.getTarget(sessionId))) {
 			throw new Error(mainCopy("session.backendLocked"));
-		}
-		// DSH agent 预设同样创建即固定：激活会话的 preset 由 host 会话 header 权威持有，
-		// 渲染层只读展示，拒绝任何运行时改写（草稿期预选不受限）。
-		if (patch.agentPreset !== undefined && patch.agentPreset !== entry.agentPreset && entry.backend === "dsh" && (entry.status === "active" || sessionRuntimeCoordinator.getTarget(sessionId))) {
-			throw new Error(mainCopy("session.agentPresetLocked"));
 		}
 		const title = patch.title?.trim();
 		if (title && title !== entry.title) {
@@ -831,26 +533,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogArchive, async (_event, sessionId: string) => {
 		const entry = sessionCatalog.get(sessionId);
-		// DSH 会话归档（G14）：host 目录移入 .pideck-archive（目录移动 + manifest，不销毁数据）。
-		// 运行中的会话不能归档（同 pi：移动文件会破坏 host 对当前写入位置的引用）。
-		if (entry?.backend === "dsh" && entry.dshSessionId && archiveDshSession) {
-			if (sessionRuntimeCoordinator.getTarget(sessionId) || sessionRuntimeCoordinator.isActivating(sessionId)) {
-				throw new Error(mainCopy("session.stopBeforeDelete"));
-			}
-			const cwd = projectStore.get(entry.projectId)?.path ?? "";
-			if (!cwd) throw new Error(mainCopy("project.notFound"));
-			// 归档时刻把 catalog 标题写进 manifest：归档区列表与恢复后都靠它显示真实会话名
-			// （旧归档缺省时由 DshHost 从日志折叠兜底，见 listArchivedSessions/unarchiveSession）。
-			const archivedPath = await archiveDshSession(entry.dshSessionId, cwd, entry.title);
-			if (!archivedPath) throw new Error(mainCopy("session.invalidArchivePath"));
-			await sessionCatalog.removeWithDescendants(sessionId);
-			void appLogger.info("session", "DSH session archived", {
-				sessionId,
-				dshSessionId: entry.dshSessionId,
-				archivedPath,
-			});
-			return true;
-		}
 		if (!entry?.filePath) return false;
 		// 运行中的会话不能归档（同删除）：移动文件会破坏 pi 对当前写入位置的引用。
 		if (sessionRuntimeCoordinator.getTarget(sessionId) || sessionRuntimeCoordinator.isActivating(sessionId)) {
@@ -884,17 +566,7 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	});
 	ipcMain.handle(ipcChannels.sessionsCatalogReadMessages, async (_event, sessionId: string) => {
 		const entry = sessionCatalog.get(sessionId);
-		// DSH 会话没有 pi 会话文件：全量读走 host 历史事件流（一次拉最大页），
-		// 与分页路径同源；未装配 readDshHistoryPage 时返回空数组。
-		if (entry?.backend === "dsh" && entry.dshSessionId && readDshHistoryPage) {
-			const page = await readDshHistoryPage(entry.dshSessionId, undefined, { maxMessages: 1000 });
-			return page.messages;
-		}
-		// ACP 会话历史只活在 agent 侧 + 运行时内存投影(load 重放):无 runtime
-		// (未激活/已停止)时返回空数组,渲染层显示起始页;激活后 load 重放补全。
-		if (entry?.backend === "acp") {
-			return readAcpMessages ? readAcpMessages(entry.acpSessionId ?? "") : [];
-		}
+		if (entry?.backend === "acp" || entry?.backend === "dsh") return [];
 		if (entry?.backend === "imagegen") {
 			// imagegen 后端会话：历史独立存 ImageSessionStore，不走 pi 文件
 			return (await readImageSessionMessages?.(sessionId)) ?? [];
@@ -982,22 +654,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 
 	ipcMain.handle(ipcChannels.sessionsCatalogReadMessagePage, async (_event, sessionId: string, before?: number, pageSize?: number, options?: { beforeEntryId?: string }) => {
 		const entry = sessionCatalog.get(sessionId);
-		// DSH 会话没有 pi 会话文件：历史浏览走 host 的 session.history 事件流翻页
-		// （游标 = 事件 seq），与 pi 的磁盘分页同形状（messages/total/nextBefore）；
-		// 第三条参数在 pi 路径是「轮数」，所以 DSH 这里按 turnCount 传（main 侧换算消息预算）。
-		if (entry?.backend === "dsh" && entry.dshSessionId && readDshHistoryPage) {
-			try {
-				return await readDshHistoryPage(entry.dshSessionId, before, { turnCount: pageSize });
-			} catch (error) {
-				// 手动停止态下历史读取必然失败且不会自愈（预热/按需兜底/崩溃重启全被门控）：
-				// 转成带原因的空页，让渲染层出「运行时已停止 + 启动 host」专态，而不是把
-				// host 未运行报成「会话文件已删除/路径失效」——DSH 会话没有 pi 会话文件。
-				// 其余错误（host 崩溃 / 文件损坏）继续抛，渲染层按普通失败处理。
-				const unavailable = dshUnavailablePageFor(error);
-				if (unavailable) return unavailable;
-				throw error;
-			}
-		}
 		if (entry?.backend === "imagegen" || !entry?.filePath) {
 			// imagegen 后端会话（可能残留无意义 pi filePath）或纯生图草稿：
 			// 走 ImageSession 独立存储恢复生图历史，避免落到不存在的 pi 文件
@@ -1059,13 +715,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 	ipcMain.handle(ipcChannels.sessionsCatalogReadProcessEvents, async (_event, sessionId: string): Promise<SessionProcessEvent[]> => {
 		if (typeof sessionId !== "string" || !sessionId.trim()) return [];
 		const entry = sessionCatalog.get(sessionId);
-		// DSH 会话没有 pi 会话文件：过程事件由运行时会话按 mux/重放收集，
-		// 历史（未激活）会话从 host history 事件流推导（轨迹账本的
-		// modelChange/permission/plan/goal/compaction 记录）。
-		if (entry?.backend === "dsh" && readDshProcessEvents) {
-			const target = sessionRuntimeCoordinator.getTarget(sessionId);
-			return readDshProcessEvents(target?.agentId, entry.dshSessionId);
-		}
 		if (!entry?.filePath) return [];
 		// 流式扫描（收够 MAX_EVENTS 即停）：历史大会话读全文会撞 V8 单字符串上限 /
 		// 主进程 384MB 堆上限（闪退），而账本只需要前若干条记录。
@@ -1087,14 +736,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 			throw new Error("Invalid entryId");
 		}
 		try {
-			// DSH 会话：工具结果全文随投影消息存内存（meta.fullText），
-			// 走 DshAgentManager 直接读取；pi 走运行时缓存/会话文件。
-			if (isDshAgent(agentId)) {
-				if (!readDshMessageFullText) {
-					throw new Error("dsh message full-text is not available");
-				}
-				return await readDshMessageFullText(agentId, messageId);
-			}
 			return await agentManager.readMessageFullText(agentId, messageId, entryId as string | undefined);
 		} catch (error) {
 			if (typeof sessionId === "string" && sessionId.trim()) {
@@ -1447,38 +1088,10 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		return sessionRuntimeCoordinator.setRuntimeModel(target, provider.trim(), modelId.trim(), modelName);
 	});
 	ipcMain.handle(ipcChannels.sessionsRuntimeSetThinking, (_event, target: SessionRuntimeTarget, level: string) => sessionRuntimeCoordinator.setRuntimeThinking(target, level));
-	ipcMain.handle(ipcChannels.sessionsRuntimeSetPermission, (_event, target: SessionRuntimeTarget, preset: string) => {
-		// Renderer input is untrusted: reject values outside DSH's finite preset
-		// set before they can reach the backend or be persisted in the catalog.
-		if (!isDshPermissionPreset(preset)) {
-			return Promise.resolve({
-				ok: false as const,
-				error: {
-					code: "SESSION_COMMAND_FAILED" as const,
-					debugDetails: `Unsupported DSH permission preset: ${String(preset)}`,
-				},
-			});
-		}
-		return sessionRuntimeCoordinator.setRuntimePermission(target, preset);
-	});
 	ipcMain.handle(ipcChannels.sessionsRuntimeClone, async (_event, target: SessionRuntimeTarget) => {
 		const validated = sessionRuntimeCoordinator.validateTarget(target);
 		if (!validated.ok) return validated;
 		try {
-			// DSH 后端：clone = fork 无锚点（完整副本）+ runtime 换绑新会话
-			// （catalog 的 dshSessionId 同步更新，重启后 attach 到 clone 结果）。
-			// D3/C10：与 fork 同约束——withRuntimeReservation（lease 检查 + replacement 预留）。
-			if (isDshAgent(target.agentId)) {
-				if (!cloneDshAgentSession) {
-					throw new Error("dsh clone is not available");
-				}
-				const value = await sessionRuntimeCoordinator.withRuntimeReservation(target.sessionId, target.agentId, () => cloneDshAgentSession(target));
-				void appLogger.info("session", "Session cloned (dsh)", {
-					sessionId: target.sessionId,
-				});
-				notifyForkCatalogRefreshed(target.sessionId);
-				return { ok: true as const, value };
-			}
 			const value = await replaceAgentSession(target.agentId, () => agentManager.cloneSession(target.agentId), { markForked: true });
 			void appLogger.info("session", "Session cloned", { sessionId: target.sessionId });
 			notifyForkCatalogRefreshed(target.sessionId);
@@ -1518,27 +1131,6 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		const mutationFork = options?.mutationFork === true;
 		const branchMode = options?.branchMode === true;
 		try {
-			// DSH 后端：fork = session.fork 裁剪 + runtime 换绑新会话（catalog 的
-			// dshSessionId 同步更新，重启后 attach 到 fork 结果）。
-			// D3/C10：withRuntimeReservation 提供完整保护——dispatch lease 检查
-			// （在途发送拒绝，防 RPC 响应落到已废弃 mux）+ replacement 预留
-			// （fork 期间阻止并发 restart 等命令交错）。
-			if (isDshAgent(target.agentId)) {
-				// 重发/编辑 fork 化迁移明确不覆盖 DSH：mutation fork 只服务 pi 后端
-				if (mutationFork) {
-					throw new Error("dsh does not support fork-mutation retry");
-				}
-				if (!forkDshAgentSession) {
-					throw new Error("dsh fork is not available");
-				}
-				const value = await sessionRuntimeCoordinator.withRuntimeReservation(target.sessionId, target.agentId, () => forkDshAgentSession(target, entryId));
-				void appLogger.info("session", "Session forked (dsh)", {
-					sessionId: target.sessionId,
-					entryId,
-				});
-				notifyForkCatalogRefreshed(target.sessionId);
-				return { ok: true as const, value };
-			}
 			const value = await replaceAgentSession(
 				target.agentId,
 				() => agentManager.forkSession(target.agentId, entryId),

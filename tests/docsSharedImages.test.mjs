@@ -36,35 +36,12 @@ test("生成副本被 gitignore，不会退化回两份手工同步的图", () =
 	}
 });
 
-test("README 中英文与官网首页都用同一张微信群二维码图", () => {
-	// 中英文 README 与 zh/en 首页四处必须一致；只改一边就是「一半文档挂旧二维码」
-	const expectations = [
-		["README.md", "docs/images/wechat-qrcode.png"],
-		["README.en.md", "docs/images/wechat-qrcode.png"],
-		[join("docs-site", "index.md"), "/images/wechat-qrcode.png"],
-		[join("docs-site", "en", "index.md"), "/images/wechat-qrcode.png"],
-	];
-	for (const [file, expected] of expectations) {
-		const content = readFileSync(join(REPO_ROOT, file), "utf8");
-		assert.ok(content.includes(expected), `${file} 未引用 ${expected}`);
-	}
-});
-
 test("官网首页用站点相对路径、README 用仓库相对路径（交叉引用会变破图）", () => {
 	const readme = readFileSync(join(REPO_ROOT, "README.md"), "utf8");
 	assert.ok(!readme.includes('src="/images/wechat-qrcode.png"'), "README 里不能用站点根路径");
 
 	const siteIndex = readFileSync(join(REPO_ROOT, "docs-site", "index.md"), "utf8");
 	assert.ok(!siteIndex.includes("docs/images/wechat-qrcode.png"), "官网首页里不能用仓库相对路径");
-});
-
-test("微信号与 QQ 群号在 README 和官网都对用户可见", () => {
-	// 用户需求是「QQ 群同级加上微信号」：只补二维码、不写微信号等于把加好友入口藏进图片里
-	for (const file of ["README.md", "README.en.md", join("docs-site", "index.md"), join("docs-site", "en", "index.md")]) {
-		const content = readFileSync(join(REPO_ROOT, file), "utf8");
-		assert.ok(content.includes("1026218644"), `${file} 丢失 QQ 群号`);
-		assert.ok(content.includes("caoayu97"), `${file} 丢失微信号`);
-	}
 });
 
 test("syncSharedReadmeImages 把源图复制进 publicDir/images", () => {

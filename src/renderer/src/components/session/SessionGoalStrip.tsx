@@ -1,6 +1,6 @@
 import { useAtomValue } from "jotai";
-import { useCallback, useRef, useState } from "react";
 import { Pause, Play, Target, Trash2 } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { sessionRuntimeBySessionIdAtomFamily, sessionRuntimeUiBySessionIdAtomFamily } from "../../atoms";
 import { parsePiGoalWidget } from "../../composerBehavior";
 import { desktopApi } from "../../desktopApi";
@@ -8,34 +8,28 @@ import { t } from "../../i18n";
 import { showNotice } from "../../utils/notice";
 import { Button } from "../ui-shadcn/button";
 import { ConfirmDialog } from "../ui-shadcn/ConfirmDialog";
-import { ComposerWidgetFrame } from "./ComposerWidgetLayout";
 import { isCoherentComposerRuntimeUi, type RuntimeHandle } from "./ComposerRuntimeIntegrations";
+import { ComposerWidgetFrame } from "./ComposerWidgetLayout";
 
 /**
- * composer 上方的 goal 常驻条（移植自 dsh-web GoalBar）。
  *
  * 形态：与 todo / queue 同列同宽的独立 36px 卡（图标 + 阶段 + 截断目标 + 操作）。
- * 数据优先 DSH runtime.state.goal；pi 走内置扩展 widget `pi-deck-goal`。
- * 无目标、已完成都不渲染。创建入口是模式选择器 / `/goal` / DSH 工具面板。
  */
 export function SessionGoalStrip(props: { sessionId: string }) {
 	const runtime = useAtomValue(sessionRuntimeBySessionIdAtomFamily(props.sessionId));
 	const runtimeUi = useAtomValue(sessionRuntimeUiBySessionIdAtomFamily(props.sessionId));
 	const agentId = runtime?.agentId;
-	const isDsh = runtime?.backend === "dsh";
 	const runtimeHandle: RuntimeHandle | undefined = runtime?.agentId ? { agentId: runtime.agentId, runtimeGeneration: runtime.runtimeGeneration } : undefined;
 	const coherent = isCoherentComposerRuntimeUi(runtimeHandle, runtimeUi) ? runtimeUi : undefined;
 	const piGoal = parsePiGoalWidget(coherent?.widgets?.["pi-deck-goal"]);
-	const goal =
-		runtime?.state?.goal ??
-		(piGoal
-			? {
-					phase: piGoal.phase,
-					objective: piGoal.objective,
-					roundsStarted: piGoal.roundsStarted,
-					maxGoalRounds: piGoal.maxGoalRounds,
-				}
-			: undefined);
+	const goal = piGoal
+		? {
+				phase: piGoal.phase,
+				objective: piGoal.objective,
+				roundsStarted: piGoal.roundsStarted,
+				maxGoalRounds: piGoal.maxGoalRounds,
+			}
+		: undefined;
 	const [busy, setBusy] = useState(false);
 	const [confirmClear, setConfirmClear] = useState(false);
 	const pendingRef = useRef(false);
@@ -46,10 +40,7 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 			pendingRef.current = true;
 			setBusy(true);
 			try {
-				if (isDsh) {
-					if (!agentId) return;
-					await desktopApi.sessions.runDshGoalAction(agentId, action);
-				} else {
+				{
 					const command = action === "pause" ? "/goal pause" : action === "resume" ? "/goal resume" : "/goal clear";
 					const result = await desktopApi.sessions.sendPrompt({
 						sessionId: props.sessionId,
@@ -57,7 +48,7 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 						message: command,
 					});
 					if (!result.accepted) {
-						showNotice(result.error ?? t("dshGoal.switchFailed"), 4000);
+						showNotice(result.error ?? t("sessionGoal.switchFailed"), 4000);
 					}
 				}
 			} catch (error) {
@@ -67,13 +58,13 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 				setBusy(false);
 			}
 		},
-		[agentId, isDsh, props.sessionId],
+		[props.sessionId],
 	);
 
 	// 无投影 / 已完成：不占输入区。blocked 仍展示，否则用户看不到卡住原因。
 	if (!goal || goal.phase === "complete") return null;
 
-	const phaseLabel = goal.phase === "paused" ? t("dshTools.goalPhase.paused") : goal.phase === "blocked" ? t("dshTools.goalPhase.blocked") : t("dshTools.goalPhase.active");
+	const phaseLabel = goal.phase === "paused" ? t("sessionGoal.Phase.paused") : goal.phase === "blocked" ? t("sessionGoal.Phase.blocked") : t("sessionGoal.Phase.active");
 
 	return (
 		<ComposerWidgetFrame data-testid="session-goal-strip" aria-label={t("sessionGoal.aria")}>
@@ -89,9 +80,9 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 							variant="ghost"
 							size="icon-xs"
 							className="size-7 rounded-full text-text-tertiary"
-							aria-label={t("dshTools.goalPause")}
-							title={t("dshTools.goalPause")}
-							disabled={busy || (isDsh && !agentId)}
+							aria-label={t("sessionGoal.Pause")}
+							title={t("sessionGoal.Pause")}
+							disabled={busy || false}
 							onClick={() => {
 								void runAction("pause");
 							}}
@@ -105,9 +96,9 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 							variant="ghost"
 							size="icon-xs"
 							className="size-7 rounded-full text-text-tertiary"
-							aria-label={t("dshTools.goalResume")}
-							title={t("dshTools.goalResume")}
-							disabled={busy || (isDsh && !agentId)}
+							aria-label={t("sessionGoal.Resume")}
+							title={t("sessionGoal.Resume")}
+							disabled={busy || false}
 							onClick={() => {
 								void runAction("resume");
 							}}
@@ -119,9 +110,9 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 						variant="ghost"
 						size="icon-xs"
 						className="size-7 rounded-full text-text-tertiary hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
-						aria-label={t("dshTools.goalClear")}
-						title={t("dshTools.goalClear")}
-						disabled={busy || (isDsh && !agentId)}
+						aria-label={t("sessionGoal.Clear")}
+						title={t("sessionGoal.Clear")}
+						disabled={busy || false}
 						onClick={() => {
 							setConfirmClear(true);
 						}}
@@ -132,10 +123,10 @@ export function SessionGoalStrip(props: { sessionId: string }) {
 			</div>
 			{confirmClear ? (
 				<ConfirmDialog
-					title={t("dshTools.goalClearConfirmTitle")}
-					message={t("dshTools.goalClearConfirmMessage")}
+					title={t("sessionGoal.ClearConfirmTitle")}
+					message={t("sessionGoal.ClearConfirmMessage")}
 					danger
-					confirmLabel={t("dshTools.goalClear")}
+					confirmLabel={t("sessionGoal.Clear")}
 					onConfirm={() => {
 						setConfirmClear(false);
 						void runAction("clear");

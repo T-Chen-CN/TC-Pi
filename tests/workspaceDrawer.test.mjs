@@ -9,7 +9,6 @@ const typescript = require("typescript");
 const host = readFileSync("src/renderer/src/components/workspace/WorkspaceDrawerHost.tsx", "utf8");
 const hook = readFileSync("src/renderer/src/hooks/useWorkspacePanels.ts", "utf8");
 const chrome = readFileSync("src/renderer/src/hooks/useWindowToolLayout.ts", "utf8");
-const editor = readFileSync("src/renderer/src/components/workspace/EditorSurface.tsx", "utf8");
 const browser = readFileSync("src/renderer/src/components/workspace/BrowserSurface.tsx", "utf8");
 const external = readFileSync("src/renderer/src/components/workspace/ExternalEditorOverlay.tsx", "utf8");
 
@@ -100,27 +99,6 @@ test("workspace panel hook exposes narrow drawer commands", () => {
 	assert.match(hook, /drawerPinned/);
 	assert.match(hook, /drawerStoragePrefix/);
 	assert.match(hook, /projectIdRef\.current/);
-});
-
-test("editor tabs enforce both count and text-budget LRU while keeping IO callbacks stable", () => {
-	// Editor state moved to useFileEditor (Phase 2 Gate 2D). Constants preserved in useWorkspacePanels.
-	assert.match(hook, /EDITOR_TAB_LIMIT\s*=\s*5/);
-	assert.match(hook, /EDITOR_TAB_TEXT_BUDGET\s*=\s*24 \* 1024 \* 1024/);
-	// Editor tabs, trimEditorTabs, readContent now owned by useFileEditor.
-	const fileEditor = readFileSync("src/renderer/src/hooks/useFileEditor.ts", "utf8");
-	assert.match(fileEditor, /const EDITOR_TAB_LIMIT = 5/);
-	assert.match(fileEditor, /const trimEditorTabs/);
-	assert.match(fileEditor, /lastAccess/);
-});
-
-test("Git diff and external editor flows reject stale project responses", () => {
-	assert.match(hook, /gitRequestRef\.current/);
-	assert.match(hook, /isCurrentGitDiffResponse\(\{/);
-	assert.match(hook, /editorRequestRef\.current/);
-	assert.match(hook, /request !== editorRequestRef\.current \|\| projectIdRef\.current !== forProjectId/);
-	assert.match(hook, /openProjectInExternalEditor/);
-	assert.match(hook, /projectIdRef\.current !== id/);
-	assert.match(external, /onOpenProject/);
 });
 
 test("browser surface has explicit fullscreen and minimize paths", () => {

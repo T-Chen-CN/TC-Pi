@@ -62,7 +62,7 @@ function harness({ backend = "pi", status, agentId, fail = false } = {}) {
 	return { controller, calls, storage, binding };
 }
 
-for (const backend of ["pi", "dsh"]) {
+for (const backend of ["pi"]) {
 	test(`${backend} welcome clear removes only that backend's model preference`, async () => {
 		const { controller, calls, storage } = harness({ backend });
 		assert.equal(controller.canClearModel, true);

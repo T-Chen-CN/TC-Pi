@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
-import type { AgentBackend, ArchivedPiSession, Project, SessionRecord, SessionLaunchPreferences, SessionSummary } from "../../../shared/types";
 import { collectSessionSubtreeIds, getSessionEnvironment } from "../../../shared/sessionIdentity";
+import type { AgentBackend, ArchivedPiSession, Project, SessionLaunchPreferences, SessionRecord, SessionSummary } from "../../../shared/types";
 import { isSameSessionPath } from "../agentListDisplay";
 import { t } from "../i18n";
 
@@ -55,7 +55,6 @@ export interface UseSessionActionsOptions {
 			unarchiveRecord: (archivedPath: string) => Promise<boolean>;
 			listArchived: () => Promise<ArchivedPiSession[]>;
 			deleteArchivedRecord: (archivedPath: string) => Promise<boolean>;
-			deleteArchivedDshSession: (dshSessionId: string) => Promise<boolean>;
 			createDraft: (input: { projectId: string; title: string; backend?: AgentBackend } & SessionLaunchPreferences) => Promise<SessionRecord>;
 		};
 	};
@@ -185,14 +184,6 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 		if (projectId) await refreshProjectSessions(projectId);
 	}
 
-	/** 永久删除已归档 DSH 会话（host 目录移入回收站） */
-	async function deleteArchivedDshSession(dshSessionId: string) {
-		await api.sessions.deleteArchivedDshSession(dshSessionId);
-		showToast(t("app.sessionDeletedFromArchive"), 2200);
-		const projectId = sessionsProjectId ?? activeProjectId;
-		if (projectId) await refreshProjectSessions(projectId);
-	}
-
 	// ── Sidebar session actions ──
 	async function openSidebarSession(projectId: string, session: SessionSummary): Promise<string | undefined> {
 		const requestSequence = ++openSessionRequestRef.current;
@@ -281,7 +272,6 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 		unarchiveHistorySession,
 		listArchivedSessions,
 		deleteArchivedSession,
-		deleteArchivedDshSession,
 		openSidebarSession,
 		openSidebarSessionById,
 		copySidebarSession,

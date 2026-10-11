@@ -1,54 +1,49 @@
-import { Button, buttonVariants } from "./components/ui-shadcn/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui-shadcn/tabs";
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "./components/ui-shadcn/dialog";
+import { Blocks, Cpu, FileCode2, FileText, FolderOpen, KeyRound, Loader2, PlugZap, Puzzle, Settings2, Shield, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Component, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import type { PiDesktopApi } from "../../preload";
+import type { ConfigProxyMode, FetchedModel } from "../../shared/types/fetchedModel";
 import { ConfirmDialog } from "./components/ui-shadcn/ConfirmDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/ui-shadcn/alert-dialog";
-import { X, Blocks, Cpu, FileCode2, FileText, KeyRound, Loader2, Puzzle, Settings2, Shield, ShieldCheck, Sparkles, PlugZap, FolderOpen } from "lucide-react";
-import { cn } from "./lib/utils";
-import { deepClone } from "./utils/deepEqual";
-import { showNotice } from "./utils/notice";
-import { applyAdaptiveTemplateReset, collectModelSpecPatches, deriveProviderCompat, mergeAdaptiveModelTemplate } from "./utils/modelSpecAutoFill";
-import type { FetchedModel, ConfigProxyMode } from "../../shared/types/fetchedModel";
-import { Component, forwardRef, useRef, useState, useEffect, useCallback, useImperativeHandle, useMemo, type ReactNode, type Ref } from "react";
-import type { PiDesktopApi } from "../../preload";
+import { Button, buttonVariants } from "./components/ui-shadcn/button";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "./components/ui-shadcn/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui-shadcn/tabs";
 import { AuthTab } from "./config/AuthTab";
-import { buildProviderOrderScope } from "./utils/providerOrder";
+import { openDocsInSystemBrowser } from "./config/ConfigShared";
+import { ExtensionsTab } from "./config/ExtensionsTab";
+import { McpTab, type McpTabHandle } from "./config/McpTab";
 import { ModelsTab } from "./config/ModelsTab";
+import { PromptsTab } from "./config/PromptsTab";
+import { RawTab } from "./config/RawTab";
+import { SettingsTab } from "./config/SettingsTab";
+import { SkillsTab } from "./config/SkillsTab";
 import { TokenDancePanel, type TokendanceInstallOutcome } from "./config/TokenDancePanel";
+import { TrustTab } from "./config/TrustTab";
 import { UsageProbeConfigDialog } from "./config/UsageProbeConfigDialog";
 import { removeSelectedModelIndexes } from "./config/modelBatchSelection";
-import { openDocsInSystemBrowser } from "./config/ConfigShared";
-import { RawTab } from "./config/RawTab";
-import { TrustTab } from "./config/TrustTab";
-import { McpTab, type McpTabHandle } from "./config/McpTab";
-import { SettingsTab } from "./config/SettingsTab";
-import { PromptsTab } from "./config/PromptsTab";
-import { SkillsTab } from "./config/SkillsTab";
-import { ExtensionsTab } from "./config/ExtensionsTab";
+import { cn } from "./lib/utils";
+import { deepClone } from "./utils/deepEqual";
+import { applyAdaptiveTemplateReset, collectModelSpecPatches, deriveProviderCompat, mergeAdaptiveModelTemplate } from "./utils/modelSpecAutoFill";
+import { showNotice } from "./utils/notice";
+import { buildProviderOrderScope } from "./utils/providerOrder";
 // 桥贡献的「独立配置页」落点：每个 gui:config.page:* 贡献在「Agent 能力」组里占一个导航页。
 // 会话取值 / 落点 id 映射 / 「页消失就回退」都收在 hook 里（PR 评审 §3）。
-import { BridgeGuiSingleSlot } from "./components/bridge/BridgeSlot";
-import { guiPageSectionId, useBridgeConfigPages } from "./hooks/useBridgeConfigPages";
-import { SecuritySection, type SecuritySectionHandle } from "./components/config/SecuritySection";
-import { DshLogo, PiLogo } from "./components/session/SessionSourceBadge";
-import { t } from "./i18n";
-import { CodeMirrorEditor } from "./components/app/CodeMirrorEditor";
-import { translateBuiltinPromptDescription } from "./composerBehavior";
-import type { AuthFile, ConfigTab, ModelItem, ModelsFile, SettingsFile } from "./config/configTypes";
-import type { ConfigFileDiagnostic, PiExtensionListResult, PiExtensionSummary, PiPromptTemplateListResult, PiPromptTemplateSummary, PiSkillListResult, PiSkillLocation, PiSkillSummary, Project, ProjectResourceDiscoveryResult, ProjectResourceListResult } from "../../shared/types";
-import { isGlobalSkillSourceId } from "../../shared/resourceIdentity";
-import { emptyDiscoveryData, emptyProjectResourceData, GLOBAL_SKILL_SOURCES, isGlobalSkill, isProjectExtension, isProjectPrompt, isProjectSkill, PROJECT_SKILL_SOURCES, type ResourceScope } from "./config/resourceScopeModel";
-import { getModelUserAgentOverride, getProviderHeaders, KNOWN_PROVIDER_ENDPOINTS, setModelUserAgentOverride } from "./config/providerHeaders";
-import { TOKENDANCE_PROVIDER } from "../../shared/tokendance";
-import { ALL_CONFIG_DIRTY_KEYS, dirtyKeysClearedByReload, dirtyKeysPreservedOnReload, orderDirtyKeysForSave, reconcileConfigDirty } from "./config/configDirtyMarks";
 import { modelThinkingLevelOf, withModelThinkingLevelDefault } from "../../shared/modelThinkingLevels";
-import { formatConfigUnsavedMessage, summarizeConfigUnsavedChanges, type ConfigUnsavedItem } from "./config/configUnsavedChangesSummary";
-import { DirtyMarker } from "./components/app/settings/SettingRows";
 import { isValidProviderName } from "../../shared/providerName";
+import { isGlobalSkillSourceId } from "../../shared/resourceIdentity";
+import { TOKENDANCE_PROVIDER } from "../../shared/tokendance";
+import type { ConfigFileDiagnostic, PiExtensionListResult, PiExtensionSummary, PiPromptTemplateListResult, PiPromptTemplateSummary, PiSkillListResult, PiSkillLocation, PiSkillSummary, Project, ProjectResourceDiscoveryResult, ProjectResourceListResult } from "../../shared/types";
+import { CodeMirrorEditor } from "./components/app/CodeMirrorEditor";
+import { BridgeGuiSingleSlot } from "./components/bridge/BridgeSlot";
+import { SecuritySection, type SecuritySectionHandle } from "./components/config/SecuritySection";
+import { translateBuiltinPromptDescription } from "./composerBehavior";
 import { mergeProviderDraft, type AddProviderDraft } from "./config/addProviderDraft";
-import { useAtomValue } from "jotai";
-import { dshModuleHiddenAtom, dshRuntimeStatusAtom } from "./atoms";
-import { dshUiVisibilityFor } from "../../shared/types/dshRuntime";
+import { ALL_CONFIG_DIRTY_KEYS, dirtyKeysClearedByReload, dirtyKeysPreservedOnReload, orderDirtyKeysForSave, reconcileConfigDirty } from "./config/configDirtyMarks";
+import type { AuthFile, ConfigTab, ModelItem, ModelsFile, SettingsFile } from "./config/configTypes";
+import { formatConfigUnsavedMessage, summarizeConfigUnsavedChanges, type ConfigUnsavedItem } from "./config/configUnsavedChangesSummary";
+import { getModelUserAgentOverride, getProviderHeaders, KNOWN_PROVIDER_ENDPOINTS, setModelUserAgentOverride } from "./config/providerHeaders";
+import { emptyDiscoveryData, emptyProjectResourceData, GLOBAL_SKILL_SOURCES, isGlobalSkill, isProjectExtension, isProjectPrompt, isProjectSkill, PROJECT_SKILL_SOURCES, type ResourceScope } from "./config/resourceScopeModel";
+import { guiPageSectionId, useBridgeConfigPages } from "./hooks/useBridgeConfigPages";
+import { t } from "./i18n";
 
 const api: PiDesktopApi = (window as unknown as { piDesktop: PiDesktopApi }).piDesktop;
 
@@ -425,11 +420,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	 *  新建会话默认后端跟随设置项 defaultAgentBackend（默认 pi），与此处配置管理入口相互独立。
 	 *  弹窗每次打开都会重建 state，这里从 localStorage 恢复上次选定的后端分页。 */
 	const [backendPane, setBackendPane] = useState<"dsh" | "pi">("pi");
-	/**
-	 * 用户隐藏了 DSH 模块（设置 → 外观 → 功能模块）：不渲染 Pi/DSH 分页头，弹窗固定在 Pi 页。
-	 * 深链点名 DSH 页（runtime 提示「去安装」等）时例外：用户是主动要去，此时保留分页头供切回 Pi。
-	 */
-	const dshModuleHidden = useAtomValue(dshModuleHiddenAtom);
 	const dshPaneHidden = true;
 	useEffect(() => {
 		// 上次停在 DSH 页、或弹窗开着时在设置里隐藏了 DSH：回到 Pi 页，避免停在一个没有入口的页面。
@@ -2297,11 +2287,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	/** 安全管理面板句柄（顶部统一保存按钮经 saveByKey 调用其 save） */
 	const securitySectionRef = useRef<SecuritySectionHandle>(null);
 
-	// DSH runtime 安装态门控：runtime 不可用时整 Tab 换成安装引导（含下载与手动导入），
-	// 不渲染任何 dsh 配置表单（表单此时项项都会失败）。
-	const dshRuntimeStatus = useAtomValue(dshRuntimeStatusAtom);
-	const dshUi = dshUiVisibilityFor(dshRuntimeStatus.state);
-
 	/** 安全管理草稿脏状态上报：有修改 markDirty("security")，保存成功/卸载清标记。 */
 	const handleSecurityDirtyChange = useCallback(
 		(dirty: boolean) => {
@@ -2332,16 +2317,6 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 	/** 按 tab 编码分发到对应保存 handler；返回是否保存成功（false = 保存失败，由错误提示区展示原因）。 */
 	const saveByKey = async (tabKey: string): Promise<boolean> => {
 		switch (tabKey) {
-			case "dsh": {
-				// runtime 不可用时整页是安装引导，没有任何可保存草稿：直接视为保存通过，
-				// 否则统一保存按钮会因为拿不到 DshConfigTab 句柄而一直报「保存失败」。
-				if (!dshUi.showDshConfigForms) return true;
-				// DSH 页保存成功后显式清未保存标记：子分区草稿已清空并上报 false，
-				// 但卸载/收起的分区可能残留脏来源，这里兜底保证黄点消失。
-				const ok = false;
-				if (ok) clearDirty("dsh");
-				return ok;
-			}
 			case "config:models":
 				// 新增/编辑页把字段保存在页内 state，先提交完整草稿；
 				// 提交回调会回写 modelsData 并回到列表，不能在同一次调用里读取尚未刷新的父级 state。

@@ -48,14 +48,14 @@ export function ImageActionButtons(props: { image: ImageContent | null | undefin
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1600);
 		} catch {
-			showNotice(t("imagegen.copyFailed"), 2000, "error");
+			showNotice(t("image.copyFailed"), 2000, "error");
 		}
 	};
 
 	const saveImage = () => {
 		void loadImageDataUrl().then((dataUrl) => {
 			if (!dataUrl) {
-				showNotice(t("imagegen.saveFailed"), 2000, "error");
+				showNotice(t("image.saveFailed"), 2000, "error");
 				return;
 			}
 			const link = document.createElement("a");

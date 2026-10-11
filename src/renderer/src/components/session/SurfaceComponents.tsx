@@ -1,14 +1,15 @@
-import { Fragment, isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject, type WheelEvent as ReactWheelEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { messageEntryId } from "../../utils/sessionCommands";
 import { toBlob } from "html-to-image";
-import { writeClipboard, writeClipboardImage } from "../../utils/clipboard";
-import { MarkdownStream } from "./MarkdownStream";
-import { PreviewRail, type PreviewRailItem } from "../motion/preview-rail";
-import { planRailTicks } from "./timeline/outlineRailTicks";
-import { areOutlineRailItemsEqual, createOutlineItemIndex, resolveVisibleRailActiveId } from "./timeline/outlineRailActive";
-import { useTimelineOutlineActiveId } from "./timeline/useTimelineOutlineActiveId";
-import { useAtomValue } from "jotai";
 import "katex/dist/katex.min.css";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent as ReactWheelEvent, type RefObject } from "react";
+import { writeClipboard, writeClipboardImage } from "../../utils/clipboard";
+import { messageEntryId } from "../../utils/sessionCommands";
+import { PreviewRail, type PreviewRailItem } from "../motion/preview-rail";
+import { Textarea } from "../ui-shadcn/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
+import { MarkdownStream } from "./MarkdownStream";
+import { areOutlineRailItemsEqual, createOutlineItemIndex, resolveVisibleRailActiveId } from "./timeline/outlineRailActive";
+import { planRailTicks } from "./timeline/outlineRailTicks";
+import { useTimelineOutlineActiveId } from "./timeline/useTimelineOutlineActiveId";
 
 /**
  * 消息图片按需解码：base64 data URL 的字符串已在消息对象中（无法省字符串），
@@ -43,106 +44,29 @@ function MessageImage(props: {
 	}, []);
 	return <img ref={ref} src={inView ? props.src : undefined} alt={props.alt} className={`${props.className}${!inView && props.placeholderClass ? ` ${props.placeholderClass}` : ""}`} loading="lazy" decoding="async" onClick={props.onClick} />;
 }
-import { summarizeMessage, type RenderMessage, type ComposerSuggestionResult, type ComposerTrigger, groupToolMessages, buildOutline, detectTrigger, applySuggestion, clearSuggestionTrigger, buildSuggestionItems, mergeCommands, matches, displayPath, flattenFiles } from "../app/AppUtils";
-import { Textarea } from "../ui-shadcn/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
 
 // Mermaid 库体积数 MB，仅在真正出现 mermaid 代码块时才动态加载，
 // 避免随渲染进程常驻、放大内存占用并在流式期间抢占主线程。
-import {
-	AlertTriangle,
-	Check,
-	CircleAlert,
-	CircleDot,
-	ChevronLeft,
-	ChevronDown,
-	ChevronUp,
-	ChevronsUpDown,
-	MoveDown,
-	MoveUp,
-	ChevronsDownUp,
-	GitBranch,
-	Eye,
-	Loader2,
-	FileText,
-	Folder,
-	Globe2,
-	MessageCircle,
-	Network,
-	PawPrint,
-	Pin,
-	Plus,
-	RefreshCw,
-	Search,
-	Settings2,
-	Terminal,
-	UploadCloud,
-	Wrench,
-	X,
-	Star,
-	FolderOpen,
-	Copy,
-	Trash,
-	Share,
-	Undo2,
-	SquarePen,
-	Send,
-	UserPen,
-	GitFork,
-	LoaderCircle,
-	Sparkles,
-	MessageSquare,
-	Quote,
-	EyeOff,
-} from "lucide-react";
-import { getFileIconSeti, getFileIconColor, getFileTypeLabel } from "../../fileIcons";
-import { normalizeSessionPathForCompare } from "../../agentListDisplay";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, CircleAlert, CircleDot, Copy, Eye, EyeOff, FileText, Folder, GitFork, LoaderCircle, MessageSquare, Quote, Send, Share, Sparkles, SquarePen, Trash, Undo2, UserPen, X } from "lucide-react";
+import removeMarkdown from "remove-markdown";
+import { imageContentSrc } from "../../../../shared/imageContentSrc";
+import type { AgentRuntimeState, ChatMessage, ImageContent } from "../../../../shared/types";
+import { desktopApi } from "../../desktopApi";
 import { t } from "../../i18n";
 import { cn } from "../../lib/utils";
 import { showNotice } from "../../utils/notice";
-import { desktopApi } from "../../desktopApi";
-import { ImageActionButtons } from "./imageActions";
 import { Button } from "../ui-shadcn/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
-import type {
-	AgentRuntimeState,
-	AgentTab,
-	AppInfo,
-	AppSettings,
-	ComposerAgentMode,
-	AvailableModel,
-	ChatMessage,
-	CodexImportReport,
-	CodexSessionSummary,
-	ClaudeImportReport,
-	ClaudeSessionSummary,
-	OpenCodeImportReport,
-	OpenCodeSessionSummary,
-	GitBranchInfo,
-	ImageContent,
-	PiCliUpdateResult,
-	PiCommand,
-	PiInstallExecResult,
-	PiInstallStatus,
-	PiUpdateCheckResult,
-	Project,
-	SessionSummary,
-	VisionBridgeEvent,
-	VisionEventsInfo,
-} from "../../../../shared/types";
-import { imageContentSrc } from "../../../../shared/imageContentSrc";
-import { parseRichInputChips, unwrapFileChipPath, formatChipDisplayLabel, isDirectoryFileChip } from "./composer/chips";
-import { buildBubbleRefSegments, replaceExpandedRefBlocksWithLabels } from "./composer/quoteChip";
+import { formatChipDisplayLabel, isDirectoryFileChip, parseRichInputChips, unwrapFileChipPath } from "./composer/chips";
 import type { BubbleRefSegment } from "./composer/quoteChip";
-import removeMarkdown from "remove-markdown";
+import { buildBubbleRefSegments, replaceExpandedRefBlocksWithLabels } from "./composer/quoteChip";
+import { ImageActionButtons } from "./imageActions";
 
-import type { WorkspaceDrawerPanel } from "../../hooks/useWorkspacePanels";
-import { formatDuration, formatTime, stripAnsi, formatPercent } from "./TimelineFormat";
-import { extractVisionBridgeBlocks, matchVisionBridgeEvent } from "../../utils/visionBridgeBlocks";
-import { visionImageHashes } from "../../utils/visionImageHash";
-import { ToolCard, ToolGroupCard, type DiffFileHandler } from "./ToolCallComponents";
-import { DiagnosticMessageCard, RespondingIndicator, ThinkingBlock } from "./TimelineEventCards";
+import { extractVisionBridgeBlocks } from "../../utils/visionBridgeBlocks";
 import { MultiSelectModal } from "./MessageShareModal";
+import { DiagnosticMessageCard, RespondingIndicator, ThinkingBlock } from "./TimelineEventCards";
+import { formatDuration, formatPercent, formatTime, stripAnsi } from "./TimelineFormat";
+import { ToolCard, ToolGroupCard } from "./ToolCallComponents";
 
 // ============================================================
 // Surface & Workspace domain components
@@ -601,43 +525,6 @@ export const AssistantText = memo(
 	(prev, next) => prev.text === next.text && prev.isStreaming === next.isStreaming && prev.settle === next.settle && prev.images === next.images && prev.onOpenFile === next.onOpenFile,
 );
 
-/** 视觉桥「请求详情」展开面板：展示最近一次 input 转换的模型/耗时/token/提示词与每张图结果。
- * 事件数据来自扩展写的 pi-deck-vision-events.jsonl（经 IPC 拉取），与消息文本里的图片 #N 序号同源。 */
-function VisionBridgeDetail(props: { events: VisionEventsInfo | null; loading: boolean }) {
-	if (props.loading) {
-		return <p className="mt-2 text-micro text-muted-foreground">…</p>;
-	}
-	const batch = props.events?.events.filter((e) => e.kind === "input").at(-1);
-	if (!batch) {
-		return <p className="mt-2 text-micro text-muted-foreground">{t("app.visionNoEvents")}</p>;
-	}
-	return (
-		<div className="mt-2 max-h-56 overflow-y-auto border-t border-border/60 pt-2 text-micro leading-relaxed text-muted-foreground">
-			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-				<span className="font-mono text-foreground/80">{batch.model}</span>
-				<span>{formatDuration(batch.totalDurationMs)}</span>
-				<span>{t("app.imageAlt", { index: batch.items.length })}</span>
-			</div>
-			<ul className="mt-1 space-y-0.5">
-				{batch.items.map((it) => (
-					<li key={it.index} className={cn(it.ok ? "" : "text-danger", "break-words")}>
-						{t("app.visionRequestItem", {
-							index: it.index,
-							duration: it.cached ? "" : `${formatDuration(it.durationMs)} · `,
-							tokens: typeof it.outputTokens === "number" ? `${t("app.visionOutputTokens", { count: it.outputTokens })} · ` : "",
-							status: it.cached ? t("app.visionCacheHit") : it.ok ? "" : t("app.visionRequestFailed", { error: it.error ?? "" }),
-						})}
-					</li>
-				))}
-			</ul>
-			{/* 提示词完整显示：长模板换行展示，不再单行省略（用户反馈展开后内容看不全） */}
-			<p className="mt-1 break-words whitespace-pre-wrap" title={batch.prompt}>
-				{t("app.visionRequestPrompt")}：{batch.prompt}
-			</p>
-		</div>
-	);
-}
-
 /** 用户消息：右对齐气泡 + 附件 + hover 显隐操作栏（复制/编辑/删除/重发/修改输入框）。
  * 编辑分两种：原地编辑（修改 JSONL + 重载会话）和修改输入框（放回 composer 不自动发送）。 */
 export const UserBubble = memo(function UserBubble(props: {
@@ -668,12 +555,6 @@ export const UserBubble = memo(function UserBubble(props: {
 	forking?: boolean;
 	/** 打开多选分享弹框 */
 	onEnterMultiSelect?: () => void;
-	/**
-	 * 本会话发图时视觉桥是否会真正跑。
-	 * false = 模型已支持看图 / DSH 不跑 pi 扩展；null = 模型目录尚未解析。
-	 * 未传时保持旧行为（只看视觉桥开关），避免单测/Web 嵌入漏传。
-	 */
-	visionBridgeExpected?: boolean | null;
 }) {
 	const { message } = props;
 	// fork 入口始终展示（hover 可见）；忙碌/进行中仅禁用而非隐藏，避免用户误以为入口「时有时无」。
@@ -693,44 +574,6 @@ export const UserBubble = memo(function UserBubble(props: {
 		setFileChipMenu({ path, x, y });
 	}, []);
 	const userTextRef = useRef<HTMLDivElement | null>(null);
-	// 视觉桥「请求详情」展开态：事件数据懒加载（用户点击才拉取，避免每条消息都读事件文件）
-	const [visionDetailOpen, setVisionDetailOpen] = useState(false);
-	const [visionEvents, setVisionEvents] = useState<VisionEventsInfo | null>(null);
-	const [visionLoading, setVisionLoading] = useState(false);
-	const loadVisionEvents = useCallback(async () => {
-		if (visionEvents || visionLoading) return;
-		setVisionLoading(true);
-		try {
-			setVisionEvents(await window.piDesktop.config.visionGetEvents());
-		} catch {
-			// 读取失败保持空态（卡片仍显示，详情区显示暂无记录）
-			setVisionEvents({ exists: false, size: 0, events: [], truncated: false });
-		} finally {
-			setVisionLoading(false);
-		}
-	}, [visionEvents, visionLoading]);
-	// 实时消息的视觉桥卡片：pi 只把转换结果写会话文件、不推送给实时消息流，
-	// 因此对带图片的乐观消息轮询事件文件，按图片哈希匹配本次转换批次。
-	const [imageHashes, setImageHashes] = useState<string[] | null>(null);
-	const [visionMatch, setVisionMatch] = useState<VisionBridgeEvent | null>(null);
-	const [visionPolling, setVisionPolling] = useState(false);
-	const [visionBridgeEnabled, setVisionBridgeEnabled] = useState<boolean | null>(null);
-	// 图片哈希与扩展侧 imageHash（sha256 前 24 位）同源
-	useEffect(() => {
-		const images = message.images ?? [];
-		if (images.length === 0) return;
-		// 视觉桥事件按图片 base64 哈希匹配；历史生图图片只有 ref 引用（无字节），
-		// 不参与匹配——全部无内联字节时直接不发起轮询。
-		const inline = images.map((image) => image.data).filter((data): data is string => typeof data === "string" && data.length > 0);
-		if (inline.length === 0) return;
-		let cancelled = false;
-		void visionImageHashes(inline).then((hashes) => {
-			if (!cancelled) setImageHashes(hashes);
-		});
-		return () => {
-			cancelled = true;
-		};
-	}, [message.images]);
 	// 激活编辑时自动滚动到编辑区
 	useEffect(() => {
 		if (editing && editAreaRef.current) {
@@ -757,72 +600,6 @@ export const UserBubble = memo(function UserBubble(props: {
 	// 用户才能直观看到「走了视觉桥」以及转换结果/失败原因，而不是一段方括号文本。
 	const vision = extractVisionBridgeBlocks(stripAnsi(message.text));
 	const visionBlocks = vision.blocks;
-	// 先读取开关再轮询事件文件：视觉桥关闭、DSH、或当前模型已勾选图片能力时，
-	// 不能把普通图片消息误显示为“转换中”。配置/模型目录都是异步的，
-	// null 表示尚未确认，期间保持静默而不是乐观显示动画。
-	useEffect(() => {
-		const images = message.images ?? [];
-		if (props.visionBridgeExpected === false || images.length === 0 || visionBlocks.length > 0 || !imageHashes || imageHashes.length === 0) {
-			setVisionBridgeEnabled(false);
-			setVisionPolling(false);
-			return;
-		}
-		if (props.visionBridgeExpected === null) {
-			setVisionBridgeEnabled(null);
-			setVisionPolling(false);
-			return;
-		}
-		let cancelled = false;
-		void window.piDesktop.config
-			.visionGetConfig()
-			.then(({ config }) => {
-				if (!cancelled) setVisionBridgeEnabled(config?.enabled === true);
-			})
-			.catch(() => {
-				if (!cancelled) setVisionBridgeEnabled(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [imageHashes, message.images, visionBlocks.length, props.visionBridgeExpected]);
-
-	// 发送后短窗口内轮询事件文件（0/700/1800/3200ms），命中即渲染实时卡片，超时静默放弃。
-	// 依赖 visionBlocks.length：历史消息文本里已有标记块时走文本卡片，不再轮询。
-	useEffect(() => {
-		const images = message.images ?? [];
-		if (visionBridgeEnabled !== true || images.length === 0 || visionBlocks.length > 0 || !imageHashes || imageHashes.length === 0) {
-			setVisionPolling(false);
-			return;
-		}
-		let cancelled = false;
-		let timer: number | undefined;
-		const delays = [0, 700, 1800, 3200];
-		let attempt = 0;
-		const poll = async () => {
-			if (cancelled) return;
-			setVisionPolling(true);
-			try {
-				const info = await window.piDesktop.config.visionGetEvents();
-				if (cancelled) return;
-				const matched = matchVisionBridgeEvent(info.events, imageHashes, message.timestamp);
-				if (matched) {
-					setVisionMatch(matched);
-					setVisionPolling(false);
-					return;
-				}
-			} catch {
-				// 拉取失败静默，等下一轮重试
-			}
-			attempt++;
-			if (attempt < delays.length) timer = window.setTimeout(poll, delays[attempt]);
-			else setVisionPolling(false);
-		};
-		void poll();
-		return () => {
-			cancelled = true;
-			if (timer !== undefined) window.clearTimeout(timer);
-		};
-	}, [imageHashes, message.images, message.timestamp, visionBlocks.length, visionBridgeEnabled]);
 	// quoted_context / referenced_session / skill / prompt_template 都在 renderUserBubbleChipText 中
 	// 就地解析为 chip；这里保留完整文本，以便重载后的自包含块不会丢失展示元数据。
 	const cleanText = vision.text;
@@ -882,20 +659,8 @@ export const UserBubble = memo(function UserBubble(props: {
 										<span className="text-muted-foreground/60">·</span>
 										<span>{t("app.visionBridgeImageLabel", { index: block.index })}</span>
 									</div>
-									<button
-										type="button"
-										className="inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-										onClick={() => {
-											setVisionDetailOpen((open) => !open);
-											if (!visionDetailOpen) void loadVisionEvents();
-										}}
-									>
-										{visionDetailOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-										{t("app.visionDetail")}
-									</button>
 								</div>
 								{block.description && <p className="mt-1.5 text-control leading-[1.6] break-words whitespace-pre-wrap text-text-primary">{block.description}</p>}
-								{visionDetailOpen && <VisionBridgeDetail events={visionEvents} loading={visionLoading} />}
 							</div>
 						) : block.kind === "skipped" ? (
 							// 未发送：中性提示卡（视觉桥没开/没选模型，图片压根没进转换流程，不是故障）。
@@ -926,57 +691,7 @@ export const UserBubble = memo(function UserBubble(props: {
 				</div>
 			)}
 			{/* 实时消息：文本里没有标记块（转换结果只写会话文件），用事件文件匹配渲染卡片 */}
-			{visionBlocks.length === 0 && visionPolling && !visionMatch && (
-				<div className="mb-2 flex w-full max-w-[min(82%,64ch)] flex-col items-end">
-					<div className="flex items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 py-1.5 text-micro text-muted-foreground">
-						<Loader2 size={11} className="animate-pideck-spin" />
-						<span>{t("app.visionConverting")}</span>
-					</div>
-				</div>
-			)}
-			{visionBlocks.length === 0 && visionMatch && (
-				<div className="mb-2 flex w-full max-w-[min(82%,64ch)] flex-col items-end gap-1.5">
-					{visionMatch.items.map((item) =>
-						item.ok ? (
-							// 成功：徽章行（图标 + 视觉桥已查看 + 图片序号）+ 描述正文（与历史标记卡片同款）
-							<div key={item.index} className="vision-bridge-card w-full min-w-0 rounded-lg border border-border bg-background/70 p-2.5" title={t("app.visionBridgeSeenDesc")}>
-								<div className="flex items-center justify-between gap-2">
-									<div className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground">
-										<Eye size={12} className="shrink-0 text-[var(--color-accent)]" />
-										<span>{t("app.visionBridgeSeen")}</span>
-										<span className="text-muted-foreground/60">·</span>
-										<span>{t("app.visionBridgeImageLabel", { index: item.index })}</span>
-									</div>
-									<button
-										type="button"
-										className="inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-										onClick={() => {
-											setVisionDetailOpen((open) => !open);
-											if (!visionDetailOpen) void loadVisionEvents();
-										}}
-									>
-										{visionDetailOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-										{t("app.visionDetail")}
-									</button>
-								</div>
-								{item.description && <p className="mt-1.5 text-control leading-[1.6] break-words whitespace-pre-wrap text-text-primary">{item.description}</p>}
-								{visionDetailOpen && <VisionBridgeDetail events={visionEvents} loading={visionLoading} />}
-							</div>
-						) : (
-							// 失败：红色卡片，原因直出（与历史标记卡片同款）
-							<div key={item.index} className="w-full min-w-0 rounded-lg border border-danger/40 bg-danger-soft/40 p-2.5" title={t("app.visionBridgeFailedDesc")}>
-								<div className="flex items-center gap-1.5 text-micro font-medium text-danger">
-									<AlertTriangle size={12} className="shrink-0" />
-									<span>{t("app.visionBridgeFailed")}</span>
-									<span className="text-danger/60">·</span>
-									<span>{t("app.visionBridgeImageLabel", { index: item.index })}</span>
-								</div>
-								{item.error && <p className="mt-1.5 text-control leading-[1.6] break-words text-danger/90">{item.error}</p>}
-							</div>
-						),
-					)}
-				</div>
-			)}
+
 			{cleanText && !editing && (
 				<div className="user-turn-bubble w-fit min-w-0 max-w-[min(82%,64ch)] rounded-[14px] border px-3 py-2 text-sm text-foreground [overflow-wrap:anywhere] break-words">
 					<div
@@ -1282,9 +997,7 @@ function renderChipText(text: string, onOpenFile?: (path: string) => void, valid
 	return nodes;
 }
 
-export { ToolCard, ToolGroupCard };
-export { DiagnosticMessageCard, RespondingIndicator, ThinkingBlock };
-export { MultiSelectModal };
+export { DiagnosticMessageCard, MultiSelectModal, RespondingIndicator, ThinkingBlock, ToolCard, ToolGroupCard };
 
 /**
  * 会话定位轴（beUI PreviewRail）：右缘一列 1px 刻度对应全部已加载的用户消息

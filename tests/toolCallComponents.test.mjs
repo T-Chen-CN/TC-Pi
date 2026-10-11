@@ -16,7 +16,7 @@ test("tool-call rendering stays isolated behind the SurfaceComponents facade", (
 	assert.match(toolCalls, /export const ToolCard = memo/);
 	assert.match(toolCalls, /export const ToolGroupCard = memo/);
 	assert.match(surface, /from "\.\/ToolCallComponents"/);
-	assert.match(surface, /export \{ ToolCard, ToolGroupCard \}/);
+	assert.match(surface, /export\s*\{[^}]*\bToolCard\b[^}]*\bToolGroupCard\b[^}]*\}/);
 	assert.doesNotMatch(surface, /function toolIcon\(toolName/);
 	assert.doesNotMatch(surface, /const BUILT_IN_TOOLS = new Set/);
 });

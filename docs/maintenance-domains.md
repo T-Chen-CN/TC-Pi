@@ -10,13 +10,6 @@
 - 生成的副本**不进版本库**（`.gitignore` 显式忽略）；源图缺失时同步函数抛错而非跳过，否则线上直接是一张破图。新增共用图片：加进 `SHARED_README_IMAGES` 白名单 + `.gitignore` + `tests/docsSharedImages.test.mjs` 的四处引用断言。
 - README 用仓库相对路径（`docs/images/<名>`）、官网用站点根路径（`/images/<名>`），两者不可互换；`docs-site` 目录下的 TS 已纳入 `npm run typecheck`。
 
-## 商店提示词库维护（resources/xueprompts.db）
-
-- 数据文件 `resources/xueprompts.db` 通过 `extraResources` 直接打进安装包（dev 读 `app.getAppPath()/resources`，打包版读 `process.resourcesPath`）。**改了 db 必须重新打包**，否则用户升级后仍看到旧数据。
-- 内置模板写入入口是 `scripts/add-builtin-prompts.mjs`（源文件 `docs/pi-prompt-templates/*.md`，跳过 README），归入分类 `编程提示词`，可重复执行（`INSERT OR REPLACE` + 分类 count 全量重算）。
-- `npm run check:xueprompts`（`scripts/check-xueprompts.mjs`）断言分类 count 与实际分组一致、内置模板全部落库且正文可解压，已挂进 `npm run build`，用于挡住「产物带旧库」这类问题。
-- **查询边界**：`content` / `description` 都是 gzip BLOB，**SQL 的 `LIKE` 对 BLOB 只做字节比较，中文关键词恒不命中**。所有涉及这两个字段的文本搜索必须在应用层 `gunzipSync` 解压后匹配（见 `XuePromptManager.list` 的 search 分支）；`title` 是明文 TEXT，可以走 SQL。
-
 ## 内置扩展热更新（resources/extensions + userData 覆盖层）
 
 - 内置扩展（`resources/extensions/*.ts`）随包分发，RPC 启动时经 `-e <绝对路径>` 注入 pi。打包态 `resources` 只读，扩展出 bug 原本只能等下次发版；**热更新**把这条例外路径补上：拉远端清单 → 写 `<userData>/builtin-extensions/` 覆盖层 → 路径解析覆盖层优先 → 重启会话即生效。

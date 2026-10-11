@@ -1406,32 +1406,6 @@ test("pi model change keeps the recorded thinking level untouched", async () => 
 	assert.equal(result.ok, true);
 	assert.equal(harness.entry.thinkingLevel, "max", "pi 换模型不得改 catalog 思考档位");
 });
-test("runtime permission preference persists only after the live agent applies it", async () => {
-	const { SessionRuntimeCoordinator } = loadCoordinator();
-	const harness = createHarness({
-		tabs: [{ id: "agent-a", status: "idle", createdAt: 1 }],
-		permissionError: "permission apply failed",
-	});
-	const coordinator = new SessionRuntimeCoordinator(harness.catalog, harness.agents, harness.sender);
-	const runtimeGeneration = coordinator.bindExistingAgent("session-1", "agent-a");
-	const target = { sessionId: "session-1", agentId: "agent-a", runtimeGeneration };
-
-	const failed = await coordinator.setRuntimePermission(target, "workspace-write");
-	assert.equal(failed.ok, false);
-	assert.equal(failed.error.code, "SESSION_COMMAND_FAILED");
-	assert.equal(harness.calls.setPermission, 1);
-	assert.equal(harness.calls.update, 0);
-	assert.notEqual(harness.entry.permissionPreset, "workspace-write");
-
-	harness.agents.setPermission = async (_agentId, preset) => {
-		harness.calls.setPermission += 1;
-		harness.runtimeState = { permissionPreset: preset };
-	};
-	const applied = await coordinator.setRuntimePermission(target, "workspace-write");
-	assert.equal(applied.ok, true);
-	assert.equal(harness.entry.permissionPreset, "workspace-write");
-	assert.equal(harness.calls.update, 1);
-});
 
 test("stop invalidates the target and restart replaces it with a higher generation", async () => {
 	const { SessionRuntimeCoordinator } = loadCoordinator();

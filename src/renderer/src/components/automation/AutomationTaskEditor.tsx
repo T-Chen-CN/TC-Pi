@@ -1,23 +1,21 @@
-import { useEffect, useState } from "react";
 import { useAtomValue } from "jotai";
 import { ChevronDown, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { AutomationTask, AutomationTaskMode, CreateAutomationTaskInput, UpdateAutomationTaskInput } from "../../../../shared/types";
 import { projectInventoryAtom } from "../../atoms/project-atoms";
-import { dshRuntimeStatusAtom } from "../../atoms";
-import { dshSendBlockReason } from "../../../../shared/types/dshRuntime";
 import { desktopApi } from "../../desktopApi";
+import { useBackendModelCatalog } from "../../hooks/useBackendModelCatalog";
 import { t } from "../../i18n";
 import { showNotice } from "../../utils/notice";
-import { Button } from "../ui-shadcn/button";
-import { Input } from "../ui-shadcn/input";
-import { Textarea } from "../ui-shadcn/textarea";
-import { Label } from "../ui-shadcn/label";
-import { Switch } from "../ui-shadcn/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui-shadcn/select";
 import { ModelPicker } from "../session/ComposerComponents";
 import { THINKING_LEVELS } from "../session/sessionPickerOptions";
-import { useBackendModelCatalog } from "../../hooks/useBackendModelCatalog";
+import { Button } from "../ui-shadcn/button";
+import { Input } from "../ui-shadcn/input";
+import { Label } from "../ui-shadcn/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui-shadcn/select";
+import { Switch } from "../ui-shadcn/switch";
+import { Textarea } from "../ui-shadcn/textarea";
 import { CronScheduleBuilder } from "./CronScheduleBuilder";
-import type { AutomationTask, AutomationTaskMode, CreateAutomationTaskInput, UpdateAutomationTaskInput } from "../../../../shared/types";
 
 interface AutomationTaskEditorProps {
 	task?: AutomationTask | null;
@@ -69,7 +67,7 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 	// 执行后端：旧任务无 backend 字段时缺省 pi。切换 dsh 后 mode/thinking 会被
 	// 锁定回继承/普通（DSH 无 plan/goal 扩展与独立思考档位，见下方 UI 约束）。
 	// automation 首版不支持 acp 后端（主进程白名单同源收窄），显式归一防枚举扩散。
-	const [backend, setBackend] = useState<TaskBackend>(task?.backend === "dsh" ? "dsh" : "pi");
+	const [backend, setBackend] = useState<TaskBackend>("pi");
 	const [thinkingLevel, setThinkingLevel] = useState(task?.thinkingLevel ?? "");
 	// 缺省（含旧任务）不在下拉里显示普通模式，而显示「跟随项目/全局」——
 	// 普通模式本就是默认行为，说「跟随」比说「普通」更贴近实际语义。
@@ -102,16 +100,10 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 
 	const lockedProjectName = projects.find((project) => project.id === projectId)?.name ?? projectId;
 
-	// DSH runtime 安装态：未安装/损坏/过旧时拦截发送，编辑器据此提示「先去设置安装」
-	// （同一拦截函数与 App 发送链路共用，保证口径一致）。
-	const dshRuntimeStatus = useAtomValue(dshRuntimeStatusAtom);
-	const dshBlockReason = dshSendBlockReason(dshRuntimeStatus.state);
-
 	// DSH 无 plan/goal 模式与独立思考档位（都是 pi 侧内置扩展），
 	// 提交时强制退回缺省；UI 上 Select 置灰 + 锁定显示值，避免用户配了不生效。
-	const isDsh = backend === "dsh";
-	const effectiveMode: AutomationTaskMode | typeof THINKING_INHERIT = isDsh ? "normal" : mode || THINKING_INHERIT;
-	const effectiveThinking = isDsh ? THINKING_INHERIT : thinkingLevel || THINKING_INHERIT;
+	const effectiveMode: AutomationTaskMode | typeof THINKING_INHERIT = mode || THINKING_INHERIT;
+	const effectiveThinking = thinkingLevel || THINKING_INHERIT;
 
 	useEffect(() => {
 		void desktopApi.settings
@@ -137,7 +129,7 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 		projectId: projectId || undefined,
 		// DSH 任务选 DSH host 的模型目录（listDshModels），pi 任务用默认目录；
 		// 切换 backend 后目录随动，避免把 pi 模型填进 DSH 任务的 model 字段。
-		backend: isDsh ? "dsh" : undefined,
+		backend: undefined,
 		enabled: modelPickerOpen,
 	});
 
@@ -233,10 +225,10 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					prompt: prompt.trim(),
 					model: selectedModel ?? { provider: "", modelId: "" },
 					// DSH 无独立档位：thinking/mode 强制回缺省（清空即「跟随/普通」）。
-					thinkingLevel: isDsh ? "" : thinkingLevel.trim(),
+					thinkingLevel: thinkingLevel.trim(),
 					// 与 model/thinkingLevel 同理：用空串表示「恢复默认（普通模式）」,
 					// 而不是省略键——省略会被主进程当成「保持原值」。
-					mode: isDsh ? "normal" : ((mode || "normal") as AutomationTaskMode),
+					mode: (mode || "normal") as AutomationTaskMode,
 					// 显式覆盖后端：旧任务没有该字段时也写死当前选择，防止「保持原值」歧义。
 					backend,
 					enabled,
@@ -257,9 +249,9 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					backend,
 					...(selectedModel ? { model: selectedModel } : {}),
 					// DSH 无独立档位，thinking/mode 一律不写（store 缺省即继承/普通）。
-					...(!isDsh && thinkingLevel.trim() ? { thinkingLevel: thinkingLevel.trim() } : {}),
+					...(thinkingLevel.trim() ? { thinkingLevel: thinkingLevel.trim() } : {}),
 					// 普通模式是缺省，不必写进创建入参；store 侧也只持久化非 normal。
-					...(!isDsh && mode && mode !== "normal" ? { mode } : {}),
+					...(mode && mode !== "normal" ? { mode } : {}),
 				};
 				await desktopApi.automation.createTask(input);
 			}
@@ -323,13 +315,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 							</SelectItem>
 						</SelectContent>
 					</Select>
-					{isDsh && dshBlockReason ? (
-						// DSH runtime 缺失/损坏/过旧：触发时 host 无法 fork，发送会被拦截。
-						// 只提示不动手（安装入口在设置），与 App 发送链路的拦截口径一致。
-						<p className="text-micro leading-snug text-destructive">{t("automation.backendDshUnavailable")}</p>
-					) : (
-						<p className="text-micro leading-snug text-muted-foreground">{t("automation.backendHint")}</p>
-					)}
 				</div>
 
 				<div className="flex flex-col gap-1.5">
@@ -338,7 +323,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					</Label>
 					<Select
 						value={effectiveMode}
-						disabled={isDsh}
 						onValueChange={(value) => {
 							setMode(value === THINKING_INHERIT ? "" : (value as AutomationTaskMode));
 						}}
@@ -357,7 +341,7 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 							))}
 						</SelectContent>
 					</Select>
-					<p className="text-micro leading-snug text-muted-foreground">{isDsh ? t("automation.dshModeHint") : t("automation.modeHint")}</p>
+					<p className="text-micro leading-snug text-muted-foreground">{t("automation.modeHint")}</p>
 				</div>
 			</div>
 
@@ -390,7 +374,6 @@ export function AutomationTaskEditor({ task, defaultProjectId, lockProject = fal
 					</Label>
 					<Select
 						value={effectiveThinking}
-						disabled={isDsh}
 						onValueChange={(value) => {
 							setThinkingLevel(value === THINKING_INHERIT ? "" : value);
 						}}

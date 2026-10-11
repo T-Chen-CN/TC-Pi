@@ -110,7 +110,7 @@ test("auto-expand wiring: controller exposes windowExpandableRef and listens nea
 	// 扩展时先扩窗口：触顶也优先消费 atom 已加载的 cohort，不因一把拉到顶而跳过本地扩窗。
 	// 2026-09 强化：扩窗必须由引擎上报的用户上滚意图授权（shouldAutoExpandRenderWindow），
 	// 布局 resize/clamp 造成的 scrollTop 回退不再被当成用户上滑（见 scrollHistoryPolicy）。
-	assert.match(controllerSource, /TURN_WINDOW_AUTO_EXPAND_THRESHOLD/);
+	assert.match(readFileSync("src/renderer/src/hooks/timeline/autoExpandThreshold.ts", "utf8"), /TURN_WINDOW_AUTO_EXPAND_THRESHOLD/);
 	assert.match(controllerSource, /shouldAutoExpandRenderWindow\(\{/);
 	assert.match(controllerSource, /windowExpandable: windowExpandableRef\.current/);
 	assert.match(controllerSource, /scrollTop: timeline\.scrollTop,/);

@@ -1,4 +1,4 @@
-import type { ArchivedDshSession, ArchivedPiSession, Project, SessionSummary } from "../../shared/types";
+import type { ArchivedPiSession, Project, SessionSummary } from "../../shared/types";
 
 /**
  * 会话管理弹窗（SessionManagerModal）的纯策略层：收录条件、行身份、
@@ -112,20 +112,6 @@ export function filterArchivedPiByFamily(items: readonly ArchivedPiSession[], fa
 	});
 }
 
-/**
- * DSH 归档按家族过滤：manifest cwd 精确匹配家族成员路径
- * （DSH 会话 cwd 恒等于创建/归属时刻的某项目 path，含 worktree 目录）。
- */
-export function filterArchivedDshByFamily(items: readonly ArchivedDshSession[], family: readonly Project[]): ArchivedDshSession[] {
-	const nativeMembers = familyPathSet(family, false);
-	const wslMembers = familyPathSet(family, true);
-	return items.filter((item) => {
-		const wsl = isWslLikePath(item.cwd);
-		const members = wsl ? wslMembers : nativeMembers;
-		return members.has(canonicalWorkspacePath(item.cwd, wsl));
-	});
-}
-
 /** canonical 路径归属到的家族非根成员（最长成员路径优先：worktree 目录可能嵌套在主项目下）。 */
 function workspaceMemberForPath(canonical: string, wsl: boolean, family: readonly Project[]): Project | undefined {
 	const root = familyRootProject(family);
@@ -149,46 +135,21 @@ export function archivedPiWorkspaceLabel(item: ArchivedPiSession, family: readon
 	if (!item.originalPath || !projectPath) return undefined;
 	const wsl = item.summary.wsl === true || isWslLikePath(projectPath);
 	return workspaceMemberForPath(canonicalWorkspacePath(projectPath, wsl), wsl, family)?.name;
-}
-
-/** DSH 归档行工作区标签：cwd 归属 worktree 子项目时返回目录名；主工作区返回 undefined。 */
-export function archivedDshWorkspaceLabel(item: ArchivedDshSession, family: readonly Project[]): string | undefined {
-	const wsl = isWslLikePath(item.cwd);
-	return workspaceMemberForPath(canonicalWorkspacePath(item.cwd, wsl), wsl, family)?.name;
-}
-
-/**
- * DSH 归档行标签（纯策略）：manifest/日志折叠标题 > cwd 末段 > 裸 host id。
- * 标题仍缺省（极老归档、日志无折叠结果）时也要比裸 id 可读。
- */
-export function managerArchivedDshLabel(row: Extract<ManagerArchivedRow, { kind: "dsh" }>): string {
-	const title = row.item.title?.trim();
-	if (title) return title;
-	const cwd = row.item.cwd.replace(/[\\/]+$/, "").trim();
-	if (cwd) {
-		const last = cwd.split(/[\\/]/).pop()?.trim();
-		if (last) return last;
-	}
-	return row.item.dshSessionId;
-}
-
-/** 归档视图合并行：pi 会话按文件恢复；DSH 会话按 host id 恢复。 */
-export type ManagerArchivedRow = { kind: "pi"; item: ArchivedPiSession } | { kind: "dsh"; item: ArchivedDshSession };
+} /** Archived pi file shown in the session manager. */
+export type ManagerArchivedRow = { kind: "pi"; item: ArchivedPiSession };
 
 /**
  * 归档行身份（弹窗选中集合用）：pi 行用会话记录 id，DSH 行用 host 会话 id。
  * 与主列表 sessionManagerRowKey 同语义，两类 id 命名空间不冲突。
  */
 export function managerArchivedRowKey(row: ManagerArchivedRow): string {
-	return row.kind === "pi" ? sessionManagerRowKey(row.item.summary) : row.item.dshSessionId;
+	return sessionManagerRowKey(row.item.summary);
 }
 
 /** 归档行时间戳（排序用）：pi 用 updatedAt，DSH 用 archivedAt。 */
 function managerArchivedTimestamp(row: ManagerArchivedRow): number {
-	return row.kind === "pi" ? row.item.summary.updatedAt : row.item.archivedAt;
-}
-
-/** 合并 pi / DSH 归档清单为一个视图，按时间倒序（调用方应先按家族过滤）。 */
-export function mergeManagerArchived(piSessions: readonly ArchivedPiSession[], dshItems: readonly ArchivedDshSession[]): ManagerArchivedRow[] {
-	return [...piSessions.map((item) => ({ kind: "pi" as const, item })), ...dshItems.map((item) => ({ kind: "dsh" as const, item }))].sort((a, b) => managerArchivedTimestamp(b) - managerArchivedTimestamp(a));
+	return row.item.summary.updatedAt;
+} /** Sort archived pi sessions by archive display time. */
+export function mergeManagerArchived(piSessions: readonly ArchivedPiSession[]): ManagerArchivedRow[] {
+	return piSessions.map((item): ManagerArchivedRow => ({ kind: "pi", item })).sort((a, b) => managerArchivedTimestamp(b) - managerArchivedTimestamp(a));
 }

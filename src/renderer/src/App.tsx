@@ -1,207 +1,158 @@
-import { Button } from "./components/ui-shadcn/button";
-import { NoticeHistoryDialog } from "./components/ui-shadcn/notice-history-dialog";
-import { useSessionNavigation } from "./hooks/useSessionNavigation";
-import { WorkbenchFileTabs } from "./components/workspace/WorkbenchFileTabs";
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
-import { toggleThemeMode } from "./themeAppearance";
 import {
-	Code,
 	Activity,
-	FolderOpen,
+	Code,
+	GitBranch,
 	Globe,
 	History,
-	Pencil,
-	Terminal,
-	GitBranch,
 	ListTree,
-	// 命令面板（Ctrl/Cmd+P）操作项图标
-	SquarePen,
-	Settings2,
-	RotateCw,
-	CircleStop,
-	RefreshCw,
-	Fingerprint,
+	Pencil,
 	// 抽屉 RPC 日志 Tab 图标
 	ScrollText,
+	Terminal,
 } from "lucide-react";
-import { configureNoticeDefaults, showNotice, type NoticeKind } from "./utils/notice";
-import { copyTextWithCopiedNotice } from "./utils/clipboardNotice";
-import { buildSettingsCommands, type PaletteCommand } from "./utils/commandPaletteCommands";
-import { CommandPalette } from "./components/overlays/CommandPalette";
-import { CommandPaletteOnboarding, markCommandPaletteOnboardingSeen } from "./components/overlays/CommandPaletteOnboarding";
-import { desktopApi as api, isLanWeb, missingElectronPreload } from "./desktopApi";
-import {
-	turnFlowSettingsAtom,
-	defaultAgentBackendAtom,
-	effectiveAgentBackendAtom,
-	busySendDeliveryAtom,
-	hiddenModulesAtom,
-	imageGenConfigAtom,
-	enhanceModelAtom,
-	dshRuntimeStatusAtom,
-	openSettingsAtom,
-	openAutomationModalAtom,
-	sessionRecordsAtom,
-	bumpNewTurnCollapseTickAtom,
-	rpcLoggingAgentIdsAtom,
-	toggleRpcLoggingAgent,
-} from "./atoms";
-import { type SidebarActions } from "./components/sidebar/SidebarContent";
-import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation";
-import { useWorkspaceSwitch } from "./hooks/useWorkspaceSwitch";
-import { WorkspaceSwitchDialog } from "./components/sidebar/WorkspaceSwitchDialog";
-import { useHomeOverview } from "./hooks/useHomeOverview";
-import { HomeOverview } from "./components/home/HomeOverview";
-import { WorkspaceFileExplorer } from "./components/sidebar/WorkspaceFileExplorer";
-import { AppSidebar } from "./components/sidebar/AppSidebar";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { busySendDeliveryAtom, defaultAgentBackendAtom, effectiveAgentBackendAtom, enhanceModelAtom, hiddenModulesAtom, openAutomationModalAtom, openSettingsAtom, rpcLoggingAgentIdsAtom, sessionRecordsAtom, toggleRpcLoggingAgent, turnFlowSettingsAtom } from "./atoms";
+import { logoStyleAtom } from "./atoms/app-ui-atoms";
+import { openProviderLoginAtom } from "./atoms/providerLoginAtoms";
 import { AppBootstrap } from "./components/app/AppBootstrap";
 import { SettingsFeatureRoot } from "./components/app/SettingsFeatureRoot";
-import { AutomationModal } from "./components/automation/AutomationModal";
-import { useRename } from "./hooks/useRename";
-import { useProjectRuntimeCapabilities } from "./hooks/useRuntimeCapabilities";
-import { useSessionRuntimeBridge } from "./hooks/useSessionRuntimeBridge";
-import { useAgentLoadNotice } from "./hooks/useAgentLoadNotice";
-import { useArchMismatchNotice } from "./hooks/useArchMismatchNotice";
-import { useModelsVerifyNotifier } from "./hooks/useModelsVerifyNotifier";
-import { useBackgroundAskPatrol } from "./hooks/useBackgroundAskPatrol";
-import { logoStyleAtom } from "./atoms/app-ui-atoms";
 import { LOGO_STYLE_STORAGE_KEY, resolveLogoStyle } from "./components/app/piTuiLogoData";
-import { openProviderLoginAtom } from "./atoms/providerLoginAtoms";
-import { useSessionLayout } from "./hooks/useSessionLayout";
-import { useFileEditor } from "./hooks/useFileEditor";
-import { useSessionFileLinks } from "./hooks/workspace/useSessionFileLinks";
-import { useOverlayActions } from "./hooks/useOverlayActions";
-import { useWorkspacePanels, type WorkspaceDrawerPanel, type WorkspaceExternalEditorAdapter } from "./hooks/useWorkspacePanels";
-import { useDrawerPorts } from "./hooks/useDrawerPorts";
-import { useTerminalDock } from "./hooks/useTerminalDock";
-import { resolveTerminalOwner, terminalOwnerKey } from "./terminalDockState";
-import { useImportFlow } from "./hooks/useImportFlow";
-import { useDirectoryImport } from "./hooks/useDirectoryImport";
-import { useQueuedPrompt } from "./hooks/useQueuedPrompt";
-import { activeAgentIdAtom } from "./hooks/useSessionRuntimeController";
-import { useSessionHistoryMutations } from "./hooks/useSessionHistoryMutations";
-import { useUserMessageEditReplay } from "./hooks/useUserMessageEditReplay";
-import { isLiveRuntimeStatus, sessionCommandFailureToast, type SessionRunCapabilities, type SessionRunAction } from "./utils/sessionCommands";
-import { GUIDE_BOOTSTRAP_SESSION_ID, readWelcomeBackendPreference, readWelcomeDshModelPreference, readWelcomeModelPreference, readWelcomeThinkingPreference, resolveChatSessionBootstrap, resolveGuidePageBackend } from "./utils/chatSessionBootstrap";
-import { useAppAppearance } from "./hooks/appearance/useAppAppearance";
+import { AutomationModal } from "./components/automation/AutomationModal";
+import { HomeOverview } from "./components/home/HomeOverview";
+import { CommandPalette } from "./components/overlays/CommandPalette";
+import { CommandPaletteOnboarding } from "./components/overlays/CommandPaletteOnboarding";
+import { AppSidebar } from "./components/sidebar/AppSidebar";
+import { type SidebarActions } from "./components/sidebar/SidebarContent";
+import { WorkspaceFileExplorer } from "./components/sidebar/WorkspaceFileExplorer";
+import { WorkspaceSwitchDialog } from "./components/sidebar/WorkspaceSwitchDialog";
+import { NoticeHistoryDialog } from "./components/ui-shadcn/notice-history-dialog";
+import { WorkbenchFileTabs } from "./components/workspace/WorkbenchFileTabs";
+import { desktopApi as api, isLanWeb, missingElectronPreload } from "./desktopApi";
 import { useAppBootstrapInfo } from "./hooks/app/useAppBootstrapInfo";
 import { useBootOverlayReady } from "./hooks/app/useBootOverlayReady";
 import { useCommandPalette } from "./hooks/app/useCommandPalette";
-import { useSidebarArchiveActions } from "./hooks/sidebar/useSidebarArchiveActions";
-import { useSettingsUpdater } from "./hooks/settings/useSettingsUpdater";
-import { useSessionRunControl } from "./hooks/session/useSessionRunControl";
+import { useAppAppearance } from "./hooks/appearance/useAppAppearance";
 import { useProjectFileTreeController } from "./hooks/files/useProjectFileTreeController";
 import { useSessionDurationTracking } from "./hooks/session/useSessionDurationTracking";
 import { useSessionPromptDispatch } from "./hooks/session/useSessionPromptDispatch";
+import { useSessionRunControl } from "./hooks/session/useSessionRunControl";
+import { useSettingsUpdater } from "./hooks/settings/useSettingsUpdater";
+import { useSidebarArchiveActions } from "./hooks/sidebar/useSidebarArchiveActions";
+import { useAgentLoadNotice } from "./hooks/useAgentLoadNotice";
+import { useArchMismatchNotice } from "./hooks/useArchMismatchNotice";
+import { useBackgroundAskPatrol } from "./hooks/useBackgroundAskPatrol";
+import { useDirectoryImport } from "./hooks/useDirectoryImport";
+import { useDrawerPorts } from "./hooks/useDrawerPorts";
+import { useFileEditor } from "./hooks/useFileEditor";
+import { useHomeOverview } from "./hooks/useHomeOverview";
+import { useImportFlow } from "./hooks/useImportFlow";
+import { useModelsVerifyNotifier } from "./hooks/useModelsVerifyNotifier";
+import { useOverlayActions } from "./hooks/useOverlayActions";
+import { useQueuedPrompt } from "./hooks/useQueuedPrompt";
+import { useRename } from "./hooks/useRename";
+import { useProjectRuntimeCapabilities } from "./hooks/useRuntimeCapabilities";
+import { useSessionHistoryMutations } from "./hooks/useSessionHistoryMutations";
+import { useSessionLayout } from "./hooks/useSessionLayout";
+import { useSessionNavigation } from "./hooks/useSessionNavigation";
+import { useSessionRuntimeBridge } from "./hooks/useSessionRuntimeBridge";
+import { activeAgentIdAtom } from "./hooks/useSessionRuntimeController";
+import { useTerminalDock } from "./hooks/useTerminalDock";
+import { useUserMessageEditReplay } from "./hooks/useUserMessageEditReplay";
+import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation";
+import { useWorkspacePanels, type WorkspaceDrawerPanel, type WorkspaceExternalEditorAdapter } from "./hooks/useWorkspacePanels";
+import { useWorkspaceSwitch } from "./hooks/useWorkspaceSwitch";
+import { useSessionFileLinks } from "./hooks/workspace/useSessionFileLinks";
+import { resolveTerminalOwner, terminalOwnerKey } from "./terminalDockState";
+import { toggleThemeMode } from "./themeAppearance";
+import { GUIDE_BOOTSTRAP_SESSION_ID, readWelcomeBackendPreference, readWelcomeModelPreference, readWelcomeThinkingPreference, resolveChatSessionBootstrap, resolveGuidePageBackend } from "./utils/chatSessionBootstrap";
+import { configureNoticeDefaults, showNotice, type NoticeKind } from "./utils/notice";
+import { isLiveRuntimeStatus, type SessionRunAction } from "./utils/sessionCommands";
 
 import { usePiUpdate } from "./hooks/usePiUpdate";
 import { useProviderUsageStartupWarmup } from "./hooks/useProviderUsage";
 
-import { useBackgroundUpdateWatch } from "./hooks/useBackgroundUpdateWatch";
-import { useChannelSwitchWatch } from "./hooks/useChannelSwitchWatch";
-import { useDataEnvWatch } from "./hooks/useDataEnvWatch";
-import { DataModeChoiceDialog } from "./components/app/DataModeChoiceDialog";
-import { DataEnvMismatchDialog } from "./components/app/DataEnvMismatchDialog";
-import { useProjectSync } from "./hooks/useProjectSync";
+import { isSameSessionPath } from "./agentListDisplay";
 import {
 	agentInventoryAtom,
 	applySessionRuntimeEventAtom,
+	cacheSessionMessagesAtom,
+	compactMiddlePackagesAtom,
 	currentSessionAtom,
 	currentSessionIdAtom,
 	currentSessionMessagesAtom,
-	currentSessionRuntimeAtom,
 	projectInventoryAtom,
+	promoteSessionComposerStateAtom,
+	promoteSessionMessagesCacheAtom,
 	removeSessionComposerStateAtom,
 	removeSessionStateAtom,
 	replaceProjectInventoryAtom,
 	replaceProjectSessionsAtom,
+	sessionCatalogLoadStateAtom,
+	sessionIdByRuntimeAgentIdAtomFamily,
+	sessionMessagesCacheAtom,
 	sessionRecordByIdAtomFamily,
 	sessionRecordsByProjectIdAtomFamily,
-	sessionIdByRuntimeAgentIdAtomFamily,
 	sessionRuntimeBySessionIdAtomFamily,
-	sidebarExpandedProjectIdsAtom,
-	compactMiddlePackagesAtom,
-	sessionCatalogLoadStateAtom,
-	sessionMessagesCacheAtom,
 	sessionSummariesByProjectIdAtomFamily,
-	promoteSessionComposerStateAtom,
-	promoteSessionMessagesCacheAtom,
 	setSessionAttachmentsAtom,
 	setSessionCatalogLoadStateAtom,
-	setSessionMessageLoadStateAtom,
-	setSessionHistoryMutationOverlayAtom,
 	setSessionDraftAtom,
-	cacheSessionMessagesAtom,
+	setSessionHistoryMutationOverlayAtom,
+	setSessionMessageLoadStateAtom,
+	sidebarExpandedProjectIdsAtom,
 	upsertSessionAtom,
-	acpToolsAtom,
-	acpEnabledAtom,
 } from "./atoms";
-import { isSameSessionPath } from "./agentListDisplay";
-import { t } from "./i18n";
-import { isChatProject, isReplacementForPendingAgent, isPendingAgentId, migrateAgentRecord, stampIdleSessionDuration, type PendingAgentTab } from "./rendererUtils";
-import { reorderProjectList } from "./utils/projectOrder";
-import { useResize } from "./hooks/useResize";
-import { ARCHIVED_SESSION_TOAST_MS, archivedSessionToastMessage, useSessionActions } from "./hooks/useSessionActions";
-import { useScratchPad } from "./hooks/useScratchPad";
-import { useWorktreeActions } from "./hooks/useWorktreeActions";
-import { ChatSessionPane } from "./components/session/ChatSessionPane";
-import { SessionSplitStage } from "./components/session/SessionSplitStage";
-import { splitLayoutSessionIds } from "./utils/sessionSplitEdge";
-import { SessionTabsBar, type SessionTabsBarProps, type SessionToolAction } from "./components/session/SessionTabsBar";
-import { SessionPaneServicesProvider, type SessionFileOpenContext } from "./components/session/SessionPaneServices";
-import { ProjectEmptyState } from "./components/session/ProjectEmptyState";
-import { FileLinkBaseProvider } from "./components/session/FileLinkBase";
-import { useSessionWorkspaceChrome } from "./hooks/useSessionWorkspaceChrome";
-import { useQuickTask } from "./hooks/useQuickTask";
+import { RenameModals } from "./components/RenameModals";
+import { AppShell } from "./components/app/AppShell";
+import { DataEnvMismatchDialog } from "./components/app/DataEnvMismatchDialog";
+import { DataModeChoiceDialog } from "./components/app/DataModeChoiceDialog";
 import { QuickTaskSurface } from "./components/app/QuickTaskSurface";
 import { AskPanelOverlay } from "./components/overlays/AskPanelOverlay";
-import { HostPluginPanelHost } from "./components/plugins/HostPluginPanelHost";
-import { HostPluginPageOverlay } from "./components/plugins/HostPluginPageOverlay";
-import { useHostPluginPageTab } from "./hooks/useHostPluginPageTab";
-import { useHostPluginNavigation } from "./hooks/plugins/useHostPluginNavigation";
-import { ResizablePanel, ResizablePanelGroup } from "./components/ui-shadcn/resizable";
-import { AppShell } from "./components/app/AppShell";
-import { WorkspaceDrawerRail } from "./components/workspace/WorkspaceDrawerRail";
-import { DrawerSurface } from "./components/workspace/DrawerSurface";
-import { WorkbenchStage } from "./components/workspace/WorkbenchStage";
-import { WorkbenchContent } from "./components/workspace/WorkbenchContent";
-import { RenameModals } from "./components/RenameModals";
 import { SessionActionOverlays } from "./components/overlays/SessionActionOverlays";
+import { HostPluginPageOverlay } from "./components/plugins/HostPluginPageOverlay";
+import { HostPluginPanelHost } from "./components/plugins/HostPluginPanelHost";
+import { ChatSessionPane } from "./components/session/ChatSessionPane";
+import { FileLinkBaseProvider } from "./components/session/FileLinkBase";
+import { ProjectEmptyState } from "./components/session/ProjectEmptyState";
+import { SessionPaneServicesProvider } from "./components/session/SessionPaneServices";
 import { SessionProxyDialog } from "./components/session/SessionProxyDialog";
+import { SessionSplitStage } from "./components/session/SessionSplitStage";
+import { SessionTabsBar, type SessionTabsBarProps, type SessionToolAction } from "./components/session/SessionTabsBar";
+import { DrawerSurface } from "./components/workspace/DrawerSurface";
+import { WorkbenchContent } from "./components/workspace/WorkbenchContent";
+import { WorkbenchStage } from "./components/workspace/WorkbenchStage";
+import { WorkspaceDrawerRail } from "./components/workspace/WorkspaceDrawerRail";
+import { useHostPluginNavigation } from "./hooks/plugins/useHostPluginNavigation";
+import { useBackgroundUpdateWatch } from "./hooks/useBackgroundUpdateWatch";
+import { useChannelSwitchWatch } from "./hooks/useChannelSwitchWatch";
+import { useDataEnvWatch } from "./hooks/useDataEnvWatch";
+import { useHostPluginPageTab } from "./hooks/useHostPluginPageTab";
+import { useProjectSync } from "./hooks/useProjectSync";
+import { useQuickTask } from "./hooks/useQuickTask";
+import { useResize } from "./hooks/useResize";
+import { useScratchPad } from "./hooks/useScratchPad";
+import { useSessionActions } from "./hooks/useSessionActions";
+import { useSessionWorkspaceChrome } from "./hooks/useSessionWorkspaceChrome";
+import { useWorktreeActions } from "./hooks/useWorktreeActions";
+import { t } from "./i18n";
+import { isChatProject, isPendingAgentId, isReplacementForPendingAgent, migrateAgentRecord, type PendingAgentTab } from "./rendererUtils";
+import { reorderProjectList } from "./utils/projectOrder";
+import { splitLayoutSessionIds } from "./utils/sessionSplitEdge";
 
-import { ImportOverlayHost } from "./components/overlays/ImportOverlayHost";
-import { EnvironmentOverlay } from "./components/overlays/EnvironmentOverlay";
-import { usePiEnvironmentGuide } from "./hooks/usePiEnvironmentGuide";
+import { hydrateImageContents } from "../../shared/imageContentSrc";
+import type { AgentBackend, AgentTab, AppSettings, ComposerAgentMode, FileTreeNode, FocusTargetPayload, GitBranchInfo, ImageContent, Project, SessionLaunchPreferences, SessionRecord, SessionSummary, TerminalTarget, TerminalThemeId } from "../../shared/types";
+import { createDefaultAppSettings } from "../../shared/types";
 import { EnvironmentDialog, FileContextMenu, ImagePreviewModal, type SessionModifiedFile } from "./components/app/AppParts";
-import { ExternalEditorOverlay } from "./components/workspace/ExternalEditorOverlay";
+import { fileNodeDragPayloadToRef, flattenFiles, getToolChangedLineCount, getToolFilePath, getToolNewContent } from "./components/app/AppUtils";
 import { navigateTo } from "./components/app/BrowserPanel";
-import { flattenFiles, fileNodeDragPayloadToRef, mergeCommands, getToolFilePath, getToolNewContent, getToolChangedLineCount } from "./components/app/AppUtils";
+import { EnvironmentOverlay } from "./components/overlays/EnvironmentOverlay";
+import { ImportOverlayHost } from "./components/overlays/ImportOverlayHost";
+import type { TerminalDockSettings } from "./components/terminal/TerminalDock";
+import { ExternalEditorOverlay } from "./components/workspace/ExternalEditorOverlay";
+import { usePiEnvironmentGuide } from "./hooks/usePiEnvironmentGuide";
 // ProjectResourcesModal 仅在打开资源弹层时加载
 const ProjectResourcesModal = lazy(() => import("./components/app/ProjectResourcesModal").then((m) => ({ default: m.ProjectResourcesModal })));
-import { createDefaultAppSettings } from "../../shared/types";
-import { hydrateImageContents } from "../../shared/imageContentSrc";
-import type {
-	AgentRuntimeState,
-	AgentTab,
-	SessionRuntimeTarget,
-	AppSettings,
-	ChatMessage,
-	FileTreeNode,
-	ImageContent,
-	PiCommand,
-	Project,
-	AgentBackend,
-	SessionLaunchPreferences,
-	SessionRecord,
-	SessionSummary,
-	ComposerAgentMode,
-	TerminalTarget,
-	TerminalThemeId,
-	GitBranchInfo,
-	FocusTargetPayload,
-} from "../../shared/types";
-import type { TerminalDockSettings } from "./components/terminal/TerminalDock";
 
 export function App() {
 	if (missingElectronPreload) {
@@ -259,7 +210,6 @@ export function App() {
 	const setMutationOverlay = useSetAtom(setSessionHistoryMutationOverlayAtom);
 	const removeSessionState = useSetAtom(removeSessionStateAtom);
 	const removeSessionComposerState = useSetAtom(removeSessionComposerStateAtom);
-	const setImageGenConfig = useSetAtom(imageGenConfigAtom);
 	const setEnhanceModel = useSetAtom(enhanceModelAtom);
 	const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
 	currentSessionIdRef.current = currentSessionId;
@@ -437,7 +387,6 @@ export function App() {
 		refreshProjectSessions,
 		refreshFiles,
 		refreshProjectTree,
-		syncDshForeignSessionsIfEnabled,
 		beginFileTreeRequest,
 		isFileTreeRequestCurrent,
 	} = useProjectSync({
@@ -453,7 +402,6 @@ export function App() {
 			sessions: {
 				listCatalog: api.sessions.listCatalog,
 				onCatalogRefreshed: api.sessions.onCatalogRefreshed,
-				syncDshForeignSessions: api.sessions.syncDshForeignSessions,
 			},
 			files: {
 				list: (projectId: string, options?: { maxDepth?: number; directory?: string }) => api.files.list(projectId, options),
@@ -1244,7 +1192,7 @@ export function App() {
 				// 模型偏好按后端分开取（issue #253）：DSH 的模型是 host route 名，不在 models.json，
 				// 必须作为显式 model 直接带给 host；pi 的偏好走 welcomeModel（launchDefaults 会按
 				// models.json 校验存在性）。历史上 DSH 侧不读偏好，点选因此永远不生效。
-				const welcomeModel = draftBackend === "dsh" ? readWelcomeDshModelPreference()?.model : readWelcomeModelPreference()?.model;
+				const welcomeModel = draftBackend === "dsh" ? readWelcomeModelPreference()?.model : readWelcomeModelPreference()?.model;
 				const welcomeThinking = readWelcomeThinkingPreference()?.thinkingLevel;
 				// 统一创建 draft 会话（Chat 项目也走普通会话、可保存）：创建不拉 pi，
 				// selectSessionCommand 同步切页、立即进入会话页。
@@ -1632,7 +1580,7 @@ export function App() {
 		const project = await api.projects.add();
 		if (!project) return;
 		// 先同步 DSH：新目录注册后，原先按 cwd 找不到项目的外部会话才能挂进来。
-		await syncDshForeignSessionsIfEnabled();
+
 		await refreshProjects();
 		if (!(await selectProjectCommand(project.id))) return;
 		// 已接受的目录选择先交给导航呈现，catalog 后台加载不能把首页留在旧画面。
@@ -1806,7 +1754,7 @@ export function App() {
 	);
 
 	// 侧栏会话归档/删除族收口到 useSidebarArchiveActions（删除/归档/恢复 + DSH 归档）
-	const { deleteSidebarSession, archiveSidebarSession, unarchiveSidebarSession, unarchiveDshSidebarSession, listArchivedSidebarSessions, deleteArchivedSidebarSession, listArchivedDshSidebarSessions, deleteArchivedDshSidebarSession, requestDeleteSidebarSession } = useSidebarArchiveActions({
+	const { deleteSidebarSession, archiveSidebarSession, unarchiveSidebarSession, listArchivedSidebarSessions, deleteArchivedSidebarSession, requestDeleteSidebarSession } = useSidebarArchiveActions({
 		activeProjectId,
 		showToast,
 		overlays,
@@ -1935,17 +1883,6 @@ export function App() {
 			createDraft: async (projectId) => {
 				await createSessionDraftWithTab(projectId);
 			},
-			createAcp: async (projectId, toolId) => {
-				const tool = store.get(acpToolsAtom).find((candidate) => candidate.id === toolId);
-				if (!tool) {
-					showToast(t("app.acpNoTools"), 3000);
-					return;
-				}
-				const session = await api.sessions.createDraft({ projectId, title: tool.name, backend: "acp", acpToolId: tool.id });
-				upsertSession(session);
-				selectSessionCommand(projectId, session.id, false);
-				workspaceChrome.registerOpenSession(session.id, "permanent");
-			},
 			deleteDraft: deleteDraftSession,
 			rename: rename.openSessionRename,
 			export: runExportSidebarSession,
@@ -1953,7 +1890,7 @@ export function App() {
 			copyPath: async (session) => {
 				// DSH 会话没有 pi 会话文件：走主进程按 dshSessionId + cwd 推导 host 持久化路径（F5）。
 				// 失败/不可推导时提示而不是把空值写进剪贴板（原实现会把 undefined 写成 "undefined" 字符串）。
-				const path = session.backend === "dsh" ? await api.sessions.getDshSessionPath(session.id) : session.filePath;
+				const path = session.filePath;
 				if (!path) {
 					showToast(t("menu.copySessionFilePathUnavailable"), 3000);
 					return;
@@ -1983,13 +1920,6 @@ export function App() {
 			listArchived: () => listArchivedSidebarSessions(),
 			deleteArchived: async (archivedPath) => {
 				await deleteArchivedSidebarSession(archivedPath);
-			},
-			unarchiveDsh: async (dshSessionId, projectId) => {
-				await unarchiveDshSidebarSession(dshSessionId, projectId);
-			},
-			listArchivedDsh: () => listArchivedDshSidebarSessions(),
-			deleteArchivedDsh: async (dshSessionId) => {
-				await deleteArchivedDshSidebarSession(dshSessionId);
 			},
 		},
 		agents: {
@@ -2142,7 +2072,7 @@ export function App() {
 				void (async () => {
 					// DSH 会话文件路径按 dshSessionId + cwd 推导（与侧栏 copyPath 同源）；
 					// 失败/不可推导时提示而不是把空值写进剪贴板。
-					const path = record.backend === "dsh" ? await api.sessions.getDshSessionPath(sessionId) : record.filePath;
+					const path = record.filePath;
 					if (!path) {
 						showToast(t("menu.copySessionFilePathUnavailable"), 3000);
 						return;

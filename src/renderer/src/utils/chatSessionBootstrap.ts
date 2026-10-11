@@ -13,15 +13,6 @@ export const GUIDE_BOOTSTRAP_SESSION_ID = "renderer:guide-bootstrap";
 
 /** 欢迎页（未启动 Agent）选择的模型偏好存储 key。 */
 export const WELCOME_MODEL_KEY = "pideck:welcome-model";
-/**
- * 引导页切到 DSH 后的模型偏好存储 key（与 pi 的 WELCOME_MODEL_KEY 分开）。
- *
- * 必须独立存储：两份偏好被不同解析器消费——pi 侧进 launchDefaults（读 models.json），
- * DSH 侧进 createDraft 的显式 model（读 host 模型目录）。共用一个 key 会让两侧互相
- * 读到对方的模型：切到 DSH 后 pi 偏好里的 models.json 模型会被当成 DSH 选择，
- * 而 DSH 的 route 名（如 jiyuan）回切 pi 后又会被当成 models.json 的 provider。
- */
-export const WELCOME_DSH_MODEL_KEY = "pideck:welcome-dsh-model";
 /** 欢迎页（未启动 Agent）显式选择的思考级别存储 key；首次发送时提升到真实会话。 */
 export const WELCOME_THINKING_KEY = "pideck:welcome-thinking";
 /** 欢迎页（未启动 Agent）显式切换的后端存储 key；首次发送时提升到真实会话。 */
@@ -40,15 +31,6 @@ export function readWelcomeModelPreference():
 	  }
 	| undefined {
 	return readStoredModelPreference(WELCOME_MODEL_KEY);
-}
-
-/** 读取引导页切到 DSH 后选择的模型偏好（无则 undefined）。 */
-export function readWelcomeDshModelPreference():
-	| {
-			model: { provider: string; modelId: string; modelName?: string };
-	  }
-	| undefined {
-	return readStoredModelPreference(WELCOME_DSH_MODEL_KEY);
 }
 
 /** 两份引导页模型偏好（pi / dsh）共用的读取与归一化。 */

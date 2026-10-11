@@ -51,12 +51,7 @@ test("dialog onOpenChange handlers invoke onClose instead of returning the callb
 });
 
 test("async leaf controllers protect deferred results and update subscriptions clean up", () => {
-	const imports = read("hooks/useImportController.ts");
 	const updateWatch = read("hooks/useBackgroundUpdateWatch.ts");
-	assert.match(imports, /mounted\.current = true/);
-	assert.match(imports, /mounted\.current = false/);
-	assert.match(imports, /requestSequence/);
-	assert.match(imports, /sequence\.current \+= 1/);
 	// 更新状态来自主进程单一快照流；卸载时必须退订，避免重复 toast 和 atom 更新。
 	assert.match(updateWatch, /api\.app\.getUpdateStatus\(\)/);
 	assert.match(updateWatch, /const unsubscribe = api\.app\.onUpdateStatus\(/);
@@ -224,40 +219,6 @@ async function flushAsync() {
 	for (let index = 0; index < 5; index += 1) await Promise.resolve();
 }
 
-test("import controller effect replay restores mounted state and rejects a deferred result after project null", async () => {
-	const scans = [];
-	const harness = createHookHarness();
-	const options = (projectId) => ({
-		projectId,
-		scan: async (id) => {
-			const item = deferred();
-			scans.push({ id, ...item });
-			return item.promise;
-		},
-		importSelected: async () => ({ ok: true }),
-	});
-	const first = harness.render(options("project-a"));
-	const firstCleanups = first.effects.map((setup) => setup()).filter(Boolean);
-	assert.equal(scans.length, 1);
-	firstCleanups.forEach((cleanup) => cleanup());
-	first.effects.forEach((setup) => setup());
-	assert.equal(scans.length, 2);
-	scans[0].resolve([{ sourcePath: "stale-a" }]);
-	scans[1].resolve([{ sourcePath: "fresh-a" }]);
-	await flushAsync();
-	assert.deepEqual(harness.render(options("project-a")).result.sessions, [{ sourcePath: "fresh-a" }]);
-
-	const old = harness.render(options("project-a"));
-	const oldCleanups = old.effects.map((setup) => setup()).filter(Boolean);
-	assert.equal(scans.length, 3);
-	oldCleanups.forEach((cleanup) => cleanup());
-	const closed = harness.render(options(null));
-	closed.effects.forEach((setup) => setup());
-	scans[2].resolve([{ sourcePath: "must-not-appear" }]);
-	await flushAsync();
-	assert.equal(harness.render(options(null)).result.sessions.length, 0);
-});
-
 test("background updater UI is snapshot-driven and installation remains user-confirmed", () => {
 	const updateWatch = read("hooks/useBackgroundUpdateWatch.ts");
 	const updateCard = read("components/app/settings/AppUpdateCard.tsx");
@@ -304,8 +265,6 @@ test("settings update card and import root keep error paths visible", () => {
 	assert.match(updateCard, /onClick=\{props\.onCheckUpdate\}/);
 	// Release 页面必须交给系统浏览器，不能让 webview 截获安装引导。
 	assert.match(updateCard, /desktopApi\.app\.openExternal\(releaseUrl, true\)/);
-	assert.match(imports, /controller\.error/);
-	assert.match(imports, /renderImportError/);
 });
 
 test("allowOther renders a custom input and sends its value through the responder envelope", async () => {

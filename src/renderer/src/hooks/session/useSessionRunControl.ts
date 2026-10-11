@@ -1,18 +1,14 @@
-import { useCallback, useRef, useState, type MutableRefObject } from "react";
-import { useStore, useSetAtom } from "jotai";
+import { useSetAtom, useStore } from "jotai";
+import { useState, type MutableRefObject } from "react";
+import type { AgentRuntimeState, AgentTab, SessionRecord, SessionRuntimeTarget } from "../../../../shared/types";
 import { applySessionRuntimeEventAtom, cacheSessionMessagesAtom, sessionRecordsAtom, setSessionHistoryMutationOverlayAtom, setSessionMessageLoadStateAtom } from "../../atoms/session-atoms";
 import { sessionIdByRuntimeAgentIdAtomFamily, sessionRuntimeBySessionIdAtomFamily } from "../../atoms/session-selectors";
-import { dshRuntimeStatusAtom } from "../../atoms/dsh-atoms";
-import { openSettingsAtom } from "../../atoms/app-ui-atoms";
-import { isLiveRuntimeStatus, requireSessionCommand, resolveSessionRunState, sessionRunCapabilities, SessionCommandFailure, toSessionRuntimeTarget, type SessionRunCapabilities, type SessionRunAction } from "../../utils/sessionCommands";
-import { sessionHistoryUnavailableState } from "../../utils/sessionHistoryAvailability";
-import { DSH_INSTALL_SETTINGS_TARGET, maybeHintMissingDshRunnerNode, showDshRuntimeBlockHint } from "../../utils/dshRuntimeHint";
-import { dshSendBlockReason } from "../../../../shared/types/dshRuntime";
-import { isPendingAgentId, type PendingAgentTab } from "../../rendererUtils";
 import { desktopApi as api } from "../../desktopApi";
 import { t } from "../../i18n";
+import { isPendingAgentId, type PendingAgentTab } from "../../rendererUtils";
 import type { NoticeKind } from "../../utils/notice";
-import type { AgentRuntimeState, AgentTab, SessionRecord, SessionRuntimeTarget } from "../../../../shared/types";
+import { isLiveRuntimeStatus, requireSessionCommand, resolveSessionRunState, SessionCommandFailure, sessionRunCapabilities, toSessionRuntimeTarget, type SessionRunAction, type SessionRunCapabilities } from "../../utils/sessionCommands";
+import { sessionHistoryUnavailableState } from "../../utils/sessionHistoryAvailability";
 import type { QueuedPrompt } from "../useQueuedPrompt";
 
 /** 确认弹窗的最小切片（关闭匿名会话/重启运行中会话需要确认） */
@@ -333,16 +329,9 @@ export function useSessionRunControl({ agents, activeAgent, activeAgentId, activ
 		// DSH 会话 runtime 不可用（未安装/损坏）时 host 无法 fork，activateRuntime 只会抛
 		// 模块解析裸报错——给「去安装」提示（含直达入口）而不是把底层错误甩给用户。
 		const restartRecord = store.get(sessionRecordsAtom)[sessionId];
-		if (restartRecord?.backend === "dsh") {
-			const dshStatus = store.get(dshRuntimeStatusAtom);
-			if (dshSendBlockReason(dshStatus.state)) {
-				showDshRuntimeBlockHint(() => store.set(openSettingsAtom, DSH_INSTALL_SETTINGS_TARGET), dshStatus.state, dshStatus.reason, {
-					installed: dshStatus.runtimeVersion,
-					declared: dshStatus.declaredRuntimeVersion,
-				});
-				return;
-			}
-			maybeHintMissingDshRunnerNode(() => store.set(openSettingsAtom, { tab: "dev", section: "dsh-runner-node" }));
+		if (restartRecord?.backend && restartRecord.backend !== "pi") {
+			showToast(t("app.legacyBackendReadOnly"), 4000);
+			return;
 		}
 		// 重启活会话走 restartRuntimeTarget→restartingAgentId→SessionSurfaceStage 的 isRestarting 遮罩；
 		// 这里（无绑定）没有 restartingAgentId，需显式设置 activating 遮罩，让会话消息区域也有加载动画。

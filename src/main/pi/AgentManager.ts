@@ -1,10 +1,15 @@
-import { app, dialog, shell, type BrowserWindow, Notification } from "electron";
+import { Notification, app, dialog, shell, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
-import { ProjectRuntimeFence } from "./ProjectRuntimeFence";
-import { stat, unlink, writeFile } from "node:fs/promises";
-import { existsSync, statSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
-import { homedir } from "node:os";
+import { statSync } from "node:fs";
+import { stat } from "node:fs/promises";
+import { sanitizeBridgeUpdate } from "../../shared/bridgeText";
+import { COMPACT_CANCELLED_BY_OWNER, COMPACT_CANCELLED_BY_USER_ABORT, COMPACT_HOOK_REJECT_MAX_MS, COMPACT_OBSERVATION_MAX_AGE_MS, COMPACT_ROUTED_TO_OWNER, COMPACT_USER_ABORT_WINDOW_MS, COMPACT_WAIT_TIMEOUT } from "../../shared/compactFeedback";
+import { isContextOverflowError } from "../../shared/contextOverflow";
+import { collectSessionFileChanges } from "../../shared/fileChanges";
+import { extractPiToolTruncation } from "../../shared/formatToolDetail";
+import type { MainProcessTranslationKey } from "../../shared/i18n/mainProcessCopy";
+import { ipcChannels } from "../../shared/ipc";
+import { updateActiveToolCalls, type ActiveToolCallState } from "../../shared/toolRuntimeState";
 import type {
 	AgentBackend,
 	AgentGatewayCapability,
@@ -17,7 +22,7 @@ import type {
 	ForkMessage,
 	I18nParams,
 	ImageContent,
-	SessionMessageImageTarget,
+	PiCommand,
 	Project,
 	RewindCheckpointPage,
 	RewindCheckpointPageParams,
@@ -25,98 +30,86 @@ import type {
 	RewindRestoreScope,
 	SendPromptInput,
 	SendPromptResult,
-	PiCommand,
-	SessionEnvironment,
 	SessionBranchTree,
+	SessionEnvironment,
+	SessionFileChange,
+	SessionMessageImageTarget,
 	SessionMessagePage,
 	SessionRuntimeModelSelection,
-	SessionFileChange,
 	SessionTodoSnapshot,
 } from "../../shared/types";
-import { ipcChannels } from "../../shared/ipc";
-import { sanitizeBridgeUpdate, stripBridgeAnsi } from "../../shared/bridgeText";
-import { collectSessionFileChanges } from "../../shared/fileChanges";
-import { extractPiToolTruncation } from "../../shared/formatToolDetail";
-import { COMPACT_CANCELLED_BY_OWNER, COMPACT_CANCELLED_BY_USER_ABORT, COMPACT_HOOK_REJECT_MAX_MS, COMPACT_OBSERVATION_MAX_AGE_MS, COMPACT_ROUTED_TO_OWNER, COMPACT_USER_ABORT_WINDOW_MS, COMPACT_WAIT_TIMEOUT } from "../../shared/compactFeedback";
-import { PiProcess } from "./PiProcess";
-import { createBridgeServiceHandler } from "./bridge/bridgeServices";
+import type { BridgeEvent, BridgeUpdate, ModelTraceInput } from "../../shared/types/bridge";
+import type { RpcLogEntry } from "../../shared/types/rpcLog";
+import type { ConfigManager } from "../config/ConfigManager";
+import { resolveBuiltInExtensionsOverlayDir } from "../extensions/builtInExtensions";
+import { resolveLoadableExtensionPaths } from "../extensions/enabledExtensionResolver";
+import { piVersionAtLeast } from "../extensions/extensionVersionGate";
+import { createPiProcessExtensionResolvers } from "../extensions/piProcessExtensionResolvers";
+import type { AppLogger } from "../logging/AppLogger";
+import { buildModelTraceLogEntry } from "../logging/ModelTrace";
+import type { RpcLogger } from "../logging/RpcLogger";
+import { MUTATING_TOOLS, restoreCheckpoint as applyCheckpointRestore, currentIndexTree, diffCheckpoints, loadAllCheckpoints, loadCheckpointFromRef, toCheckpointSummary } from "../rewind/index.ts";
+import type { SecurityStore } from "../security/SecurityStore";
+import { scanJsonlLines } from "../sessions/jsonlLineStream";
+import type { SettingsStore } from "../settings/SettingsStore";
 import { APP_DEEP_LINK_SCHEME } from "../utils/deepLinkScheme";
+import { toWindowsHostPath, toWslLinuxPath, type WslEnvironment } from "../wsl/WslPaths";
+import { AgentMessageProjector, buildActiveBranchEntryIds as buildActiveBranchEntryIdsForDisplay } from "./AgentMessageProjector";
+import { PiProcess } from "./PiProcess";
+import type { RpcResponse } from "./PiRpcClient";
+import { ProjectRuntimeFence } from "./ProjectRuntimeFence";
+import { RewindCheckpointCoordinator } from "./RewindCheckpointCoordinator";
+import { SessionFileEditor, type SessionEntryTarget, type SessionFileRef } from "./SessionFileEditor";
+import { SessionHistoryReader, boundTurnWindowStart } from "./SessionHistoryReader";
+import { STANDBY_TTL_MS, StandbyAgentPool } from "./StandbyAgentPool";
+import { AbortStreamGateController } from "./abortStreamGateController";
+import { buildAgentSessionKey, toAbsoluteSessionPath, type AgentSessionIdentityDefaults } from "./agentSessionIdentity";
+import {
+	asRecord,
+	clampPercent,
+	countRoleMessagesBefore,
+	inferTitleFromMessages,
+	isDefaultAgentTitle,
+	leadingSummaryCards,
+	looksLikePiSessionFileStem,
+	nonEmptyString,
+	pickNumber,
+	resolveNotificationSessionId,
+	shouldReloadMessagesAfterCompaction,
+	stripAnsi,
+	stripToolResultForDelivery,
+	trimHistoryMessages,
+	turnTrimStartIndex,
+} from "./agentUtils";
+import { formatBashToolMessage } from "./bashResult";
+import { getBridgeServer } from "./bridge/BridgeServer";
+import { createBridgeServiceHandler } from "./bridge/bridgeServices";
+import { createCacheHitStatsReader, type CacheHitStats, type CacheHitStatsReader } from "./cacheHitStats";
 import { createCompactRpcRequest } from "./compactRpc";
 import { readPiCompactionOwnership, type PiCompactionOwnership } from "./compactionOwner";
 import { mergeSubagentSources } from "./derivedSubagents";
-import { parseAvailableThinkingLevelsResponse } from "./thinkingLevels";
-import { listActiveBuiltInExtensionPaths } from "../extensions/builtInExtensions";
-import { createPiProcessExtensionResolvers } from "../extensions/piProcessExtensionResolvers";
-import { piVersionAtLeast } from "../extensions/extensionVersionGate";
-import { resolveLoadableExtensionPaths } from "../extensions/enabledExtensionResolver";
 import { collectEntryRendererTypes } from "./extensionEntryRendererScan";
-import { resolveBuiltInExtensionsOverlayDir } from "../extensions/builtInExtensions";
-import { getBridgeServer } from "./bridge/BridgeServer";
-import { StandbyAgentPool, STANDBY_TTL_MS } from "./StandbyAgentPool";
+import { formatExtensionErrorReason } from "./extensionError";
+import { describeExtensionFallbackSkip, formatExtensionFallbackDebug, shouldRetryWithoutExtensions } from "./extensionStartupFallback";
+import { ExtensionUiGate } from "./extensionUiGate";
+import { mergeHistoryWithPreservedMessages, stabilizeProjectedIdsFromIdentities, stabilizeReloadedMessageIds } from "./historyMessages";
+import { LiveStreamChannel } from "./liveStreamChannel";
+import { MessageEmitBatcher } from "./messageEmitBatcher";
+import { estimateMessagesPayloadBytes } from "./messagePayloadSize";
+import { MessagePerfTracker } from "./messagePerfTracker";
+import type { ProjectTrustChoice } from "./projectTrustGate";
+import { ProjectTrustGate } from "./projectTrustGate";
+import { RpcLiveLogTap } from "./rpcLiveLogTap";
+import { isRoleMessageRole } from "./sessionEntryIds";
 import { computeStandbyFingerprint } from "./standbyFingerprint";
-import type { BridgeEvent, BridgeUpdate, ModelTraceInput } from "../../shared/types/bridge";
-import { describeExtensionFallbackSkip, formatExtensionFallbackDebug, resolveDisabledExtensionsCopy, resolveDisabledExtensionsReason, shouldRetryWithoutExtensions } from "./extensionStartupFallback";
-import type { DisabledExtensionsReason } from "./extensionStartupFallback";
-import { StartupDiagnosticsQueue } from "./startupDiagnosticsQueue";
 import type { QueuedStartupDiagnostic } from "./startupDiagnosticsQueue";
+import { StartupDiagnosticsQueue } from "./startupDiagnosticsQueue";
+import { StoppedMessageIdentityCache } from "./stoppedMessageIdentity";
+import { parseAvailableThinkingLevelsResponse } from "./thinkingLevels";
 
 export type { QueuedStartupDiagnostic };
-import { formatExtensionErrorReason } from "./extensionError";
-import type { RpcResponse } from "./PiRpcClient";
-import { formatBashToolMessage } from "./bashResult";
-import type { MainProcessTranslationKey } from "../../shared/i18n/mainProcessCopy";
-import { mergeHistoryWithPreservedMessages, stabilizeProjectedIdsFromIdentities, stabilizeReloadedMessageIds } from "./historyMessages";
-import { buildAgentSessionKey, toAbsoluteSessionPath, type AgentSessionIdentityDefaults } from "./agentSessionIdentity";
-import { SessionFileEditor, type SessionEntryTarget, type SessionFileRef } from "./SessionFileEditor";
-import { SessionHistoryReader, boundTurnWindowStart } from "./SessionHistoryReader";
-import { scanJsonlLines } from "../sessions/jsonlLineStream";
-import { estimateMessagesPayloadBytes } from "./messagePayloadSize";
-import { StoppedMessageIdentityCache } from "./stoppedMessageIdentity";
-import { currentIndexTree, diffCheckpoints, loadAllCheckpoints, loadCheckpointFromRef, MUTATING_TOOLS, restoreCheckpoint as applyCheckpointRestore, toCheckpointSummary } from "../rewind/index.ts";
-import { AgentMessageProjector, buildActiveBranchEntryIds as buildActiveBranchEntryIdsForDisplay } from "./AgentMessageProjector";
-import { RewindCheckpointCoordinator } from "./RewindCheckpointCoordinator";
-import { LiveStreamChannel } from "./liveStreamChannel";
-import { resolveNotificationSessionId } from "./agentUtils";
-import { isRoleMessageRole } from "./sessionEntryIds";
-import { createStreamGateState, isStreamGateSealed, noteAbortSettled, openStreamGateForNewRun, sealStreamGate, type StreamGateState } from "./streamGate";
-import { RpcLiveLogTap } from "./rpcLiveLogTap";
-import { MessagePerfTracker } from "./messagePerfTracker";
-import { AbortStreamGateController } from "./abortStreamGateController";
-import { MessageEmitBatcher } from "./messageEmitBatcher";
-import { createCacheHitStatsReader, type CacheHitStats, type CacheHitStatsReader } from "./cacheHitStats";
-import {
-	stripAnsi,
-	pickNumber,
-	clampPercent,
-	asRecord,
-	nonEmptyString,
-	trimHistoryMessages,
-	turnTrimStartIndex,
-	countRoleMessagesBefore,
-	buildMessageFlushPayload,
-	leadingSummaryCards,
-	stripToolResultForDelivery,
-	cleanTitle,
-	inferTitleFromMessages,
-	isDefaultAgentTitle,
-	looksLikePiSessionFileStem,
-	shouldReloadMessagesAfterCompaction,
-} from "./agentUtils";
-import { updateActiveToolCalls, type ActiveToolCallState } from "../../shared/toolRuntimeState";
-import type { SettingsStore } from "../settings/SettingsStore";
-import type { SecurityStore } from "../security/SecurityStore";
-import type { ConfigManager } from "../config/ConfigManager";
-import type { RpcLogger } from "../logging/RpcLogger";
-import { buildModelTraceLogEntry } from "../logging/ModelTrace";
-import type { RpcLogEntry } from "../../shared/types/rpcLog";
-import type { AppLogger } from "../logging/AppLogger";
-import { toWindowsHostPath, toWslLinuxPath, type WslEnvironment } from "../wsl/WslPaths";
-import { ProjectTrustGate } from "./projectTrustGate";
-import { ExtensionUiGate } from "./extensionUiGate";
-import type { ProjectTrustChoice } from "./projectTrustGate";
 
 export type { ProjectTrustChoice };
-import { isContextOverflowError } from "../../shared/contextOverflow";
 
 /** 从 RPC 返回的未知 ask 记录中安全读取字段，避免批量答案转换扩散 any 强转。 */
 function readAskField(input: unknown, key: string): unknown {
@@ -278,7 +271,7 @@ export class AgentManager {
 	 * 若完整存入 ChatMessage.meta 并随流式 emit 反复全量传输，会显著放大 IPC payload
 	 * 并推高渲染进程内存，是大会话白屏的重要诱因。超长结果保留首尾各一部分，中间省略。
 	 */
-	/** 本地事件监听器（用于 FeishuBridge 等主进程内部订阅） */
+	/** 本地事件监听器，用于主进程内部订阅。 */
 	private readonly localEventListeners = new Set<(agentId: string, event: unknown) => void>();
 	/** 状态变更监听器（用于 PetStateBridge 等主进程内部模块订阅 AgentTab[] 聚合状态） */
 	private readonly stateListeners = new Set<(tabs: AgentTab[]) => void>();
@@ -458,12 +451,7 @@ export class AgentManager {
 		 * 该行会让 pi 拒绝加载会话并 exit 1，见 #114）。由 main/index.ts 装配 SessionScanner 实现。
 		 */
 		private readonly repairSessionFile?: (sessionPath: string) => Promise<boolean>,
-		/**
-		 * 会话是否已绑定飞书（key = SessionRecord.id）。
-		 * 由 main/index.ts 注入 FeishuBridge.hasSessionBinding 查询；
-		 * 命中时 PiProcess 注入 PIDECK_FEISHU_LINKED，ask_question 扩展切换为禁用提示版。
-		 */
-		private readonly isFeishuSession?: (sessionKey: string | undefined) => boolean,
+
 		/**
 		 * agentId → SessionRecord.id 解析（由 main/index.ts 注入 coordinator.getSessionId）。
 		 * 通知 toast 的 launch 必须携带 record.id：renderer 的 sessionRecordByIdAtomFamily
@@ -471,11 +459,7 @@ export class AgentManager {
 		 * 用它跳转在 renderer 永远解析不到会话。
 		 */
 		private readonly resolveSessionId?: (agentId: string) => string | undefined,
-		/**
-		 * 会话 key（SessionRecord.id 或会话文件路径）→ 会话级代理覆盖模式（follow/on/off）。
-		 * 由 main/index.ts 注入 catalog 查询；缺省/未命中 = 跟随全局。与 isFeishuSession 使用
-		 * 同一 key（securitySessionKey ?? sessionPath），保证 create/reattach/临时会话行为一致。
-		 */
+		/** 会话身份解析代理覆盖；未命中时跟随全局设置，所有 spawn 路径使用同一身份。 */
 		private readonly resolveSessionProxy?: (sessionKey: string | undefined) => import("../../shared/types/session").SessionProxyMode | undefined,
 		/**
 		 * provider/modelId 是否在 pi 的模型目录中（选择器展示的 pi --list-models 结果，
@@ -594,9 +578,7 @@ export class AgentManager {
 			// 会话级代理覆盖：spawn 时按会话记录覆盖全局设置（on → 强制代理 / off → 强制直连）。
 			// 与 securitySessionId 用同一 key，匿名会话（noSession）无 key → 跟随全局。
 			proxyOverride: this.resolveSessionProxy?.(securitySessionKey ?? sessionPath),
-			// 飞书绑定会话：ask_question 禁用（扩展读 PIDECK_FEISHU_LINKED）。
-			// 查询用与 securitySessionId 相同的会话 key，保证与 FeishuBridge 的 sessionId 索引一致。
-			feishuLinked: this.isFeishuSession?.(securitySessionKey ?? sessionPath) ?? false,
+
 			securitySnapshotPath: this.securityStore?.getSnapshotPath(),
 			// 预检修复：全部 spawn 路径（create/reattach/withTemporarySession）都在 start() 内生效。
 			repairSessionFileBeforeStart: this.repairSessionFile,
@@ -998,7 +980,6 @@ export class AgentManager {
 		if (!project) return null;
 		const proxyMode = this.resolveSessionProxy?.(input.sessionId);
 		if (proxyMode === "on" || proxyMode === "off") return null;
-		if (this.isFeishuSession?.(input.sessionId) === true) return null;
 		if ((await this.projectTrust.resolveTrustWithoutPrompt(project)) === null) return null;
 		const entry = this.standbyPool.take(input.projectId, this.computeStandbyFingerprintFor(project));
 		if (!entry) return null;

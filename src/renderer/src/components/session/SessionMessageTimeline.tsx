@@ -1,37 +1,35 @@
 import { useAtomValue } from "jotai";
 import { selectAtom } from "jotai/utils";
+import { Loader2 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps, ReactNode, Ref, RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, ImageContent } from "../../../../shared/types";
-import { MarkdownStream } from "./MarkdownStream";
-import { replaceExpandedRefBlocksWithLabels } from "./composer/quoteChip";
-import { Button } from "../ui-shadcn/button";
-import { DiagnosticMessageCard, EmptyState, MultiSelectModal, RespondingIndicator, TurnRow, UserBubble, stripMarkdown } from "./SurfaceParts";
-import { getMultiSelectImageCaptureIds, groupToolMessages, reconcileRuns, type RenderMessage } from "../app/AppUtils";
-import { liveThinkingIdBySessionIdAtomFamily, liveTextStreamingBySessionAtom, liveThinkingStreamingBySessionAtom, sessionMessageCacheBySessionIdAtomFamily, sessionMessageLoadStateAtom, sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionSendStateByIdAtom } from "../../atoms";
-import { writeClipboardImage } from "../../utils/clipboard";
-import { useTimelineSelection } from "../../hooks/useTimelineSelection";
-import { SelectionToolbar } from "./timeline/SelectionToolbar";
-import { deriveTimelineRunActivity } from "./timeline/timelineRunActivity";
-import { BridgeWorkingLine } from "../bridge/BridgeSlot";
+import { liveTextStreamingBySessionAtom, liveThinkingIdBySessionIdAtomFamily, liveThinkingStreamingBySessionAtom, sessionMessageCacheBySessionIdAtomFamily, sessionMessageLoadStateAtom, sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionSendStateByIdAtom } from "../../atoms";
+import { askEchoBySessionIdAtomFamily } from "../../atoms/ask-echo-atoms";
 import { canLoadSessionTimelineMore, deriveSessionSurfaceRuntime, type SessionTimelineController } from "../../hooks/useSessionTimelineController";
+import { useTimelineSelection } from "../../hooks/useTimelineSelection";
 import { t } from "../../i18n";
+import { resolveFreshTailIds } from "../../lib/pinTurnScroll";
 import { cn } from "../../lib/utils";
-import { Loader2, LoaderCircle, Power } from "lucide-react";
+import { injectAskEchoMessage } from "../../utils/askUi";
+import { writeClipboardImage } from "../../utils/clipboard";
 import { showNotice } from "../../utils/notice";
 import { isLiveRuntimeStatus } from "../../utils/sessionCommands";
-import { composeFailureNotice, isRetryStatusMessage, reduceFailureNoticePass, type FailureNoticePassState } from "./timelineFailureNotice";
-import { SessionStartSurface } from "./SessionStartSurface";
-import { NotifyMessageCard, shouldRenderNotifyCard } from "./NotifyMessageCard";
-import { ExtensionEntryCard } from "./ExtensionEntryCard";
 import { MessageScroller } from "../agents/message-scroller";
-import { askEchoBySessionIdAtomFamily } from "../../atoms/ask-echo-atoms";
-import { injectAskEchoMessage } from "../../utils/askUi";
-import { resolveFreshTailIds } from "../../lib/pinTurnScroll";
+import { getMultiSelectImageCaptureIds, groupToolMessages, reconcileRuns, type RenderMessage } from "../app/AppUtils";
+import { BridgeWorkingLine } from "../bridge/BridgeSlot";
+import { Button } from "../ui-shadcn/button";
+import { ExtensionEntryCard } from "./ExtensionEntryCard";
+import { NotifyMessageCard, shouldRenderNotifyCard } from "./NotifyMessageCard";
+import { SessionStartSurface } from "./SessionStartSurface";
+import { DiagnosticMessageCard, EmptyState, MultiSelectModal, RespondingIndicator, TurnRow, UserBubble, stripMarkdown } from "./SurfaceParts";
 import { chatContentWidthStyle } from "./chatContentWidth";
-import { useSessionVisionBridgeExpected } from "../../hooks/useSessionVisionBridgeExpected";
-import { selectTimelineTurnWindow, shouldWindowTimelineTurns, TIMELINE_MOUNTED_TURN_LIMIT, countAgentRunItems } from "./timeline/turnRenderWindow";
+import { replaceExpandedRefBlocksWithLabels } from "./composer/quoteChip";
+import { SelectionToolbar } from "./timeline/SelectionToolbar";
+import { deriveTimelineRunActivity } from "./timeline/timelineRunActivity";
+import { TIMELINE_MOUNTED_TURN_LIMIT, countAgentRunItems, selectTimelineTurnWindow, shouldWindowTimelineTurns } from "./timeline/turnRenderWindow";
+import { composeFailureNotice, isRetryStatusMessage, reduceFailureNoticePass, type FailureNoticePassState } from "./timelineFailureNotice";
 
 type TurnRowProps = ComponentProps<typeof TurnRow>;
 type UserBubbleProps = ComponentProps<typeof UserBubble>;
@@ -121,21 +119,6 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 	const messageLoadState = useAtomValue(messageLoadStateSelector);
 	const sendState = useAtomValue(sendStateSelector);
 	const controller = props.controller;
-	// DSH host 被用户手动停止：历史暂时读不了（main 侧降级成带原因的空页）。
-	// 与普通读盘失败分开渲染——DSH 会话没有 pi 会话文件，重试也永远不会自愈。
-	const dshHostStopped = messageLoadState?.status === "error" && messageLoadState.reason === "dsh-host-stopped";
-	const [startingDshHost, setStartingDshHost] = useState(false);
-	/** 专态主按钮：显式启动 host（唯一能解开手动停止标记的路径）+ 重载本会话历史。 */
-	const startDshHostAndRetry = useCallback(async () => {
-		if (startingDshHost) return;
-		setStartingDshHost(true);
-		try {
-			// 启动失败（host boot 报错）保留专态并提示；成功路径由控制器重载历史
-			if (!(await controller.startDshHostAndReload())) showNotice(t("config.dsh.hostStartFailed"), 6000);
-		} finally {
-			setStartingDshHost(false);
-		}
-	}, [controller, startingDshHost]);
 	const timelineRef = props.timelineRef ?? controller.timelineRef;
 	const activeMessages = controller.messages;
 	const paginatedMessages = controller.visibleMessages;
@@ -552,7 +535,6 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 	// 文件修改由 SessionView 提取最近一轮并放在 composer 上方；时间线只负责渲染消息。
 	// 时间线里已有用户图片才解析模型目录：原生看图时气泡不能显示视觉桥「转换中」。
 	const hasUserImages = useMemo(() => activeMessages.some((message) => message.role === "user" && Boolean(message.images?.length)), [activeMessages]);
-	const visionBridgeExpected = useSessionVisionBridgeExpected(sessionId, hasUserImages);
 	// 生图轮的 user 消息（紧随其后带 imageGen meta 的 assistant 占位/结果）：参考图直接进
 	// 供应商 image 参数，不走 LLM 视觉桥——必须禁用视觉桥 UI，否则参考图气泡会被误显示
 	// 「转换中/视觉桥已查看」。普通带图消息（下一跳是非 imageGen assistant）不受影响；
@@ -797,7 +779,7 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
           也不裸显示起始页误导——明确错误文案 + 重试（2026-08 生图会话文件缺失）。
           DSH host 被手动停止走下面的专态分支：DSH 会话没有 pi 会话文件，说成
           「文件可能已被删除」会把用户引向错误方向，而且重试永远无效。 */}
-			{messageLoadState?.status === "error" && activeMessages.length === 0 && !dshHostStopped && (
+			{messageLoadState?.status === "error" && activeMessages.length === 0 && (
 				<div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
 					<p className="text-sm font-medium">{t("timeline.loadFailed")}</p>
 					<p className="max-w-[560px] text-xs text-muted-foreground">{t("timeline.loadFailedHint")}</p>
@@ -812,21 +794,6 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 			{/* DSH 手动停止专态：不是故障而是用户自己的选择（预热/按需兜底/崩溃重启全被
 			    门控，不会自愈），所以主操作是「启动 host」而非只给重试；启动成功后
 			    控制器自动重载历史，用户无感回到会话内容。 */}
-			{messageLoadState?.status === "error" && activeMessages.length === 0 && dshHostStopped && (
-				<div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-					<p className="text-sm font-medium">{t("timeline.dshHostStopped")}</p>
-					<p className="max-w-[560px] text-xs text-muted-foreground">{t("timeline.dshHostStoppedHint")}</p>
-					<div className="flex items-center gap-2">
-						<Button type="button" size="sm" className="gap-1.5" disabled={startingDshHost} onClick={() => void startDshHostAndRetry()}>
-							{startingDshHost ? <LoaderCircle className="size-3.5 animate-pideck-spin" aria-hidden="true" /> : <Power className="size-3.5" aria-hidden="true" />}
-							{t("timeline.dshHostStoppedStart")}
-						</Button>
-						<Button type="button" variant="outline" size="sm" onClick={() => void controller.reloadFromDisk()}>
-							{t("common.retry")}
-						</Button>
-					</div>
-				</div>
-			)}
 
 			{!hasActiveConversation && <EmptyState hasProject={props.hasProject} onCreate={props.onCreateSession} />}
 
@@ -900,7 +867,6 @@ export function SessionMessageTimeline(props: SessionMessageTimelineProps) {
 									validFilePaths={props.validFilePaths}
 									onEnterMultiSelect={handleEnterMultiSelect}
 									// 生图参考图永远不触发视觉桥（参考图直接进供应商 API）
-									visionBridgeExpected={imageGenUserMessageIds.has(message.id) ? false : visionBridgeExpected}
 								/>
 							);
 						}

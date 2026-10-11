@@ -1,35 +1,33 @@
 import { useAtomValue } from "jotai";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { type GroupImperativeHandle, type PanelImperativeHandle } from "react-resizable-panels";
-import { ResizablePanel, ResizablePanelGroup } from "../ui-shadcn/resizable";
 import type { ChatMessage, GitBranchInfo, ImageContent, TerminalTarget, TerminalThemeId } from "../../../../shared/types";
-import type { SessionTimelineController } from "../../hooks/useSessionTimelineController";
-import { isLanWeb, desktopApi as api } from "../../desktopApi";
-import { SessionHeader } from "./SessionHeader";
-import { BridgeOverlayHost, BridgeGuiSlot, BridgeSlot } from "../bridge/BridgeSlot";
 import { BRIDGE_TARGET } from "../../../../shared/types/bridge";
+import { projectByIdAtomFamily, sessionRecordByIdAtomFamily } from "../../atoms";
+import { desktopApi as api, isLanWeb } from "../../desktopApi";
+import { useAnimationWindow } from "../../hooks/useAnimationWindow";
 import { useBridgeSessionTitle } from "../../hooks/useBridgeSessionTitle";
+import { useReplyActions } from "../../hooks/useReplyActions";
+import type { EnqueuePromptSnapshot } from "../../hooks/useSessionSend";
+import type { SessionTimelineController } from "../../hooks/useSessionTimelineController";
+import { COMPOSER_MAX_HEIGHT, COMPOSER_MIN_HEIGHT, TIMELINE_MIN_HEIGHT, displayProjectDirectoryName, redistributeTerminalAgainstTimeline, sessionGroupDefaultLayout, sessionResizableGroupKey, shouldMountBottomComposer } from "../../rendererUtils";
+import { groupToolMessages } from "../app/AppUtils";
+import { BridgeGuiSlot, BridgeOverlayHost, BridgeSlot } from "../bridge/BridgeSlot";
+import type { TerminalDockSettings } from "../terminal/TerminalDock";
+import { TERMINAL_PANEL_COLLAPSED_SIZE, TERMINAL_PANEL_MIN_SIZE, TerminalDockPanel } from "../terminal/TerminalDockPanel";
+import { ResizablePanel, ResizablePanelGroup } from "../ui-shadcn/resizable";
+import { chatContentWidthStyle } from "./chatContentWidth";
+import { ComposerArea } from "./ComposerArea";
 import { SessionBranchBar } from "./SessionBranchBar";
 import { SessionFilesStrip } from "./SessionFilesStrip";
 import { SessionGoalStrip } from "./SessionGoalStrip";
-import { SessionSubagentsStrip } from "./SessionSubagentsStrip";
-import { SessionTodoStrip } from "./SessionTodoStrip";
-import { SessionTeamStrip } from "./SessionTeamStrip";
-import { SessionQueuedMessagesStrip } from "./SessionQueuedMessagesStrip";
-import { SessionSurfaceStage } from "./SessionSurfaceStage";
-import { ComposerArea } from "./ComposerArea";
-import { useReplyActions } from "../../hooks/useReplyActions";
-import { useAnimationWindow } from "../../hooks/useAnimationWindow";
-import { chatContentWidthStyle } from "./chatContentWidth";
-import { TerminalDockPanel, TERMINAL_PANEL_COLLAPSED_SIZE, TERMINAL_PANEL_MIN_SIZE } from "../terminal/TerminalDockPanel";
-import type { TerminalDockSettings } from "../terminal/TerminalDock";
+import { SessionHeader } from "./SessionHeader";
 import { useSessionPaneServices } from "./SessionPaneServices";
-import { COMPOSER_MAX_HEIGHT, COMPOSER_MIN_HEIGHT, TIMELINE_MIN_HEIGHT, displayProjectDirectoryName, redistributeTerminalAgainstTimeline, shouldMountBottomComposer, sessionResizableGroupKey, sessionGroupDefaultLayout } from "../../rendererUtils";
-import { projectByIdAtomFamily, sessionRecordByIdAtomFamily } from "../../atoms";
-import type { EnqueuePromptSnapshot } from "../../hooks/useSessionSend";
-import { groupToolMessages } from "../app/AppUtils";
-import type { AgentRunItem } from "./timeline/types";
+import { SessionSubagentsStrip } from "./SessionSubagentsStrip";
+import { SessionSurfaceStage } from "./SessionSurfaceStage";
+import { SessionTodoStrip } from "./SessionTodoStrip";
 import { countUserTurns } from "./timeline/turnRenderWindow";
+import type { AgentRunItem } from "./timeline/types";
 
 // terminal 程序化布局保护窗口（ms）：setLayout 后该窗口内的 terminal
 // onResize 一律视为程序化结果，不写 collapsed 状态。
@@ -371,9 +369,8 @@ export function SessionView({
 								queuePanel={queuePanel}
 								widgets={
 									<>
-										<SessionQueuedMessagesStrip sessionId={sessionId} />
 										<SessionTodoStrip sessionId={sessionId} />
-										<SessionTeamStrip sessionId={sessionId} />
+
 										<SessionFilesStrip sessionId={sessionId} run={latestAgentRun} onOpenFile={onOpenFile} onDiffFile={onDiffFile} />
 										<SessionSubagentsStrip sessionId={sessionId} onOpenChildSession={onOpenBranchSession} />
 										<SessionGoalStrip sessionId={sessionId} />

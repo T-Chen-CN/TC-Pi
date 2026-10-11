@@ -41,6 +41,37 @@ function modelsFile(providers) {
 	return JSON.stringify({ providers });
 }
 
+for (const enabled of [undefined, false]) {
+	test(`fetchProviderUsage：${enabled === false ? "显式关闭" : "默认关闭"}不请求供应商`, async () => {
+		let requests = 0;
+		const { ConfigManager: QueryManager } = loadTsCommonJs("src/main/config/ConfigManager.ts", {
+			stubs: {
+				electron: {
+					net: {
+						fetch: async () => {
+							requests += 1;
+							throw new Error("Disabled provider must not be queried");
+						},
+					},
+					session: {},
+				},
+			},
+		});
+		await withConfigDir(
+			{
+				"models.json": modelsFile({ deepseek: { baseUrl: "https://api.deepseek.com/v1", apiKey: "fixture-key" } }),
+				"usage-probes.json": JSON.stringify({ providers: { deepseek: enabled === false ? { enabled: false } : {} } }),
+			},
+			async (dir) => {
+				const result = await new QueryManager(dir, (key) => key).fetchProviderUsage("deepseek", "pi");
+				assert.equal(result.disabled, true);
+				assert.equal(result.success, false);
+				assert.equal(requests, 0);
+			},
+		);
+	});
+}
+
 test("listUsageProbeStates：内置识别命中也不自动开（默认关，显式开启才查）", async () => {
 	await withConfigDir({ "models.json": modelsFile({ deepseek: { baseUrl: "https://api.deepseek.com/v1" } }) }, async (dir) => {
 		const states = await new ConfigManager(dir, (key) => key).listUsageProbeStates("pi");

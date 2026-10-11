@@ -25,7 +25,6 @@
 @import "./styles/foundation.css" layer(legacy);
 @import "./styles/timeline.css" layer(legacy);
 @import "./styles/surfaces.css" layer(legacy);
-@import "./styles/integrations.css" layer(legacy);
 @import "./styles/workspace.css" layer(legacy);
 @import "./styles/usageStats.css" layer(legacy);
 @import "./styles/tailwind.css";

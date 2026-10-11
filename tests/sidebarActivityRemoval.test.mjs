@@ -9,7 +9,7 @@ test("removed activity views and usage-history storage have no modules or update
 		assert.equal(existsSync(new URL(`../src/renderer/src/${path}`, import.meta.url)), false, path);
 	}
 	assert.doesNotMatch(read("atoms/session-atoms.ts"), /recent-session-atoms|touchRecentSession|forgetRecentSession/);
-	assert.doesNotMatch(read("atoms/app-ui-atoms.ts") + read("hooks/useSidebarController.ts") + read("components/sidebar/AppSidebar.tsx") + read("components/sidebar/ProjectTree.tsx"), /sidebarNavTab|settingsNavTab|persistNavTab|ActiveSessionsTree|RecentSessionsSection/);
+	assert.doesNotMatch(read("atoms/app-ui-atoms.ts") + read("hooks/useSidebarController.ts") + read("components/sidebar/AppSidebar.tsx"), /sidebarNavTab|settingsNavTab|persistNavTab|ActiveSessionsTree|RecentSessionsSection/);
 });
 
 test("home retains catalog-based recent sessions and active runtime navigation", () => {

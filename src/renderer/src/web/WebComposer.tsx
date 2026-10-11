@@ -14,15 +14,14 @@
  * - prefill：重发（prepare-resend）/提示词插入时由父级填充文本，nonce 变化触发
  * - 无会话时禁用；流式期间提交按钮转为停止
  */
-import { useEffect, useRef, useState } from "react";
-import { ClipboardList, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui-shadcn/button";
 import { t } from "@/i18n";
-import type { AgentBackend, AvailableModel, ComposerAgentMode, SessionModelPreference } from "../../../shared/types";
+import { ClipboardList, ImagePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { AvailableModel, ComposerAgentMode, SessionModelPreference } from "../../../shared/types";
 import { buildComposerPromptSubmission } from "../composerBehavior";
 import { compressImageToDataUrl, imagesFromPasteEvent } from "./webImageCompress";
 import { WebModelSelector } from "./WebModelSheet";
-import { WebBackendSelector } from "./WebBackendSelector";
 import { WebThinkingSelector } from "./WebThinkingSelector";
 
 /** 单会话图片上限（压缩后每张约 100–300KB，4 张足够多数场景且 body 可控）。 */
@@ -155,7 +154,7 @@ export function WebComposer(props: {
 								event.target.value = "";
 							}}
 						/>
-						{props.onBackendChange ? <WebBackendSelector backend={props.backend ?? "pi"} locked={Boolean(props.backendLocked)} onChange={props.onBackendChange} /> : null}
+
 						<Button type="button" variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0 text-muted-foreground" disabled={props.disabled || busy || images.length >= MAX_ATTACHED_IMAGES} title={t("web.attachImage")} aria-label={t("web.attachImage")} onClick={() => fileInputRef.current?.click()}>
 							<ImagePlus className="size-4" aria-hidden="true" />
 						</Button>

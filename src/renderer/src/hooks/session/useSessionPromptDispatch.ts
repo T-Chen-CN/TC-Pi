@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import { useStore } from "jotai";
 import { t, translateI18nDescriptor } from "../../i18n";
 import { desktopApi as api } from "../../desktopApi";
-import { applyDshGoalSendTransform, buildComposerPromptSubmission } from "../../composerBehavior";
+import { buildComposerPromptSubmission } from "../../composerBehavior";
 import { resolveBusySendDelivery } from "../../../../shared/busySendDelivery";
 import { PromptDeliveryUnknownError } from "../../utils/promptErrors";
 import { busySendDeliveryAtom, bumpNewTurnCollapseTickAtom, currentSessionRuntimeAtom, sessionDraftByIdAtom, sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily } from "../../atoms";
@@ -23,7 +23,6 @@ export interface SessionPromptDispatchDeps {
  * - livePromptByAgentRef：contentEditable 实时值镜像（发送路径读这里，权威源是 sessionDraft atom）；
  * - setPromptForAgent / setPrompt：写指定会话/当前会话的草稿（函数式更新从 atom 权威源取 previous，
  *   避免镜像滞后把已删除内容带回输入框）；
- * - dispatchPromptSnapshot：IPC sendPrompt 唯一出口——DSH 目标改写（agentMessage 拒绝 → /goal）、
  *   unknown 投递不降级（网络/IPC 抖动不可重试，防止重复发送）、成功后 bump 新一轮折叠 tick；
  * - submitPromptSnapshot：非队列入口——忙碌时按 busySendDelivery 设置解析投递语义（steer/followUp/直发）；
  * - isAgentCurrentlyBusy / translateAgentErrorMessage：忙碌判定与 BUSY_ 错误码本地化。
@@ -56,23 +55,15 @@ export function useSessionPromptDispatch({ store, setSessionDraft, currentSessio
 	const isAgentCurrentlyBusy = useCallback(() => {
 		if (!currentSessionId) return false;
 		const rt = store.get(currentSessionRuntimeAtom);
-		// 与 composer isBusy 对齐（含 isExecutingTool）：DSH 工具执行期间 steer 也应可用。
 		return rt?.status === "running" || Boolean(rt?.state?.isStreaming) || Boolean(rt?.state?.isExecutingTool);
 	}, [currentSessionId, store]);
 
 	const dispatchPromptSnapshot = useCallback(
 		async (sessionId: string, message: string, images?: ImageContent[], streamingBehavior?: "steer" | "followUp", agentMode: ComposerAgentMode = "normal", templateDescription?: string) => {
-			// 排队投递与输入框同一套规则：DSH 拒绝 agentMessage，首次目标改写成 /goal。
 			const record = store.get(sessionRecordByIdAtomFamily(sessionId));
-			const isDsh = record?.backend === "dsh";
-			const visibleMessage = isDsh
-				? applyDshGoalSendTransform({
-						message,
-						mode: agentMode,
-						goal: store.get(sessionRuntimeBySessionIdAtomFamily(sessionId))?.state?.goal,
-					})
-				: message;
-			const submission = buildComposerPromptSubmission(visibleMessage, isDsh ? "normal" : agentMode);
+			if (record?.backend && record.backend !== "pi") throw new Error(t("app.legacyBackendReadOnly"));
+			const visibleMessage = message;
+			const submission = buildComposerPromptSubmission(visibleMessage, agentMode);
 			let result: Awaited<ReturnType<typeof api.sessions.sendPrompt>>;
 			try {
 				result = await api.sessions.sendPrompt({
@@ -116,7 +107,6 @@ export function useSessionPromptDispatch({ store, setSessionDraft, currentSessio
 			templateDescription?: string,
 		) => {
 			// 非队列入口：当前选中 agent 忙碌时按「忙碌时投递行为」设置决定投递语义
-			//（pi/dsh 统一）；空闲直发（undefined）。客户端队列 drain 直接调用
 			// dispatchPromptSnapshot，并显式指定其投递语义。
 			const behavior = streamingBehavior ?? resolveBusySendDelivery(sessionId === currentSessionId && isAgentCurrentlyBusy(), store.get(busySendDeliveryAtom));
 			try {

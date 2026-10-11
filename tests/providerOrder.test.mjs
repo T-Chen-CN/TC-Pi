@@ -121,13 +121,13 @@ test("契约完整性：供应商排序在主进程设置、配置页两处、DS
 
 	// 模型选择器链路：偏好从 settings 读到 ComposerPickerHost，再传给按顺序分组的选项
 	assert.ok(preferenceState.includes("setProviderOrder(settings.providerOrder ?? [])"));
-	assert.ok(preferenceState.includes("dshProviderOrder"));
+	assert.equal(preferenceState.includes("dshProviderOrder"), false);
 	assert.ok(pickerOptions.includes("orderProviderGroups("));
 	// DSH 会话用 dshProviderOrder，Pi 会话用 providerOrder（同一入口三元切换，不能只传一个）
-	assert.ok(pickerHost.includes("providerOrder={preference.isDshSession ? preference.dshProviderOrder : preference.providerOrder}"));
+	assert.ok(pickerHost.includes("providerOrder={preference.providerOrder}"));
 
 	// 拖拽手柄/上移/下移三个提示文案中英都要有（缺 key 会渲染成原始 key）
-	for (const key of ["config.dragProvider", "config.moveProviderUp", "config.moveProviderDown", "config.providerOrderHint", "config.providerOrderReset", "config.dsh.providerOrderHint"]) {
+	for (const key of ["config.dragProvider", "config.moveProviderUp", "config.moveProviderDown", "config.providerOrderHint", "config.providerOrderReset"]) {
 		assert.ok(zhCopy.includes(`"${key}"`), `zh-CN 缺少 ${key}`);
 		assert.ok(enCopy.includes(`"${key}"`), `en-US 缺少 ${key}`);
 	}

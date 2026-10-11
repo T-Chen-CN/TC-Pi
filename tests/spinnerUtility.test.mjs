@@ -70,7 +70,7 @@ test("title-tab loading badge delegates rotation to the shared utility", () => {
 });
 
 test("legacy spinner shells delegate rotation to the shared utility", () => {
-	const legacyStyles = ["src/renderer/src/styles/foundation.css", "src/renderer/src/styles/timeline.css", "src/renderer/src/styles/integrations.css", "src/renderer/src/styles/surfaces.css"].map((filePath) => readFileSync(filePath, "utf8")).join("\n");
+	const legacyStyles = ["src/renderer/src/styles/foundation.css", "src/renderer/src/styles/timeline.css", "src/renderer/src/styles/surfaces.css"].map((filePath) => readFileSync(filePath, "utf8")).join("\n");
 
 	assert.doesNotMatch(legacyStyles, /animation:\s*(?:[\w-]*spin|spin)[^;]*;/, "legacy spinner shells must not define their own rotation timing");
 

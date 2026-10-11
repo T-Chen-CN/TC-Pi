@@ -19,7 +19,7 @@ test("styles.css layer order: vendor < legacy < utilities", () => {
 	assert.match(stylesEntry, /@import\s+"streamdown\/styles\.css"\s+layer\(vendor\)\s*;/);
 	assert.match(stylesEntry, /@import\s+"\.\/file-icons\.css"\s+layer\(vendor\)\s*;/);
 
-	for (const file of ["foundation.css", "timeline.css", "surfaces.css", "integrations.css", "workspace.css"]) {
+	for (const file of ["foundation.css", "timeline.css", "surfaces.css", "workspace.css"]) {
 		assert.match(stylesEntry, new RegExp(`@import\\s+"\\./styles/${file}"\\s+layer\\(legacy\\)\\s*;`), `${file} must import with layer(legacy)`);
 	}
 
@@ -46,7 +46,7 @@ test("v3-braun sidebar-body no longer hardcodes padding/gap (Tailwind owns spaci
 
 test("handwritten CSS files stay unlayered internally (layer only at import)", () => {
 	const layerAtRule = /(?:^|[\s;}])@layer\s+(components|legacy|base|vendor)\b/m;
-	for (const file of ["foundation.css", "timeline.css", "surfaces.css", "integrations.css", "workspace.css"]) {
+	for (const file of ["foundation.css", "timeline.css", "surfaces.css", "workspace.css"]) {
 		const source = readFileSync(`src/renderer/src/styles/${file}`, "utf8");
 		const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, "");
 		assert.doesNotMatch(withoutComments, layerAtRule, `${file} must not wrap itself in @layer; entry styles.css owns the layer assignment`);

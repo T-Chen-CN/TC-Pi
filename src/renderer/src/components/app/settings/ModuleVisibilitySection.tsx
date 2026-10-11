@@ -3,7 +3,7 @@ import { useAtomValue } from "jotai";
 import type { AppSettings } from "../../../../../shared/types";
 import { HIDEABLE_MODULE_IDS, isModuleHidden, toggleHiddenModule, type HideableModuleId } from "../../../../../shared/hiddenModules";
 import { t, type TranslationKey } from "../../../i18n";
-import { imageGenConfigAtom, sessionRecordsAtom, sessionRuntimeByIdAtom } from "../../../atoms";
+import { sessionRecordsAtom, sessionRuntimeByIdAtom } from "../../../atoms";
 import { Badge } from "../../ui-shadcn/badge";
 import { SettingsSection } from "./SettingsStorageTab";
 import { DirtyMarker, SettingRow } from "./SettingRows";

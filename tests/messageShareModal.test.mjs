@@ -11,7 +11,7 @@ const checkbox = readFileSync("src/renderer/src/components/ui-shadcn/checkbox.ts
 test("message sharing keeps the SurfaceComponents facade after presentation extraction", () => {
 	assert.match(shareModal, /export function MultiSelectModal/);
 	assert.match(surface, /from "\.\/MessageShareModal"/);
-	assert.match(surface, /export \{ MultiSelectModal \}/);
+	assert.match(surface, /export\s*\{[^}]*\bMultiSelectModal\b[^}]*\}/);
 	// 选择逻辑与树渲染已抽到共享模块：弹窗只保留外壳与复制动作
 	assert.match(shareModal, /from "\.\/MessageSelectionTree"/);
 	assert.doesNotMatch(shareModal, /function getSelectableMessageIds/);

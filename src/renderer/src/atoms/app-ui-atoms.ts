@@ -1,12 +1,10 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { BusySendDelivery } from "../../../shared/busySendDelivery";
+import { isModuleHidden } from "../../../shared/hiddenModules";
 import type { AgentBackend } from "../../../shared/types";
 import type { QuickMessagesSnapshot } from "../../../shared/types/quickMessages";
 import type { ReplyActionsSnapshot } from "../../../shared/types/replyActions";
-import { resolveEffectiveAgentBackend } from "../../../shared/types/dshRuntime";
-import { isModuleHidden } from "../../../shared/hiddenModules";
-import { dshRuntimeStatusAtom } from "./dsh-atoms";
 import type { SettingsFieldAnchorSlug } from "../utils/settingsFieldAnchors";
 import { defaultExpandedSidebarProjects, readExpandedSidebarProjects } from "../utils/sidebarExpandedProjects";
 

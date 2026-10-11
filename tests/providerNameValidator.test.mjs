@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isValidProviderName, PROVIDER_NAME_MAX_LENGTH } from "../src/shared/providerName.ts";
-import { credentialRefFor } from "../src/shared/dshCredentialRef.ts";
 
 // 配置键不应被 DSH 环境变量引用的 ASCII 规则约束。
 test("provider names accept Unicode, digits, spaces and punctuation", () => {
@@ -29,14 +28,4 @@ test("provider names reject percent because cmd.exe expands %VAR% regardless of 
 test("provider names trim surrounding spaces without rejecting internal spaces", () => {
 	assert.equal(isValidProviderName("  openai  "), true);
 	assert.equal(isValidProviderName("  中文 名称  "), true);
-});
-
-test("DSH generates safe references independently of display/config names", () => {
-	for (const name of ["中文供应商", "供应商 2", "2provider", "a.b", "-leading-dash"]) {
-		const ref = credentialRefFor(undefined, name);
-		assert.match(ref, /^[A-Za-z_][A-Za-z0-9_]*$/);
-		assert.equal(ref, credentialRefFor(undefined, name));
-	}
-	assert.notEqual(credentialRefFor(undefined, "中文供应商"), credentialRefFor(undefined, "另一家供应商"));
-	assert.equal(credentialRefFor(undefined, "openai"), "OPENAI_API_KEY");
 });

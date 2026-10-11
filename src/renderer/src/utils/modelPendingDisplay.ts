@@ -73,7 +73,7 @@ export function resolveComposerLiveModel(input: { record?: { provider?: string; 
  * 两种后端都是「点选 > 默认」（issue #253）：
  * - pi：点选是 welcomeModel，默认是 launchDefaults 的折叠结果（显式默认 / 切换列表 /
  *   上次使用）。
- * - DSH：点选来自独立的 WELCOME_DSH_MODEL_KEY，默认是部署默认（settings.yaml 的
+ * - DSH：点选来自独立的 WELCOME_MODEL_KEY，默认是部署默认（settings.yaml 的
  *   agent-default-model）。历史上 dsh 分支直接返回 defaultModel，把点选丢掉了——
  *   理由是「DSH 模型由部署默认决定」，但 host 提供 sessions.selectModel（PiDeck 的
  *   DshAgentManager.setModel 就在用），运行中也能换模型，所以引导页点选同样有意义。
@@ -81,7 +81,6 @@ export function resolveComposerLiveModel(input: { record?: { provider?: string; 
  *   不需要在展示层把两种后端的点选一起丢掉。
  */
 export function resolveGuideDisplayModel(input: {
-	isDsh: boolean;
 	/** 引导页点选（已经过 isWelcomeModelLost 校验，失效时为 undefined）。两种后端各自传入对应存储的偏好。 */
 	welcomeModel?: { provider: string; modelId: string; modelName?: string };
 	/** 主进程解析出的预选默认（pi 的 launchDefaults 折叠结果 / DSH 的部署默认）。 */

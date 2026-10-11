@@ -3,11 +3,10 @@ import { TOKENDANCE_APP_URL, TOKENDANCE_APP_URL_HEADER, TOKENDANCE_BASE_URL, TOK
 // 落盘前统一排序：目录/缓存旧数据可能仍是平台返回顺序，写入 models.json 必须与下拉列表一致。
 import { sortModelRows } from "../../shared/modelOrder";
 import type { AvailableModel } from "../../shared/types";
-import { mergePiProvider, type PiProviderSnapshot } from "./providerMigration";
-import type { PiModelItem } from "./ConfigManager";
-import type { ConfigManager } from "./ConfigManager";
-import type { TokendanceCatalogStore } from "./tokendanceCatalog";
 import type { PiAiCatalogEntry } from "../pi/piAiBuiltinCatalog";
+import type { ConfigManager, PiModelItem } from "./ConfigManager";
+import { mergePiProvider, type PiProviderSnapshot } from "./piProviderConfig";
+import type { TokendanceCatalogStore } from "./tokendanceCatalog";
 
 /**
  * 按模型 id 从 pi-ai 目录补能力字段（maxTokens/reasoning/input/thinkingLevelMap）。

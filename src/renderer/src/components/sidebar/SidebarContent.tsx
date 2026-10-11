@@ -1,31 +1,31 @@
-import { Bolt, Clock, Folder, Globe, MessageSquare, Monitor, Moon, Search, Sun } from "lucide-react";
+import { useAtomValue } from "jotai";
+import { Bolt, Clock, Folder, MessageSquare, Monitor, Moon, Search, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { AgentTab, AppThemeMode, ArchivedDshSession, ArchivedPiSession, Project, SessionRecord, SessionSummary, WorktreeEntry } from "../../../../shared/types";
-import { AgentContextMenu, DraftSessionContextMenu, ProjectContextMenu, SessionContextMenu, SessionManagerModal, WorktreeCreateDialog } from "./SidebarParts";
+import { formatAccelerator } from "../../../../shared/shortcuts";
+import type { AgentTab, AppThemeMode, ArchivedPiSession, Project, SessionRecord, SessionSummary, WorktreeEntry } from "../../../../shared/types";
+import type { RpcLogEntry } from "../../../../shared/types/rpcLog";
 import { sessionRecordToSummary } from "../../atoms";
 import { hasPendingUpdateAtom, pendingAppUpdateAtom, pendingCatalogUpdateAtom, pendingPiUpdateAtom, updateStatusAtom } from "../../atoms/update-atoms";
-import { useAtomValue } from "jotai";
-import { isManagerSessionSummary, worktreeFamilyProjects } from "../../sessionManagerModel";
-import { t } from "../../i18n";
-import { cn } from "../../lib/utils";
-import { showNotice } from "../../utils/notice";
-import { resolveSessionRunState, sessionRunCapabilities, type SessionRunAction } from "../../utils/sessionCommands";
-import { getBoundSidebarRuntimeAgent, getBoundSidebarRuntimeAgentByAgentId, type SidebarController } from "../../hooks/useSidebarController";
-import type { RpcLogEntry } from "../../../../shared/types/rpcLog";
-import type { SidebarRunControl } from "./SidebarComponents";
-import { sessionDisplayName } from "../../utils/sessionDisplayName";
-import { Button } from "../ui-shadcn/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
-import { Dock, DockItem } from "../motion/dock";
-import { UpdateDotHint } from "./UpdateDotHint";
-import { AutomationDockButton } from "../automation/AutomationDockButton";
-import { HostPluginDockButtons } from "../plugins/HostPluginDockButtons";
-import { BridgeGuiSlot } from "../bridge/BridgeSlot";
-import { MorphingSearch, type MorphingSearchItem } from "../motion/morphing-search";
-import { displayProjectDirectoryName, isChatProject } from "../../rendererUtils";
-import { formatAccelerator } from "../../../../shared/shortcuts";
 import { desktopApi } from "../../desktopApi";
 import { useShortcutBindings } from "../../hooks/useShortcutBindings";
+import { getBoundSidebarRuntimeAgent, getBoundSidebarRuntimeAgentByAgentId, type SidebarController } from "../../hooks/useSidebarController";
+import { t } from "../../i18n";
+import { cn } from "../../lib/utils";
+import { displayProjectDirectoryName, isChatProject } from "../../rendererUtils";
+import { isManagerSessionSummary, worktreeFamilyProjects } from "../../sessionManagerModel";
+import { showNotice } from "../../utils/notice";
+import { resolveSessionRunState, sessionRunCapabilities, type SessionRunAction } from "../../utils/sessionCommands";
+import { sessionDisplayName } from "../../utils/sessionDisplayName";
+import { AutomationDockButton } from "../automation/AutomationDockButton";
+import { BridgeGuiSlot } from "../bridge/BridgeSlot";
+import { Dock, DockItem } from "../motion/dock";
+import { MorphingSearch, type MorphingSearchItem } from "../motion/morphing-search";
+import { HostPluginDockButtons } from "../plugins/HostPluginDockButtons";
+import { Button } from "../ui-shadcn/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
+import type { SidebarRunControl } from "./SidebarComponents";
+import { AgentContextMenu, DraftSessionContextMenu, ProjectContextMenu, SessionContextMenu, SessionManagerModal, WorktreeCreateDialog } from "./SidebarParts";
+import { UpdateDotHint } from "./UpdateDotHint";
 import type { WorkspaceNavigationPort } from "./WorkspaceNavigation";
 
 export type SidebarActions = {
@@ -66,8 +66,6 @@ export type SidebarActions = {
 		beginDrag?: (sessionId: string) => void;
 		endDrag?: () => void;
 		createDraft: (projectId: string) => Promise<void>;
-		/** 新建 ACP 工具会话(toolId → settings.acpTools 条目);后端固定 acp。 */
-		createAcp: (projectId: string, toolId: string) => Promise<void>;
 		deleteDraft: (session: SessionRecord) => Promise<void>;
 		rename: (projectId: string, session: SessionSummary) => void;
 		export: (projectId: string, session: SessionSummary) => Promise<void>;
@@ -90,12 +88,6 @@ export type SidebarActions = {
 		listArchived: () => Promise<ArchivedPiSession[]>;
 		/** 永久删除已归档会话（pi 文件归档；移入回收站并移出索引） */
 		deleteArchived: (archivedPath: string) => Promise<void>;
-		/** 恢复 DSH 归档会话（host 目录移回 sessions 树并重建 catalog 记录） */
-		unarchiveDsh: (dshSessionId: string, projectId?: string) => Promise<void>;
-		/** 列出 DSH 归档会话（会话管理弹窗归档视图用；含标题） */
-		listArchivedDsh: () => Promise<ArchivedDshSession[]>;
-		/** 永久删除已归档 DSH 会话（host 目录移入回收站） */
-		deleteArchivedDsh: (dshSessionId: string) => Promise<void>;
 	};
 	agents: {
 		rename: (agent: AgentTab) => void;
@@ -635,7 +627,7 @@ export function SidebarContent(props: SidebarContentProps) {
 						controller.closeMenu();
 					}}
 					// F5：DSH 会话无 filePath 但可复制 host 会话文件路径（主进程按 dshSessionId 推导）
-					hasFilePath={Boolean(menuSession.filePath) || menuSession.backend === "dsh"}
+					hasFilePath={Boolean(menuSession.filePath)}
 					canRpcLog={Boolean(menuSessionRuntimeAgent)}
 					rpcToggleDisabled={!menuSessionRuntimeAgent}
 					isRpcLogging={menuSessionRuntimeAgent ? controller.isAgentRpcLogging(menuSessionRuntimeAgent.id) : false}
@@ -699,9 +691,6 @@ export function SidebarContent(props: SidebarContentProps) {
 					onUnarchive={(archived) => actions.sessions.unarchive(archived, managerProject.id)}
 					listArchived={actions.sessions.listArchived}
 					deleteArchived={(archivedPath) => actions.sessions.deleteArchived(archivedPath)}
-					onUnarchiveDsh={(dshSessionId) => actions.sessions.unarchiveDsh(dshSessionId, managerProject.id)}
-					listArchivedDsh={actions.sessions.listArchivedDsh}
-					deleteArchivedDsh={(dshSessionId) => actions.sessions.deleteArchivedDsh(dshSessionId)}
 				/>
 			)}
 			{controller.worktreeCreateProjectId && (

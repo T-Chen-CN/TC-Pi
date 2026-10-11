@@ -5,7 +5,7 @@
 
 ## 项目简介
 
-PiDeck 是 Electron 桌面应用，在多个项目目录间管理和运行 pi RPC Agent：多项目工作区、会话时间线、历史恢复、文件抽屉、Git 面板、终端、内置浏览器、提示词/技能/扩展商店、打包发布。
+PiDeck 是 Electron 桌面应用，在多个项目目录间管理和运行 pi RPC Agent：多项目工作区、会话时间线、历史恢复、文件抽屉、Git 面板、终端、内置浏览器、本地提示词/技能/pi 扩展管理、打包发布。
 
 技术栈：Electron + React 19 + TypeScript + Vite（版本以 `package.json` 为准）。
 
@@ -50,7 +50,7 @@ src/
 │   ├── git/           # GitService；git 子进程收口在 git/gitRun.ts
 │   ├── prompts/ skills/ extensions/ settings/   # 各领域 Manager
 │   ├── terminal/      # node-pty 终端会话
-│   ├── feishu/ pet/ web/ ipc/                   # 飞书/桌宠/Web 服务/IPC 域
+│   ├── web/ ipc/                              # Web 服务/IPC 域
 │   └── ipc/           # ★ IPC 域注册（*Ipc.ts 只做输入校验和适配）
 ├── preload/           # contextBridge 暴露最小 PiDesktopApi
 ├── renderer/src/      # atoms/ components/(ui-shadcn|session|sidebar|workspace|app) hooks/ i18n/ styles/
@@ -190,7 +190,6 @@ src/
 | 领域 | 硬约束 | 详见 maintenance-domains.md 小节 |
 |------|--------|------|
 | README/官网共用图片 | 唯一数据源 `docs/images/`，不复制到 docs-site | README 与官网共用图片 |
-| 提示词库 xueprompts.db | `content`/`description` 是 gzip BLOB，SQL LIKE 中文恒不命中，必须应用层 gunzip 后匹配 | 商店提示词库维护 |
 | 内置扩展热更新 | 判据是逐文件 sha256 不是版本号；覆盖层必须完整快照 + vendored 依赖；磁盘根统一走 `resolveBuiltInExtensionRoots()` | 内置扩展热更新 |
 | 生图存储 | **base64 不进 JSONL**（只存 ref）；读取永远有字节上界；`<img src>` 只走 `imageContentSrc()` | 生图会话存储 |
 | 会话消息编辑/删除/重发 | 编辑/删除写 pi 原生 `context_edit`（原文不改写、费用不回退；被移出的条目界面直接不显示，原始文件仍保留）；重发仍用 `deleted` 墓碑截断分支；追加条目的 parentId 必须取当前 leaf，pi 活着禁改会话文件，三道闸不许放宽 | 会话消息编辑/删除/重发 |

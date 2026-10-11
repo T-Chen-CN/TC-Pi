@@ -41,7 +41,7 @@ test("主进程三个 handler 都注册且先校验后动作", () => {
 });
 
 test("主进程写入路径固定在 configDir（禁止拼接渲染层传入路径）", () => {
-	// 保存以 configManager.getUsageProbeConfigDir(backend) 为根（pi=~/.pi/agent，dsh=$DSH_HOME），
+	// 保存以 configManager.getUsageProbeConfigDir(backend) 为根（Pi 配置目录），
 	// 不接受渲染层传目录。
 	assert.match(systemIpc, /saveUsageProbeForProvider\(\s*configManager\.getUsageProbeConfigDir\(backend\)/);
 	assert.match(systemIpc, /getUsageProbeConfigDir\(backend\)/);
@@ -89,13 +89,13 @@ test('用户探针明确拒绝 kind:"custom"（专用解析器仅限内置）', 
 });
 
 test("ConfigManager 用量查询按 provider 名路由：门控 + 识别 + 测试共用探测层", () => {
-	// 统一入口签名（per-provider 路由取代「调用方先解析端点」；backend 分流 pi/dsh 链路）。
+	// 统一入口签名；旧 backend 参数仍做边界校验，仅允许 Pi。
 	assert.match(configManager, /async fetchProviderUsage\(provider: string, backend: UsageProbeBackend = "pi"\)/);
 	assert.match(configManager, /async getUsageProbeSettings\(\s*provider: string,\s*backend: UsageProbeBackend/);
 	assert.match(configManager, /async recognizeUsageTemplate\(\s*provider: string,\s*backend: UsageProbeBackend/);
 	assert.match(configManager, /async testUsageProbe\(/);
-	// 门控：用户显式关闭（enabled=false）快速返回。
-	assert.match(configManager, /enabled === false/);
+	// 门控：未显式开启快速返回 disabled；检查实际分支，不能靠注释中的旧条件通过。
+	assert.match(configManager, /if\s*\(\s*settings\.config\?\.enabled\s*!==\s*true\s*\)\s*\{\s*return\s*\{\s*success:\s*false,\s*disabled:\s*true/);
 	// 声明式模板构建（general/newapi）在主进程，渲染层不可见密钥。
 	assert.match(configManager, /buildDeclarativeUsageProbeTemplate/);
 	// 三入口都经由 runUsageProbes（preflight/截断/redirect fail-closed 行为一致）。
