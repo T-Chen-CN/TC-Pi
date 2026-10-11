@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ChevronDown, ChevronRight, Loader2, MoreHorizontal, Pin, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, MoreHorizontal, Pin } from "lucide-react";
 import { useAtomValue } from "jotai";
 import type { Project } from "../../../../shared/types";
 import type { SidebarController } from "../../hooks/useSidebarController";
@@ -23,19 +23,15 @@ import type { SidebarActions } from "./SidebarContent";
 const fail = () => showNotice(t("workspace.navigationFailed"));
 
 /** 当前工作区全部会话；排序和分组是纯策略，展开集合由侧栏 controller 持有。 */
-export function WorkspaceSessionList(props: { project?: Project; sessionId?: string; controller: SidebarController; actions: SidebarActions }) {
+export function WorkspaceSessionList(props: { project?: Project; sessionId?: string; controller: SidebarController; actions: SidebarActions; onSelect: (projectId: string, sessionId: string) => Promise<boolean> }) {
 	const { project, controller, actions } = props;
 	const records = controller.catalog.sessionsByProject[project?.id ?? ""];
 	const groups = useMemo(() => workspaceSessionGroups(records ?? [], controller.pinnedSessionIds), [records, controller.pinnedSessionIds]);
 	const loading = project && controller.catalog.catalogLoadStateByProject[project.id]?.status === "loading";
 	return (
-		<div id="workspace-session-list" data-testid="workspace-session-list" className="ml-3 flex max-h-[24vh] shrink-0 flex-col gap-0.5 overflow-y-auto border-l border-border/60 pl-1">
+		<div id="workspace-session-list" data-testid="workspace-session-list" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-1">
 			{project ? (
 				<>
-					<Button variant="ghost" className="h-8 shrink-0 justify-start gap-2 px-2 text-caption" onClick={() => void actions.sessions.createDraft(project.id).catch(fail)}>
-						<Plus className="size-3.5" />
-						{t("app.newSession")}
-					</Button>
 					{loading && (
 						<div className="flex shrink-0 items-center gap-2 px-2 py-2 text-caption text-muted-foreground">
 							<Loader2 className="size-3 animate-pideck-spin" />
@@ -44,11 +40,8 @@ export function WorkspaceSessionList(props: { project?: Project; sessionId?: str
 					)}
 					{!loading && !groups.length && <p className="shrink-0 px-2 py-2 text-caption text-muted-foreground">{t("workspace.noSessions")}</p>}
 					{groups.map((group) => (
-						<WorkspaceSessionRow key={group.session.id} group={group} project={project} sessionId={props.sessionId} controller={controller} actions={actions} />
+						<WorkspaceSessionRow key={group.session.id} group={group} project={project} sessionId={props.sessionId} controller={controller} actions={actions} onSelect={props.onSelect} />
 					))}
-					<Button variant="ghost" className="h-8 shrink-0 justify-start px-2 text-caption text-muted-foreground" onClick={() => controller.openSessionManager(project.id)}>
-						{t("workspace.manageSessions")}
-					</Button>
 				</>
 			) : (
 				<p className="shrink-0 px-2 py-2 text-caption text-muted-foreground">{t("workspace.chooseFirst")}</p>
@@ -58,7 +51,7 @@ export function WorkspaceSessionList(props: { project?: Project; sessionId?: str
 }
 
 /** 逐会话订阅 runtime/UI，拒绝旧代待确认徽章，不用当前焦点的全局状态。 */
-function WorkspaceSessionRow(props: { group: WorkspaceSessionGroup; project: Project; sessionId?: string; controller: SidebarController; actions: SidebarActions }) {
+function WorkspaceSessionRow(props: { group: WorkspaceSessionGroup; project: Project; sessionId?: string; controller: SidebarController; actions: SidebarActions; onSelect: (projectId: string, sessionId: string) => Promise<boolean> }) {
 	const { group, controller, actions } = props;
 	const item = group.session;
 	const runtime = useAtomValue(sessionRuntimeBySessionIdAtomFamily(item.id));
@@ -100,7 +93,7 @@ function WorkspaceSessionRow(props: { group: WorkspaceSessionGroup; project: Pro
 						variant="ghost"
 						className={cn("h-auto min-h-10 min-w-0 flex-1 justify-start gap-1.5 px-2 py-1 text-left", item.id === props.sessionId && "bg-accent text-accent-foreground")}
 						aria-pressed={item.id === props.sessionId}
-						onClick={() => void actions.sessions.open(item.projectId, item.id).catch(fail)}
+						onClick={() => void props.onSelect(item.projectId, item.id).catch(fail)}
 						draggable
 						onDragStart={(event) => {
 							event.dataTransfer.effectAllowed = "move";

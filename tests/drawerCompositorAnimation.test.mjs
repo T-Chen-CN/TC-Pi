@@ -46,7 +46,7 @@ test("drawer keeps its content mounted through the layout transition", () => {
 
 test("closed drawer does not reserve horizontal gutter", () => {
 	// 关闭时必须仍可 collapse（未钉住时 collapsible，钉住后禁折叠防误拖）
-	assert.match(appShell, /id="drawer"[\s\S]*?collapsible=\{!drawerPinned\}/);
+	assert.match(appShell, /id="drawer"[\s\S]*?collapsible=\{!drawerPinned\s*\|\|\s*!hasDrawer\s*\|\|\s*drawerCollapsed\}/);
 	assert.doesNotMatch(appShell, /collapsible=\{Boolean\(drawer\)\}/);
 	// CSS 兜底：未打开时强制 0 宽，避免偶发 1px/minSize 缝
 	assert.match(styles, /\.wechat-shell:not\(\.drawer-open\) \.shell-panel-drawer \{[\s\S]*?max-width:\s*0 !important;/);

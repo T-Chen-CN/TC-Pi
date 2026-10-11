@@ -9,7 +9,7 @@ import { t } from "../i18n";
 import { hostPluginPanelAtom } from "../atoms/host-plugin-atoms";
 
 /** 导航的唯一 owner：异步恢复按最新选择结算，不允许迟到 catalog 抢回焦点。 */
-export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: string | undefined, sessionId: string | undefined) {
+export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: string | undefined, sessionId: string | undefined, prepareProjectSelection?: (projectId: string) => Promise<boolean>) {
 	const store = useStore();
 	const [page, setPage] = useAtom(workspacePageAtom);
 	const [lists, setLists] = useAtom(workspaceListsAtom);
@@ -33,37 +33,50 @@ export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: st
 	}, [sessionId, records, setLastSessions]);
 	const open = useCallback(
 		async (targetProject: string, targetSession: string, tabMode?: "preview" | "permanent") => {
+			if (prepareProjectSelection && !(await prepareProjectSelection(targetProject))) return false;
 			revision.current += 1;
 			pending.current = undefined;
 			setRestoreRequest(undefined);
 			setPage("workspace");
-			await snapshot.current.rawActions.sessions.open(targetProject, targetSession, tabMode);
+			return (await snapshot.current.rawActions.sessions.open(targetProject, targetSession, tabMode)) !== false;
 		},
-		[setPage, setRestoreRequest],
+		[setPage, setRestoreRequest, prepareProjectSelection],
 	);
 	const select = useCallback(
 		(targetProject: string, force = false) => {
-			setPage("workspace");
 			// 同项目有选中会话时保留现场；只有项目身份而无会话时仍应恢复历史。
-			if (!force && snapshot.current.projectId === targetProject && snapshot.current.sessionId) return;
-			const request = { projectId: targetProject, revision: ++revision.current };
-			pending.current = request;
-			snapshot.current.rawActions.projects.select(targetProject);
-			snapshot.current.rawActions.sessions.ensureCatalogsLoaded([targetProject]);
-			setRestoreRequest(targetProject);
+			if (!force && snapshot.current.projectId === targetProject && snapshot.current.sessionId) {
+				setPage("workspace");
+				return;
+			}
+			const commit = () => {
+				const request = { projectId: targetProject, revision: ++revision.current };
+				const finish = (accepted: boolean | void) => {
+					if (accepted === false || request.revision !== revision.current) return false;
+					setPage("workspace");
+					pending.current = request;
+					snapshot.current.rawActions.sessions.ensureCatalogsLoaded([targetProject]);
+					setRestoreRequest(targetProject);
+					return true;
+				};
+				const selected = snapshot.current.rawActions.projects.select(targetProject);
+				return typeof selected === "object" ? selected.then(finish) : finish(selected);
+			};
+			return prepareProjectSelection ? prepareProjectSelection(targetProject).then((accepted) => (accepted ? commit() : false)) : commit();
 		},
-		[setPage, setRestoreRequest],
+		[setPage, setRestoreRequest, prepareProjectSelection],
 	);
 	/** 新会话快捷键进入引导页，不能被“同项目保持选择”的导航策略吞掉。 */
 	const welcome = useCallback(
-		(targetProject: string) => {
+		async (targetProject: string) => {
+			if (prepareProjectSelection && !(await prepareProjectSelection(targetProject))) return;
 			revision.current += 1;
 			pending.current = undefined;
 			setRestoreRequest(undefined);
 			setPage("workspace");
-			snapshot.current.rawActions.projects.select(targetProject);
+			await snapshot.current.rawActions.projects.select(targetProject);
 		},
-		[setPage, setRestoreRequest],
+		[setPage, setRestoreRequest, prepareProjectSelection],
 	);
 	useEffect(() => {
 		const request = pending.current;
@@ -91,7 +104,7 @@ export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: st
 				select,
 				add: async () => {
 					const id = await snapshot.current.rawActions.projects.add();
-					if (id) select(id, true);
+					if (id) await select(id, true);
 					return id;
 				},
 			},
@@ -99,6 +112,7 @@ export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: st
 				...rawActions.sessions,
 				open,
 				createDraft: async (id) => {
+					if (prepareProjectSelection && !(await prepareProjectSelection(id))) return;
 					revision.current += 1;
 					pending.current = undefined;
 					setRestoreRequest(undefined);
@@ -107,7 +121,7 @@ export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: st
 				},
 			},
 		}),
-		[rawActions, select, open, setPage, setRestoreRequest],
+		[rawActions, select, open, setPage, setRestoreRequest, prepareProjectSelection],
 	);
 	const home = useCallback(() => {
 		revision.current += 1;
@@ -115,12 +129,12 @@ export function useWorkspaceNavigation(rawActions: SidebarActions, projectId: st
 		setRestoreRequest(undefined);
 		setPage("home");
 	}, [setPage, setRestoreRequest]);
+	// 独立聊天只选择自己的工作区，不自动弹出临时会话浮层。
 	const chat = useCallback(
 		(id: string) => {
-			setLists((current) => ({ ...current, sessions: true }));
-			select(id);
+			void select(id);
 		},
-		[setLists, select],
+		[select],
 	);
 	return { page, lists, setLists, actions, home, welcome, chat };
 }

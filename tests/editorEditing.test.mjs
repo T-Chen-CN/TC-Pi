@@ -42,7 +42,7 @@ test("FileDiffViewer: auto-save reads the latest edit and never reapplies a stal
 	assert.match(viewer, /const getLatestContent = useCallback\(\(\) => contentRef\.current, \[\]\)/);
 	assert.match(viewer, /contentRef\.current = value;\n\s*setContent\(value\)/);
 	// 保存完成后若用户已继续输入，不得用保存开始时的快照覆盖当前编辑内容。
-	assert.match(viewer, /if \(contentRef\.current === latest\) \{\n\s*setDirty\(false\);\n\s*\}/);
+	assert.match(viewer, /if\s*\(contentRef\.current\s*===\s*latest\)\s*\{\s*setDirty\(false\);\s*savedCallbackRef\.current\?\.\(\);\s*\}/);
 	assert.doesNotMatch(viewer, /lastSavedRef\.current = latest;\n\s*setContent\(latest\)/);
 });
 
@@ -51,9 +51,10 @@ test("editors bind Ctrl+/ comment toggle and JSON lint", () => {
 	// Ctrl+/ 注释/取消注释（@codemirror/commands 的 toggleComment）
 	assert.match(editor, /import \{[^}]*toggleComment/);
 	assert.match(editor, /Mod-\//);
-	// JSON 语法错误即时提示（lintGutter + jsonParseLinter，仅 json/jsonc）
+	// JSON 语法错误即时提示；JSONC 允许注释，不使用严格 JSON.parse 校验。
 	assert.match(editor, /lintGutter\(\), linter\(jsonParseLinter\(\)\)/);
-	assert.match(editor, /resolvedLanguage\.language\.name === "json"/);
+	assert.match(editor, /language\?\.trim\(\)\.toLowerCase\(\)\s*===\s*"json"/);
+	assert.doesNotMatch(editor, /resolvedLanguage\.language\.name/);
 });
 
 test("FileDiffViewer: markdown preview reuses .markdown-body + markdown-preview-chrome, no parallel legacy classes", () => {
@@ -89,6 +90,8 @@ test("FileDiffViewer: image/PDF get inline preview via base64 Blob URL", () => {
 	assert.match(viewer, /className="file-diff-media-preview"/);
 	assert.match(viewer, /className="file-diff-pdf-preview"/);
 	assert.match(viewer, /editor\.pdfPreview/);
+	// 预览专用二进制文件不额外挂空文本编辑器（防止滚动到空编辑区或误保存）。
+	assert.match(viewer, /!isDiffMode\s*&&\s*!preview\s*&&\s*!isImage\s*&&\s*!isPdf\s*&&/);
 	// 主进程 handler：读文件转 base64，ENOENT 返回空串（渲染层走「不支持」提示）
 	assert.match(ipc, /filesReadBase64/);
 	assert.match(ipc, /buffer\.toString\("base64"\)/);

@@ -34,7 +34,7 @@ function functionBody(name, source = appSource) {
 test("opening a sidebar history selects a SessionRecord without creating an Agent", () => {
 	const body = functionBody("openSidebarSession", sessionActionsSource);
 	assert.match(body, /await refreshProjectSessions\(projectId, true\)/);
-	assert.match(body, /commitSessionSelection\(projectId, record\.id, true\)/);
+	assert.match(body, /await\s+commitSessionSelection\(projectId,\s*record\.id,\s*true,\s*requestSequence\)/);
 	assert.doesNotMatch(body, /listCatalog|bindSessionRuntime|createAgent\(/);
 });
 
@@ -50,7 +50,7 @@ test("App routes project and Session selection through the command owner", () =>
 	assert.match(sessionRunControlSource, /selectSessionCommand\(projectId, targetSessionId, true\)/);
 	// select 口只负责选中 + 交给统一的按需加载入口，「什么时候该扫、什么时候该跳过」
 	// 的规则留在 ensureProjectCatalogLoaded 一处，不在 select 口重复一份（防止规则漂移）。
-	assert.match(appSource, /select: \(projectId\) => \{\s*selectProjectCommand\(projectId\);[\s\S]*?ensureProjectCatalogLoaded\(projectId\);/);
+	assert.match(appSource, /select:\s*\(projectId\)\s*=>\s*\{\s*const\s+selection\s*=\s*selectProjectCommand\(projectId\);[\s\S]*?ensureProjectCatalogLoaded\(projectId\);\s*return\s+selection;/);
 	assert.match(appSource, /ensureProjectCatalogLoaded = useCallback\(\s*\(projectId: string, silent = false\) => \{\s*const loadState = store\.get\(sessionCatalogLoadStateAtom\)\[projectId\];\s*if \(loadState\?\.status === "loading" \|\| loadState\?\.status === "ready"\) return;/);
 	assert.doesNotMatch(appSource, /setCurrentSessionId\(/);
 });

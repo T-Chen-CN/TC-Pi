@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
-import { dshModuleHiddenAtom, imageGenModuleHiddenAtom, composerModesHiddenAtom, acpEnabledAtom, acpToolsAtom } from "../../atoms";
+import { imageGenModuleHiddenAtom, composerModesHiddenAtom } from "../../atoms";
 import { AlertCircle, Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownLeft, Eye, EyeOff, FileText, GitBranch, ImageIcon, ListChecks, Loader2, Paperclip, Plus, RefreshCw, Sparkles, Star, Target, Terminal, Wrench, X } from "lucide-react";
 import { t, type TranslationKey } from "../../i18n";
 import type { PromptEnhanceView } from "../../hooks/usePromptEnhance";
@@ -9,7 +9,6 @@ import { Button } from "../ui-shadcn/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "../ui-shadcn/command";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "../ui-shadcn/dialog";
 import { cn } from "../../lib/utils";
-import { showNotice } from "../../utils/notice";
 import { ModelThinkingChip } from "./ModelThinkingChip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
 import { ConfirmDialog } from "../app/AppParts";
@@ -17,7 +16,6 @@ import { useComposerModeAvailability } from "../../hooks/useComposerModeAvailabi
 import type { ImageGenConfigFile } from "../../../../shared/imageGenConfig";
 import { ProviderUsageInline } from "../app/ProviderUsageInline";
 import { useProviderUsageBatchRefresh } from "../../hooks/useProviderUsage";
-import { DshLogo, PiLogo } from "./SessionSourceBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui-shadcn/select";
 import { computeModelDisplay, formatModelRef, resolveComposerLiveModel, resolveGuideDisplayModel, type ModelPending } from "../../utils/modelPendingDisplay";
 import { WELCOME_DSH_MODEL_KEY, WELCOME_MODEL_KEY, isWelcomeModelLost, readWelcomeDshModelPreference, readWelcomeModelPreference, shouldClearWelcomePreference } from "../../utils/chatSessionBootstrap";
@@ -130,42 +128,6 @@ export function ExtensionWidgetCard(props: {
 		</div>
 	);
 }
-/** This distribution has a single pi backend, so no backend picker is needed. */
-export function ComposerBackendPicker(_props: { backend: AgentBackend; disabled?: boolean; onChangeBackend: (backend: AgentBackend, acpToolId?: string) => void }) {
-	return null;
-}
-
-/**
- * ACP 工具选择（仅 acp 后端渲染，摆在后端 picker 旁）：logo-only 触发器（与后端
- * picker 同克度，当前工具名进 title 悬停提示），点击弹工具列表。受控组件
- * （toolId/onChange 由外层从会话 record 装配），草稿期可改、激活后由调用方不传
- * onChange 只读展示——与 DshAgentPresetControl 双形态同理。首次工具选择在
- * 后端 picker 的两页式弹层内完成（点 Agent CLI 原地切工具页），这里负责后续改选。
- */
-export function AcpToolControl(props: { toolId?: string; disabled?: boolean; onChange?: (toolId: string) => void }) {
-	const acpTools = useAtomValue(acpToolsAtom);
-	const current = acpTools.find((tool) => tool.id === props.toolId);
-	return (
-		<Select value={current?.id ?? ""} disabled={props.disabled || !props.onChange} onValueChange={(value) => props.onChange?.(value)}>
-			<SelectTrigger
-				size="sm"
-				className="composer-bar-btn backend h-7 gap-1 rounded-md border-transparent px-1.5 text-control font-semibold text-foreground hover:bg-muted/60 focus-visible:border-transparent focus-visible:ring-0 data-[state=open]:border-transparent data-[state=open]:ring-0 [&_[data-slot='select-icon']]:hidden"
-				title={current ? `${t("session.acpToolHint")} — ${current.name}` : t("session.acpToolHint")}
-			>
-				<Terminal className="size-[15px] shrink-0 text-muted-foreground" />
-			</SelectTrigger>
-			<SelectContent align="start">
-				{acpTools.map((tool) => (
-					<SelectItem key={tool.id} value={tool.id}>
-						<Terminal className="size-3.5 shrink-0 text-muted-foreground" />
-						<span className="truncate">{tool.name}</span>
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
-	);
-}
-
 /**
  * 底栏右侧分支切换器（shadcn 下拉）：当前分支 chip 即触发器，展开分支列表；
  * 选择目标分支后先弹确认（切换会携带未提交更改、冲突时 git 会拒绝），
@@ -257,10 +219,6 @@ export function ComposerBottomBar(props: {
 	backend?: AgentBackend;
 	/** 提示词增强域（hook 拥有状态，底栏只呈现）：缺省隐藏入口。 */
 	enhance?: { view: PromptEnhanceView; start: () => void; cancel: () => void };
-	/** 切换后端：UI 层面先停 runtime 再写 catalog；acp 可带工具 id（picker 两页式弹层内选定）。 */
-	onChangeBackend?: (backend: AgentBackend, acpToolId?: string) => void;
-	/** ACP 工具二级选择（仅 acp 后端渲染；激活后不传 onChange 即只读）。 */
-	acpTool?: { toolId?: string; onChange?: (toolId: string) => void };
 	feishuIndicator?: ReactNode;
 	/** 安全等级选择器（自包含组件，注入到左下角工具组） */
 	securityControl?: ReactNode;
@@ -375,39 +333,9 @@ export function ComposerBottomBar(props: {
 	// shrink-0：面板缩到最小时底栏不被输入区挤扁/挤出滚动条
 	return (
 		<div className="composer-bottom-bar min-h-10 shrink-0 border-t border-transparent px-2.5 py-2">
-			<div className="composer-bottom-layout flex min-w-0 items-center gap-2">
+			{/* 常驻右侧会话比旧中栏更窄：模型/思考换到独立一行，发送保持右对齐。 */}
+			<div className="composer-bottom-layout flex min-w-0 items-center gap-2 @max-[480px]:flex-wrap">
 				<div className="composer-bottom-left flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
-					{props.onChangeBackend ? (
-						<>
-							<ComposerBackendPicker backend={props.backend ?? "pi"} disabled={props.disabled} onChangeBackend={props.onChangeBackend} />
-							{/* ACP 二级工具选择：仅 acp 后端且草稿期（onChangeBackend 存在）时出现；挂载即弹引导选工具；激活后走只读分支 */}
-							{props.backend === "acp" && props.acpTool ? <AcpToolControl toolId={props.acpTool.toolId} disabled={props.disabled} onChange={props.acpTool.onChange} /> : null}
-						</>
-					) : props.backend ? (
-						/* 后端已锁定（会话激活后不可切换：pi 文件与 DSH session log 格式不同，
-						   中途切换会导致消息同步渲染不可靠）：只读标识，只显示官方 logo 不重复文字。
-						   inline-flex 居中：span 默认 inline，svg 按 baseline 排会偏上，
-						   与底栏其它按钮（flex 居中 15px 图标）水平不平齐。
-						   用户输入时 Agent 可能已被自动启动、后端随之锁定，但用户不一定知情；
-						   点击时弹提示说明锁定原因与换后端的途径（新建会话）。 */
-						<button
-							type="button"
-							className="composer-bar-btn backend inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-1.5 text-control font-semibold text-foreground hover:bg-muted/60"
-							title={t("session.backendLockedHint")}
-							aria-label={t("session.backendLockedHint")}
-							onClick={() => showNotice(t("session.backendLockedNotice"), 5000)}
-						>
-							{props.backend === "dsh" ? (
-								<DshLogo className="size-[15px] shrink-0" />
-							) : props.backend === "imagegen" ? (
-								<ImageIcon className="size-[15px] shrink-0 text-muted-foreground" />
-							) : props.backend === "acp" ? (
-								<Terminal className="size-[15px] shrink-0 text-muted-foreground" />
-							) : (
-								<PiLogo className="size-[15px] shrink-0" />
-							)}
-						</button>
-					) : null}
 					{/* 特殊模式退出×：模式选择器已常驻底栏，这里是进行中模式的快捷退出
 					    （imagegen 同样可退出；imageGenLocked 时无法切走故不显示；选择器被隐藏时它也是唯一逃生口）。 */}
 					{isSpecialMode && !props.imageGenLocked && (
@@ -493,7 +421,9 @@ export function ComposerBottomBar(props: {
 						</>
 					)}
 				</div>
-				<div className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4${isImageGenMode ? " overflow-x-auto overflow-y-hidden [scrollbar-width:none]" : " overflow-hidden"}`}>
+				<div
+					className={`composer-bottom-center flex min-w-0 flex-1 items-center justify-center gap-4 @max-[620px]:justify-start @max-[620px]:overflow-x-auto @max-[620px]:pb-px @max-[480px]:order-3 @max-[480px]:basis-full @max-[480px]:flex-none${isImageGenMode ? " overflow-x-auto overflow-y-hidden [scrollbar-width:none]" : " overflow-hidden"}`}
+				>
 					{/* 生图模式用独立供应商/模型下拉，不展示会话 LLM chip，避免两套配置混用。
 					    ACP 同理：模型/思考由 agent CLI 自持（session/config options 或各自 /model 命令），
 					    PiDeck 维护的 models.json 对 agent CLI 无意义，隐藏 chip 防止两套语义混用。 */}

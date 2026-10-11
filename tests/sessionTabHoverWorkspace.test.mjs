@@ -32,7 +32,7 @@ function extractFunctionToEnd(source, name) {
 	return source.slice(start);
 }
 
-const sessionTabBody = extractFunction(tabsBar, "SessionTab", "NewSessionMenu");
+const sessionTabBody = extractFunction(tabsBar, "SessionTab", "NewSessionButton");
 const editorTabBody = extractFunction(tabsBar, "EditorWorkbenchTab", "GroupCapsuleButton");
 
 test("Tab 右键菜单携带与 ⋯ 菜单同源的会话操作组", () => {

@@ -273,16 +273,6 @@ export type AppInfo = {
 	installedAt?: string;
 };
 
-export type FeedbackEnvironment = {
-	appVersion: string;
-	platform: NodeJS.Platform;
-	arch: string;
-	electronVersion: string;
-	chromeVersion: string;
-	nodeVersion: string;
-	pi: PiInstallStatus;
-};
-
 /** 应用更新生命周期阶段（由 electron-updater 事件映射）。 */
 export type AppUpdatePhase = "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "error";
 

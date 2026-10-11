@@ -215,11 +215,7 @@ export type AppSettings = {
 	askNotificationEnabled: boolean;
 	/** 激活 Agent 数量提醒（人文关怀）：激活数达到阈值时，启动时提示关闭空闲会话释放内存。默认开启。 */
 	agentCountReminderEnabled: boolean;
-	/**
-	 * 公告通知：拉取到新未读公告时在右上角弹 toast 提醒（默认开启）。
-	 * 关闭后仅保留侧栏公告入口的红点（公告中心随时可看），不再主动弹窗；
-	 * 弹出时机由渲染层忙碌检测控制（输入中/模态打开/窗口隐藏时延迟），与本开关解耦。
-	 */
+	/** Legacy read compatibility only; announcement functionality has been removed. */
 	announcementNotificationEnabled: boolean;
 	/**
 	 * 应用内 toast 的展示时长（ms），全局统一口径：所有提示（含调用方显式传入的时长、
@@ -943,7 +939,7 @@ export function createDefaultAppSettings(): AppSettings {
 		askNotificationEnabled: false,
 		// 人文关怀提醒默认开启：与主进程 SettingsStore 默认一致，首屏未拉到真实设置前不关闭提醒
 		agentCountReminderEnabled: true,
-		// 公告通知默认开启：与主进程 SettingsStore 默认一致，首屏未拉到真实设置前不误关提醒
+		// 旧字段读取兼容；此值不再驱动任何功能。
 		announcementNotificationEnabled: true,
 		// toast 展示时长：与主进程 defaultSettings 同源（全局统一口径）
 		toastDurationMs: DEFAULT_TOAST_DURATION_MS,

@@ -123,6 +123,9 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin(), hostPluginPreloadPlugin()],
   },
   renderer: {
+    // 与主进程/其它 Vite 入口隔离预构建目录，避免共享缓存被重新优化后
+    // 已运行窗口仍引用旧 deps URL（504），导致核心编辑器模块加载失败。
+    cacheDir: resolve(__dirname, "node_modules/.vite-pideck-renderer"),
     // Windows 上 localhost 可能优先解析到 IPv6 ::1，Electron 加载 dev server 时会超时；固定 IPv4 保证本机访问稳定。
     server: {
       host: "127.0.0.1",
@@ -137,6 +140,36 @@ export default defineConfig({
     // "MIME text/html" 模块错误、整页白屏。
     optimizeDeps: {
       include: [
+        // 编辑器是核心工作台能力，语言切换不应在运行中触发依赖重优化。
+        "@codemirror/state",
+        "@codemirror/view",
+        "@codemirror/language",
+        "@codemirror/commands",
+        "@codemirror/autocomplete",
+        "@codemirror/search",
+        "@codemirror/lint",
+        "@codemirror/lang-javascript",
+        "@codemirror/lang-json",
+        "@codemirror/lang-markdown",
+        "@codemirror/lang-css",
+        "@codemirror/lang-sass",
+        "@codemirror/lang-less",
+        "@codemirror/lang-html",
+        "@codemirror/lang-yaml",
+        "@codemirror/lang-xml",
+        "@codemirror/lang-python",
+        "@codemirror/lang-go",
+        "@codemirror/lang-rust",
+        "@codemirror/lang-java",
+        "@codemirror/lang-cpp",
+        "@codemirror/lang-sql",
+        "@codemirror/legacy-modes/mode/shell",
+        "@codemirror/legacy-modes/mode/ruby",
+        "@codemirror/legacy-modes/mode/dockerfile",
+        "@codemirror/legacy-modes/mode/protobuf",
+        "@codemirror/legacy-modes/mode/toml",
+        "@codemirror/legacy-modes/mode/properties",
+        "@lezer/highlight",
         "@ai-sdk/react",
         "ai",
         "@ai-sdk/provider",

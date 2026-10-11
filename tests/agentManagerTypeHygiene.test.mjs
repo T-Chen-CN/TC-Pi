@@ -12,6 +12,6 @@ test("AgentManager 不再使用 Record<string, any> 收窄（全表 8 处）", (
 	assert.doesNotMatch(source, /: Record<string, any>/);
 });
 
-test("统一 isRecord 谓词存在（与 AnnouncementService 同型）", () => {
+test("统一 isRecord 谓词存在", () => {
 	assert.match(source, /function isRecord\(value: unknown\): value is Record<string, unknown>/);
 });

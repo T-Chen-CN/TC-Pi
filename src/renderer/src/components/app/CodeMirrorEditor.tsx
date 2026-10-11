@@ -66,8 +66,9 @@ export const CodeMirrorEditor = memo(function CodeMirrorEditor({ value, onChange
 	useEffect(() => {
 		if (!hostRef.current) return;
 		const resolvedLanguage = resolveEditorLanguage(language);
-		// JSON 语言包（LanguageSupport）的 language 字段为 "json"，用于启用 lint
-		const isJson = resolvedLanguage !== null && "language" in resolvedLanguage && resolvedLanguage.language.name === "json";
+		// 语言包没有可靠的 language.name；用调用方的扩展名/语言 id 决定校验。
+		// JSONC 允许注释，不能把严格 JSON.parse 的诊断套到它上面。
+		const isJson = language?.trim().toLowerCase() === "json";
 		const view = new EditorView({
 			parent: hostRef.current,
 			state: EditorState.create({

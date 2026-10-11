@@ -5,7 +5,11 @@ import { cn } from "../../lib/utils";
 
 export function WorkbenchFileTabs(props: { tabs: readonly WorkbenchEditorTabItem[]; onSelect: (id: string) => void; onClose: (id: string) => void; onPromote: (id: string) => void }) {
 	return (
-		<div role="tablist" aria-label={t("app.files")} className="simple-file-tabs flex h-12 min-h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-border/40 px-2">
+		<div
+			role="tablist"
+			aria-label={t("app.files")}
+			className="simple-file-tabs relative z-[930] flex h-12 min-h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-border/40 pr-2 pl-[max(0.5rem,var(--session-tabs-left-inset,0.5rem))] [.custom-titlebar-enabled_&]:[-webkit-app-region:drag] [&_button]:[-webkit-app-region:no-drag]"
+		>
 			{props.tabs.map((tab) => (
 				<div key={tab.id} className="flex min-w-0 shrink-0 items-center gap-1">
 					<button

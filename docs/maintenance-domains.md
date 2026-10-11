@@ -10,13 +10,6 @@
 - 生成的副本**不进版本库**（`.gitignore` 显式忽略）；源图缺失时同步函数抛错而非跳过，否则线上直接是一张破图。新增共用图片：加进 `SHARED_README_IMAGES` 白名单 + `.gitignore` + `tests/docsSharedImages.test.mjs` 的四处引用断言。
 - README 用仓库相对路径（`docs/images/<名>`）、官网用站点根路径（`/images/<名>`），两者不可互换；`docs-site` 目录下的 TS 已纳入 `npm run typecheck`。
 
-## 公告维护与发布（announcements-md → announcements.json）
-
-- 公告的**唯一编辑入口**是 `announcements-md/*.md`（front matter + markdown 正文；目录内 `README.md` 是维护说明，脚本显式跳过）。**禁止手写仓库根 `announcements.json`**，客户端实际拉取的文件必须由脚本生成。
-- 发布流程：改 md → `npm run build:announcements`（`node scripts/build-announcements.js`）生成 json → md 与 json 一起 commit 到 `main` 分支。`npm run check:announcements`（`--check`）断言 json 与 md 逐字节一致，用于 CI 防手工改动漂移。
-- md 格式：front matter 必填 `id` / `title` / `level`(info|warn|critical) / `publishedAt` / `effectiveUntil`（ISO 8601），可选 `minVersion`（仅向更低版本客户端展示）；`id` 必须稳定唯一（渲染层已读去重 key）且不含空白；下线公告 = 删除对应 md 文件重新生成，或等 `effectiveUntil` 自然过期。
-- 渲染安全边界：公告是外部数据。**列表卡片只展示 `announcementExcerpt()` 清洗后的短摘要（不渲染 md）**；「查看详情」弹窗复用 `MarkdownStream`（light 模式）渲染完整正文——与会话消息同一套 streamdown sanitize 管线。禁止在列表卡片直接渲染 md 或引入第二条公告渲染链。
-
 ## 商店提示词库维护（resources/xueprompts.db）
 
 - 数据文件 `resources/xueprompts.db` 通过 `extraResources` 直接打进安装包（dev 读 `app.getAppPath()/resources`，打包版读 `process.resourcesPath`）。**改了 db 必须重新打包**，否则用户升级后仍看到旧数据。

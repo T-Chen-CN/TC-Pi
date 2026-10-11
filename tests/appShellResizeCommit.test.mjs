@@ -8,8 +8,9 @@ import assert from "node:assert/strict";
 
 const shell = readFileSync("src/renderer/src/components/app/AppShell.tsx", "utf8");
 
-test("resize state commits via Group onLayoutChanged, not per-frame Panel onResize", () => {
+test("resize preferences commit through the gesture owner, never per-frame Panel onResize", () => {
 	assert.match(shell, /onLayoutChanged=\{handleLayoutChanged\}/);
+	assert.match(shell, /useWorkbenchPanelResize\(/);
 	assert.doesNotMatch(shell, /onResize=\{handle/);
 });
 
@@ -28,8 +29,11 @@ test("viewport zoom/resize keeps sidebar and drawer widths in pixel mode", () =>
 test("programmatic layout changes do not overwrite persisted widths", () => {
 	// 缩放/窗口拉伸/程序化开合都不能走持久化 setter；只有用户交互才提交宽度。
 	assert.match(shell, /if \(!meta\.isUserInteraction\) \{/);
-	assert.match(shell, /if \(!meta\.isUserInteraction\) \{[\s\S]*?return;\s*\}[\s\S]*?const drawerPanel[\s\S]*?const next = shouldCommitPanelPixels\(/);
-	assert.match(shell, /shouldCommitPanelPixels/);
+	// 持久化改由有目标身份的手势 hook 收口，Group 回调不能无差别保存四栏。
+	assert.doesNotMatch(shell, /shouldCommitPanelPixels|conversationPanel\.saveWidth\(px\)/);
+	const resize = readFileSync("src/renderer/src/hooks/useWorkbenchPanelResize.ts", "utf8");
+	assert.match(resize, /if\s*\(target\s*===\s*"list"\)\s*current\.setListWidth/);
+	assert.match(resize, /else\s*if\s*\(target\s*===\s*"conversation"\)\s*current\.saveConversationWidth/);
 });
 
 test("splitter paints a single neutral diffused line", () => {

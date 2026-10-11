@@ -132,7 +132,7 @@ let previewSettings: AppSettings = {
 	askNotificationEnabled: false,
 	// 人文关怀提醒开关：与主进程 SettingsStore 默认值保持一致（预览 mock 需覆盖 AppSettings 全部必填字段）
 	agentCountReminderEnabled: true,
-	// 公告通知开关：与主进程 SettingsStore 默认一致（预览 mock 需覆盖 AppSettings 全部必填字段）
+	// 旧字段读取兼容，与主进程设置形状保持一致。
 	announcementNotificationEnabled: true,
 	// toast 展示时长：与主进程 defaultSettings 一致
 	toastDurationMs: DEFAULT_TOAST_DURATION_MS,
@@ -360,46 +360,6 @@ export function createPreviewApi(): PiDesktopApi {
 				recentTimings: [],
 			}),
 			openDiagnosticsFolder: async () => undefined,
-			// 环境体检预览桩：返回空报告，仅供预览模式不崩溃
-			healthCheck: async () => ({
-				generatedAt: Date.now(),
-				environment: {
-					appVersion: "preview",
-					platform: "win32",
-					arch: "",
-					osVersion: "",
-					locale: "",
-					timezone: "",
-					electronVersion: "",
-					chromeVersion: "",
-					nodeVersion: "",
-					installMode: "dev",
-					userDataDir: "",
-					logsDir: "",
-					appRssBytes: 0,
-					appHeapUsedBytes: 0,
-					systemTotalMemoryBytes: 0,
-					systemFreeMemoryBytes: 0,
-					dataDirFreeBytes: 0,
-					flags: {
-						wslEnabled: false,
-						wslDistro: "",
-						piProxyEnabled: false,
-						desktopProxyEnabled: false,
-						piProxyConfigured: false,
-						chromiumSandbox: false,
-						developerDiagnostics: false,
-						webServiceEnabled: false,
-						customPiPathConfigured: false,
-					},
-					pi: { installed: false, searchedDirs: [] },
-				},
-				checks: [],
-				logSummary: { total: 0, error: 0, warn: 0, todayError: 0, todayWarn: 0, recent: [] },
-				logFiles: [],
-			}),
-			healthExportReport: async () => ({ ok: true, canceled: false, path: "preview" }),
-			healthExportBundle: async () => ({ ok: true, canceled: false, path: "preview" }),
 		},
 		editors: {
 			list: async () => [],
@@ -711,6 +671,7 @@ export function createPreviewApi(): PiDesktopApi {
 				error: { code: "SESSION_NOT_FOUND", debugDetails: "preview runtime activation is disabled" },
 			}),
 			stopRuntime: async (target) => ({ ok: true, value: target }),
+			switchWorkspace: async () => ({ status: "ready" }),
 			abortRuntime: async (target) => ({
 				ok: true,
 				value: { target, value: undefined },
@@ -1118,27 +1079,6 @@ export function createPreviewApi(): PiDesktopApi {
 			installUpdate: async () => undefined,
 			checkUpdateMirrors: async () => [{ id: "atomgit", status: "ok", latencyMs: 320, speedKBps: 2560, checkedAt: Date.now() }],
 			onOpenInBrowser: () => () => undefined,
-			feedbackEnvironment: async () => ({
-				appVersion: "preview",
-				platform: "win32",
-				arch: "x64",
-				electronVersion: "preview",
-				chromeVersion: "preview",
-				nodeVersion: "preview",
-				pi: {
-					installed: true,
-					command: "pi",
-					version: "preview",
-					searchedDirs: [],
-				},
-			}),
-			getFeedbackProjectContext: async (_projectId: string) => ({
-				projectId: _projectId,
-				projectName: "preview",
-				agentsMd: "",
-				agentsMdTruncated: false,
-				skills: [],
-			}),
 			openExternal: async () => undefined,
 			// 浏览器预览态无主进程：直接返回失败载荷，UI 自动走「在浏览器打开」降级。
 			getChangelog: async () => ({
@@ -1602,15 +1542,6 @@ export function createPreviewApi(): PiDesktopApi {
 			listCustom: async () => [],
 			importCustom: async () => ({ ok: false, error: "canceled" as const }),
 			removeCustom: async () => false,
-		},
-		announcements: {
-			// 预览模式：无公告数据，返回空快照保持 PiDesktopApi 形状完整（订阅空操作）
-			list: async () => ({ items: [], fetchedAt: null, source: "cache" as const, readIds: [], notifiedIds: [] }),
-			refresh: async () => ({ items: [], fetchedAt: null, source: "cache" as const, readIds: [], notifiedIds: [] }),
-			markRead: async () => true,
-			markAllRead: async () => true,
-			markNotified: async () => true,
-			onChanged: () => () => {},
 		},
 		terminal: {
 			// 预览模式只按归属键过滤：agent 目标用 agentId，project 目标用项目 id

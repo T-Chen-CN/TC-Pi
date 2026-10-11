@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { ipcChannels } from "../shared/ipc";
+import type { WorkspaceRuntimeSwitchInput, WorkspaceRuntimeSwitchResult } from "../shared/types/workspaceRuntime";
 import type { TokendanceAuthMode, TokendancePaymentSessionResult } from "../shared/tokendance";
 import type { AcpToolConfig, AcpToolInput, AcpToolValidation } from "../shared/types/acp";
-import type { AnnouncementState } from "../shared/types/announcement";
 import type { HostPluginContext, HostPluginDesktopApi } from "../shared/types/hostPlugin";
 import type { RpcLogBatch, RpcLogEntry } from "../shared/types/rpcLog";
 import type { ModelTraceRecord } from "../shared/types/bridge";
@@ -123,8 +123,6 @@ import type {
 	ExternalEditorSetting,
 	FileManagerInfo,
 	FocusTargetPayload,
-	FeedbackEnvironment,
-	FeedbackProjectContext,
 	FeishuBotConfig,
 	FeishuBridgeStatus,
 	FeishuChatBinding,
@@ -197,10 +195,6 @@ import type {
 	TerminalTarget,
 	WebNetworkAddress,
 	WebServiceStatusInfo,
-	HealthExportResult,
-	HealthReport,
-	HealthReportContext,
-	HealthReportFormat,
 } from "../shared/types";
 import type { ProviderUsageResult, UsageProbeSaveInput, UsageProbeSaveResult, UsageProbeSettingsResult, UsageProbeStatesResult, UsageProbeTestInput } from "../shared/types/providerUsage";
 
@@ -727,6 +721,7 @@ const api = {
 		activateRuntime: (sessionId: string) => ipcRenderer.invoke(ipcChannels.sessionsRuntimeActivate, sessionId) as Promise<SessionCommandResult<SessionRuntimeInfo>> /** 汇报当前聚焦的会话（主进程据此决定非聚焦会话的 Ask 桌面通知） */,
 		setFocusedSession: (sessionId?: string) => ipcRenderer.invoke(ipcChannels.sessionsSetFocusedSession, sessionId) as Promise<void>,
 		stopRuntime: (target: SessionRuntimeTarget) => ipcRenderer.invoke(ipcChannels.sessionsRuntimeStop, target) as Promise<SessionCommandResult<SessionRuntimeTarget>>,
+		switchWorkspace: (input: WorkspaceRuntimeSwitchInput) => ipcRenderer.invoke(ipcChannels.sessionsWorkspaceSwitch, input) as Promise<WorkspaceRuntimeSwitchResult>,
 		abortRuntime: (target: SessionRuntimeTarget) => ipcRenderer.invoke(ipcChannels.sessionsRuntimeAbort, target) as Promise<SessionCommandResult<SessionTargetedValue<void>>>,
 		restartRuntime: (target: SessionRuntimeTarget) => ipcRenderer.invoke(ipcChannels.sessionsRuntimeRestart, target) as Promise<SessionCommandResult<SessionRuntimeReplacement>>,
 		compactRuntime: (target: SessionRuntimeTarget, prompt?: string) => ipcRenderer.invoke(ipcChannels.sessionsRuntimeCompact, target, prompt) as Promise<SessionCommandResult<SessionTargetedValue<AgentRuntimeState>>>,
@@ -973,12 +968,6 @@ const api = {
 		/** 运行架构检测：判断是否在 ARM 芯片上跑 x64 转译包（Rosetta），用于提示换原生包 */
 		getArchStatus: () => ipcRenderer.invoke(ipcChannels.archStatus) as Promise<ArchStatus>,
 		openDiagnosticsFolder: () => ipcRenderer.invoke(ipcChannels.diagnosticsOpenFolder) as Promise<void>,
-		/** 环境体检：跑一次完整检查并返回脱敏报告。 */
-		healthCheck: () => ipcRenderer.invoke(ipcChannels.healthCheck) as Promise<HealthReport>,
-		/** 把 Markdown 报告保存到用户选择的路径。 */
-		healthExportReport: (markdown: string, reportJson?: string) => ipcRenderer.invoke(ipcChannels.healthExportReport, markdown, reportJson) as Promise<HealthExportResult>,
-		/** 把脱敏日志 + 报告 + 环境 JSON 打成 zip 保存到用户选择的路径。 */
-		healthExportBundle: (markdown: string, reportJson: string) => ipcRenderer.invoke(ipcChannels.healthExportBundle, markdown, reportJson) as Promise<HealthExportResult>,
 	},
 	logs: {
 		list: (query?: AppLogQuery) => ipcRenderer.invoke(ipcChannels.logsList, query ?? {}) as Promise<AppLogEntry[]>,
@@ -1029,9 +1018,6 @@ const api = {
 		skipUpdateVersion: (version: string) => ipcRenderer.invoke(ipcChannels.appUpdateSkipVersion, version) as Promise<void>,
 		/** 探测内置更新镜像可用性与速度（设置页「更新源」）。 */
 		checkUpdateMirrors: () => ipcRenderer.invoke(ipcChannels.appCheckUpdateMirrors) as Promise<MirrorHealthResult[]>,
-		feedbackEnvironment: () => ipcRenderer.invoke(ipcChannels.appFeedbackEnvironment) as Promise<FeedbackEnvironment>,
-		/** 问题反馈「新建会话分析」：读取项目根 AGENTS.md（截断）与项目级技能列表。 */
-		getFeedbackProjectContext: (projectId: string) => ipcRenderer.invoke(ipcChannels.appFeedbackProjectContext, projectId) as Promise<FeedbackProjectContext>,
 		openExternal: (url: string, forceSystem?: boolean) => ipcRenderer.invoke(ipcChannels.appOpenExternal, url, forceSystem) as Promise<void>,
 		/** 拉取更新日志正文（带本地缓存）；markdown=null 时用 pageUrl 降级为浏览器打开。
 		 *  forceRefresh=true 跳过缓存 TTL 强制拉最新（「刷新」按钮）。 */
@@ -1375,23 +1361,6 @@ const api = {
 		importCustom: () => ipcRenderer.invoke(ipcChannels.soundsImportCustom) as Promise<SoundImportResult>,
 		/** 删除自定义音频文件 */
 		removeCustom: (name: string) => ipcRenderer.invoke(ipcChannels.soundsRemoveCustom, name) as Promise<boolean>,
-	},
-	announcements: {
-		/** 拉取当前公告快照（主进程返回缓存态，不触发网络请求） */
-		list: () => ipcRenderer.invoke(ipcChannels.announcementList) as Promise<AnnouncementState>,
-		/** 手动刷新公告（设置页/入口按钮；主进程防重入，并发调用安全） */
-		refresh: () => ipcRenderer.invoke(ipcChannels.announcementRefresh) as Promise<AnnouncementState>,
-		/** 标记单条公告已读（幂等） */
-		markRead: (id: string) => ipcRenderer.invoke(ipcChannels.announcementMarkRead, id) as Promise<boolean>,
-		/** 全部已读 */
-		markAllRead: () => ipcRenderer.invoke(ipcChannels.announcementMarkAllRead) as Promise<boolean>,
-		/**
-		 * 记录已弹过提醒的公告 id（批量幂等）。与 markRead 分离：关掉 toast 不等于已读。
-		 * 持久化在主进程，保证「每条公告只弹一次」跨重启/崩溃重载成立。
-		 */
-		markNotified: (ids: readonly string[]) => ipcRenderer.invoke(ipcChannels.announcementMarkNotified, ids) as Promise<boolean>,
-		/** 订阅公告快照推送（定时拉取/已读变更后触发）；返回退订函数，组件卸载必须调用 */
-		onChanged: (callback: (state: AnnouncementState) => void) => subscribe(ipcChannels.announcementChanged, callback),
 	},
 	terminal: {
 		list: (target: TerminalTarget) => ipcRenderer.invoke(ipcChannels.terminalList, target) as Promise<TerminalTab[]>,

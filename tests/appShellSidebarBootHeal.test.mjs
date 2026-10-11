@@ -13,7 +13,7 @@ import test from "node:test";
  * handleLayoutChanged 又因 !isUserInteraction 早退 → 侧栏永久丢失。
  *
  * 修复：handleLayoutChanged 的非交互分支在早退前自愈——list 状态未折叠但面板
- * isCollapsed() 时立即 resize(listWidthRef.current)（走 list|chat 枢轴，不影响抽屉）。
+ * isCollapsed() 时经统一整组布局入口恢复，保护列表与会话的宽度。
  * 本测试用空白容忍正则断言该分支存在，防止重构时丢失。
  */
 
@@ -26,13 +26,13 @@ test("handleLayoutChanged 非交互分支包含侧栏零宽自愈", () => {
 	const branch = nonUserBranch[0];
 	assert.match(branch, /listPanelRef\.current/, "非交互分支应读取 list 面板句柄");
 	assert.match(branch, /listPanel\.isCollapsed\s*\(\s*\)/, "自愈应检查 list 面板是否被库重解挤到折叠");
-	assert.match(branch, /listPanel\.resize\s*\(\s*listWidthRef\.current\s*\)/, "自愈应恢复保存的侧栏宽度");
+	assert.match(branch, /panelLayout\.syncPanelLayout\s*\(\s*\)/, "自愈应原子恢复保存的布局宽度");
 	assert.match(branch, /!\s*listCollapsed/, "自愈仅在状态未折叠时触发，不得与用户主动折叠打架");
 });
 
-test("自愈位于交互回写逻辑之前且不改变用户交互路径", () => {
-	const healIndex = source.indexOf("listPanel.resize(listWidthRef.current)");
-	const userWriteIndex = source.indexOf("isUserInteraction: true");
+test("自愈不再通过全栏回写改变宽度偏好", () => {
+	const healIndex = source.indexOf("panelLayout.syncPanelLayout()");
 	assert.ok(healIndex > 0, "自愈调用应存在于 AppShell");
-	assert.ok(userWriteIndex > healIndex, "自愈应在拖拽回写（isUserInteraction: true）之前执行");
+	assert.doesNotMatch(source.slice(healIndex), /shouldCommitPanelPixels|saveWidth\(px\)/);
+	assert.match(source, /useWorkbenchPanelResize\(/);
 });

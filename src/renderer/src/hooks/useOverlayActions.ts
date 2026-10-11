@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
 import { desktopApi as api } from "../desktopApi";
-import type { Project, AppInfo } from "../../../shared/types";
 interface ConfirmDialogConfig {
 	title: string;
 	message: string;
@@ -15,36 +14,16 @@ interface TrustRequest {
 	projectName: string;
 }
 
-interface UseOverlayActionsParams {
-	activeProject?: Project;
-	appInfo: AppInfo;
-	showToast: (message: string, duration?: number) => void;
-}
-
-export function useOverlayActions({ activeProject, appInfo, showToast }: UseOverlayActionsParams) {
+/** Owns confirmation and workspace trust dialogs; issue feedback has been removed. */
+export function useOverlayActions() {
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogConfig | null>(null);
 	const [trustRequest, setTrustRequest] = useState<TrustRequest | null>(null);
-	const [feedbackOpen, setFeedbackOpen] = useState(false);
 
 	const showConfirm = useCallback((config: ConfirmDialogConfig) => setConfirmDialog(config), []);
 	const clearConfirm = useCallback(() => setConfirmDialog(null), []);
 
 	const overlayProps = useMemo(
 		() => ({
-			feedback: feedbackOpen
-				? {
-						open: true as const,
-						props: {
-							open: true as const,
-							project: activeProject,
-							appInfo,
-							onClose: () => setFeedbackOpen(false),
-							onToast: (message: string) => showToast(message),
-							// GitHub Issue 提交页需要登录/富文本，强制系统浏览器打开（不受「链接打开方式」设置影响）
-							onOpenExternal: (url: string) => void api.app.openExternal(url, true),
-						},
-					}
-				: undefined,
 			confirm: confirmDialog
 				? {
 						open: true as const,
@@ -71,7 +50,7 @@ export function useOverlayActions({ activeProject, appInfo, showToast }: UseOver
 					}
 				: undefined,
 		}),
-		[feedbackOpen, activeProject, appInfo, confirmDialog, trustRequest, showToast],
+		[confirmDialog, trustRequest],
 	);
 
 	return {
@@ -80,8 +59,6 @@ export function useOverlayActions({ activeProject, appInfo, showToast }: UseOver
 		clearConfirm,
 		trustRequest,
 		setTrustRequest,
-		feedbackOpen,
-		setFeedbackOpen,
 		overlayProps,
 	};
 }

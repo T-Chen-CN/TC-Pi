@@ -16,7 +16,7 @@ test("session tabs mount once outside SessionView; pane keeps standalone header"
 	assert.match(app, /sessionTabsBarNode/);
 	assert.match(app, /SessionPaneServicesProvider/);
 	// Tab 栏挂在 WorkbenchStage chrome，分屏之上（与文件 Tab 同一条）
-	assert.match(app, /chrome=\{sessionTabsBarNode\}/);
+	assert.match(app, /\{sessionTabsBarNode\}/);
 	assert.doesNotMatch(app, /\{sessionTabsBarNode\}\s*\n\s*\{currentSessionId/);
 
 	const headerStart = sessionView.indexOf("<SessionHeader");

@@ -23,7 +23,7 @@ function functionBlock(name, nextName) {
 }
 
 function syncFunctionBlock(name, nextName) {
-	const start = findFunctionStart(name, false);
+	const start = Math.max(findFunctionStart(name, false), findFunctionStart(name, true));
 	const syncEnd = findFunctionStart(nextName, false);
 	const asyncEnd = findFunctionStart(nextName, true);
 	const end = syncEnd === -1 ? asyncEnd : asyncEnd === -1 ? syncEnd : Math.min(syncEnd, asyncEnd);
@@ -73,7 +73,7 @@ test("keeps request sequencing and stale-result gates around catalog fallback", 
 		"catalog stale gate",
 	);
 	assert.match(block, /catch \(error\) \{\s*if \(requestSequence !== openSessionRequestRef\.current\) return undefined;\s*showToast/);
-	assert.match(block, /if \(!record \|\| requestSequence !== openSessionRequestRef\.current\) return undefined;\s*commitSessionSelection/);
+	assert.match(block, /if \(!record \|\| requestSequence !== openSessionRequestRef\.current\) return undefined;\s*if\s*\(\s*!\(await commitSessionSelection/);
 });
 
 test("keeps by-ID fallback project-scoped after canonical refresh", () => {
@@ -90,7 +90,7 @@ test("keeps by-ID fallback project-scoped after canonical refresh", () => {
 			"record = getProjectSessionRecords(projectId).find(",
 			"(candidate) => candidate.id === sessionId",
 			"if (!record || requestSequence !== openSessionRequestRef.current) return undefined;",
-			"commitSessionSelection(projectId, record.id, true);",
+			"await commitSessionSelection(projectId, record.id, true, requestSequence)",
 		],
 		"by-ID catalog fallback",
 	);
@@ -122,7 +122,7 @@ test("open paths commit after the stale gate without invalidating again", () => 
 		["openSidebarSession", openBySummary()],
 		["openSidebarSessionById", openById()],
 	]) {
-		assertInOrder(block, ["if (!record || requestSequence !== openSessionRequestRef.current) return undefined;", "commitSessionSelection(projectId, record.id, true);"], `${name} stale gate and selection`);
+		assertInOrder(block, ["if (!record || requestSequence !== openSessionRequestRef.current) return undefined;", "await commitSessionSelection(projectId, record.id, true, requestSequence)"], `${name} stale gate and selection`);
 		assert.equal(block.match(/\+\+openSessionRequestRef\.current/g)?.length, 1, `${name} should invalidate only when opening starts`);
 	}
 });
@@ -130,7 +130,7 @@ test("open paths commit after the stale gate without invalidating again", () => 
 test("focuses the composer after publishing a new draft selection", () => {
 	const block = createDraft();
 
-	assertInOrder(block, ["upsertSession(session);", "commitSessionSelection(projectId, session.id, true);", "creatingSessionDraftRef.current.delete(projectId);"], "draft selection and focus");
+	assertInOrder(block, ["upsertSession(session);", "await commitSessionSelection(projectId, session.id, true)", "creatingSessionDraftRef.current.delete(projectId);"], "draft selection and focus");
 });
 
 test("uses only the canonical project refresh port", () => {

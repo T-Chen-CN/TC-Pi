@@ -7,7 +7,7 @@ import { open, readFile, stat } from "node:fs/promises";
  * - 截断时做行对齐：head 丢弃末尾半行、tail 丢弃开头半行——半行对 JSONL 消费方
  *   必然解析失败，主动剔除避免脏数据进缓存/去重集合/展示层；
  * - 文件不存在/不可读时向上抛，由调用方决定兜底（与 readFile 语义一致）。
- * 参照 health/LogBundleExporter 的 stat 后 tail-read 模式，供日志域与 IPC 复用。
+ * 使用 stat 后 tail-read 模式，供日志域与 IPC 复用。
  */
 export async function readTextBounded(path: string, maxBytes: number, mode: "head" | "tail" = "tail"): Promise<string> {
 	const size = (await stat(path)).size;

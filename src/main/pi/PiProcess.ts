@@ -95,6 +95,8 @@ type VersionCacheEntry = { status: "pending"; promise: Promise<boolean> } | { st
 export class PiProcess extends EventEmitter {
 	private proc?: ChildProcessWithoutNullStreams;
 	private rpc?: PiRpcClient;
+	/** stop 同时作废尚在修复文件、预热 WSL 或探测版本的启动请求。 */
+	private stopGeneration = 0;
 	/** 从 --version 归一化出的完整版本串（如 "0.85.0" / "1.0.0"），用于启动诊断与各版本门槛比较。 */
 	private piVersion: string | null = null;
 	/**
@@ -239,6 +241,7 @@ export class PiProcess extends EventEmitter {
 
 	async start(sessionPath?: string, trustOverride?: "approve" | "no-approve", noSession?: boolean) {
 		if (this.proc) return this.rpc!;
+		const stopGeneration = this.stopGeneration;
 
 		// 预检会话文件：旧版 PiDeck 私有 sessionName 头行会让 pi 拒绝加载（exit 1）。
 		// 修复失败不阻塞启动——pi 自身的报错会进入启动诊断，比静默吞掉更有价值。
@@ -458,6 +461,7 @@ export class PiProcess extends EventEmitter {
 			// Windows 下通过 PiLocator.createInvocation 显式包裹含空格的 npm shim 路径，避免 cmd 拆分路径导致 agent 启动失败。
 			// spawn 本身很少同步抛错（ENOENT 等多半异步 error 事件），但 cwd 非法等仍可能同步失败，必须捕获。
 			try {
+				if (stopGeneration !== this.stopGeneration) throw new Error("Pi process stopped during startup");
 				this.proc = spawn(invocation.command, finalArgs, {
 					cwd: spawnCwd,
 					stdio: ["pipe", "pipe", "pipe"],
@@ -606,6 +610,7 @@ export class PiProcess extends EventEmitter {
 	}
 
 	stop() {
+		this.stopGeneration += 1;
 		if (!this.proc) {
 			// 进程已不在仍可能残留停放态（例如 start 中途失败路径）。
 			this.restoreParkedExtensions();

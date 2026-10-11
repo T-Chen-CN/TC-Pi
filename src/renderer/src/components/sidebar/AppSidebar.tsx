@@ -11,9 +11,14 @@ import { settingsOpenAtom } from "../../atoms";
 import { desktopApi } from "../../desktopApi";
 import { Button } from "../ui-shadcn/button";
 import { t } from "../../i18n";
+import { WorkspaceNavigation } from "./WorkspaceNavigation";
+import { WorkspaceProjectNavigation } from "./WorkspaceProjectNavigation";
+import { WorkspaceNavigationMount } from "./WorkspaceNavigationHost";
+import { SidebarNavigation, type SidebarHistoryNavigation } from "./SidebarNavigation";
 
 interface AppSidebarProps {
 	navigation: WorkspaceNavigationPort;
+	historyNavigation: SidebarHistoryNavigation;
 	workspaceFiles: ReactNode;
 	simple?: boolean;
 	actions: SidebarActions;
@@ -27,7 +32,6 @@ interface AppSidebarProps {
 	isLanWeb: boolean;
 	/** 「新建会话」：打开初始引导页（居中输入框 + 项目下拉切换），由 App 提供。 */
 	onOpenNewSession: () => void;
-	onOpenFeedback: () => void;
 	/** 关于弹框（版本/官网/GitHub 链接）数据，由 App 从 AppInfo IPC 拉取后提供。 */
 	appInfo: AppInfo;
 	/** 底栏主题切换：当前主题模式 + 点击循环（浅色→暗色→跟随系统），由 App 提供。 */
@@ -74,6 +78,9 @@ export function AppSidebar(props: AppSidebarProps) {
 
 	return (
 		<>
+			<WorkspaceNavigationMount>
+				<WorkspaceNavigation controller={controller} navigation={props.navigation} projectId={props.currentProjectId} sessionId={props.currentSessionId} />
+			</WorkspaceNavigationMount>
 			<SidebarContent
 				navigation={props.navigation}
 				workspaceFiles={props.workspaceFiles}
@@ -90,7 +97,7 @@ export function AppSidebar(props: AppSidebarProps) {
 				onOpenNewSession={props.onOpenNewSession}
 				chrome={
 					<>
-						<div className={props.simple ? "list-toolbar flex h-12 shrink-0 items-center gap-1 px-2.5 [-webkit-app-region:no-drag]" : "list-toolbar flex h-10 shrink-0 items-center gap-1 border-b border-border/40 pr-2.5 pl-[max(0.625rem,var(--traffic-lights-width,0px))]"}>
+						<div className="list-toolbar flex h-14 shrink-0 items-center gap-1 py-2 pr-2.5 pl-[max(0.625rem,var(--traffic-lights-width,0px))] [&>div]:min-w-0 [&>div]:flex-1">
 							<AboutPopover appInfo={props.appInfo}>
 								<div
 									className="app-badge flex min-w-0 flex-1 cursor-pointer items-center justify-center pl-5"
@@ -109,18 +116,16 @@ export function AppSidebar(props: AppSidebarProps) {
 									<BrandLockup />
 								</div>
 							</AboutPopover>
-							{/* 简洁模式顶部 simple-navigation-bar 已有同语义的列表折叠/展开按钮
-							（面板折叠后它仍常驻），侧栏内再渲染一份就是同屏双入口；标签模式没有那条导航条，保留此处按钮。 */}
-							{!props.simple && (
-								<Button type="button" variant="ghost" size="icon-sm" className="icon-button list-toggle-native size-7" aria-label={props.listCollapsed ? t("app.expandList") : t("app.collapseList")} title={props.listCollapsed ? t("app.expandList") : t("app.collapseList")} onClick={props.toggleListCollapsed}>
-									<PanelLeft size={14} strokeWidth={2} aria-hidden="true" />
-								</Button>
-							)}
+							<Button type="button" variant="ghost" size="icon-sm" className="list-toggle-native size-7 shrink-0" aria-label={props.listCollapsed ? t("app.expandList") : t("app.collapseList")} title={props.listCollapsed ? t("app.expandList") : t("app.collapseList")} onClick={props.toggleListCollapsed}>
+								<PanelLeft size={14} strokeWidth={2} aria-hidden="true" />
+							</Button>
 						</div>
+						<SidebarNavigation controller={controller} navigation={props.navigation} history={props.historyNavigation} projectId={props.currentProjectId}>
+							<WorkspaceProjectNavigation controller={controller} navigation={props.navigation} projectId={props.currentProjectId} removingWorktreePaths={props.removingWorktreePaths} worktreesByProject={props.worktreesByProject} branchByProject={props.branchByProject} />
+						</SidebarNavigation>
 					</>
 				}
 				onOpenSettings={() => setSettingsOpen(true)}
-				onOpenFeedback={props.onOpenFeedback}
 				themeMode={props.themeMode}
 				onToggleTheme={props.onToggleTheme}
 			/>

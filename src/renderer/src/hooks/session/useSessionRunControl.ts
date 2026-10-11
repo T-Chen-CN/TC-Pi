@@ -29,7 +29,7 @@ export interface SessionRunControlDeps {
 	showToast: (message: string, duration?: number, kind?: NoticeKind) => void;
 	overlays: RunControlConfirmOverlay;
 	refreshProjectSessions: (projectId: string, silent?: boolean) => Promise<unknown>;
-	selectSessionCommand: (projectId: string, sessionId: string, force?: boolean) => void | Promise<void>;
+	selectSessionCommand: (projectId: string, sessionId: string, force?: boolean) => void | Promise<void | boolean>;
 	registerOpenSession: (sessionId: string, mode: "permanent" | "preview") => void;
 	getSessionRecord: (sessionId: string) => SessionRecord | undefined;
 	pendingAgentsRef: MutableRefObject<PendingAgentTab[]>;

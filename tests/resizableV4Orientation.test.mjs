@@ -36,7 +36,7 @@ test("session and shell use v4 Group orientation props only", () => {
 	assert.doesNotMatch(sessionViewCode, /\bPanelResizeHandle\b/);
 	assert.doesNotMatch(appShellCode, /\bPanelResizeHandle\b/);
 	// Group 直系子节点只能是 Panel/Separator；大纲浮层必须在 Group 外
-	assert.match(appShellCode, /<\/ResizablePanelGroup>[\s\S]*\{!props\.overview\s*&&\s*outlineContent\}/);
+	assert.match(appShellCode, /<\/ResizablePanelGroup>[\s\S]*\{outlineContent\}/);
 	assert.doesNotMatch(appShellCode, /\{[^}]*outlineContent\}[\s\S]*ResizableHandle[\s\S]*shell-panel-drawer/);
 });
 

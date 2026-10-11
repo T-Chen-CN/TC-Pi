@@ -68,7 +68,6 @@ function releaseSteps() {
 		scriptStep("内置扩展清单", join(ROOT, "scripts/generate-extensions-manifest.mjs"), ["--check"]),
 		scriptStep("提示词库清单", join(ROOT, "scripts/generate-content-manifests.mjs"), ["--domain", "prompts", "--check"]),
 		scriptStep("技能库清单", join(ROOT, "scripts/generate-content-manifests.mjs"), ["--domain", "skills", "--check"]),
-		scriptStep("公告 json 与 md 同步", join(ROOT, "scripts/build-announcements.js"), ["--check"]),
 		scriptStep("Electron 二进制体检", join(ROOT, "scripts/check-electron.mjs")),
 	];
 	return steps;

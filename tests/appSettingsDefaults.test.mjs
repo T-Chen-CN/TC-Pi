@@ -51,9 +51,7 @@ test("acpEnabled is opt-in: default false, migration and patch strictly coerce t
 	// 主进程装配按开关门控注册 ACP 网关：关闭时零成本的关键路径。
 	const mainIndex = read("src/main/index.ts");
 	assert.doesNotMatch(mainIndex, /new AcpAgentManager/);
-	// 渲染层菜单门控：关闭时隐藏 ACP 入口（acpEnabledAtom）。
-	// 真正挂载的新建会话菜单是 SessionTabsBar 内部 NewSessionMenu（sidebar/同名组件已删，历史孤儿）。
-	const menu = read("src/renderer/src/components/session/SessionTabsBar.tsx");
-	assert.match(menu, /acpEnabledAtom/, "SessionTabsBar 新建菜单必须读 acpEnabledAtom");
-	assert.match(menu, /acpVisible/, "SessionTabsBar 新建菜单必须以开关+工具表门控 ACP 组");
+	// 此发行版只使用 pi；会话栏加号直接创建当前工作区会话，不再提供后端/项目菜单。
+	const tabs = read("src/renderer/src/components/session/SessionTabsBar.tsx");
+	assert.doesNotMatch(tabs, /acpEnabledAtom|acpToolsAtom|onNewAcpSession/, "会话栏不应残留 ACP 新建菜单");
 });

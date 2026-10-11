@@ -15,12 +15,12 @@ const zh = readFileSync("src/renderer/src/i18n/rendererCopy.zh-CN.ts", "utf8");
 const en = readFileSync("src/renderer/src/i18n/rendererCopy.en-US.ts", "utf8");
 const surfaces = readFileSync("src/renderer/src/styles/surfaces.css", "utf8");
 
-test("settings expose workspace content open mode; split orientation removed", () => {
+test("legacy content mode stays readable while the file-first layout removes the obsolete control", () => {
 	assert.match(settings, /WorkspaceContentOpenMode = "split" \| "maximize"/);
 	assert.match(settings, /workspaceContentOpenMode: WorkspaceContentOpenMode/);
 	assert.match(store, /workspaceContentOpenMode: "split"/);
 	// workspaceContentOpenMode 设置项位于常用设置 tab（CommonTab，自 SettingsModal 拆分）
-	assert.match(commonTab, /workspaceContentOpenMode/);
+	assert.doesNotMatch(commonTab, /workspaceContentOpenMode/);
 	assert.match(zh, /"settings\.workspaceContentOpenMode"/);
 	assert.match(en, /"settings\.workspaceContentOpenMode"/);
 	// 分屏方向设置已移除：中间栏固定左右分屏，不允许上下分屏
@@ -40,30 +40,19 @@ test("settings expose workspace content open mode; split orientation removed", (
 	assert.doesNotMatch(surfaces, /\.file-diff-tab-bar\s*\{[^}]*border-top:\s*2px solid var\(--color-accent\)/);
 });
 
-test("WorkbenchStage hosts session + content with collapse-safe maximize", () => {
-	assert.match(stage, /export function WorkbenchStage/);
-	assert.match(stage, /layout === "maximize"/);
-	assert.match(stage, /panel\.collapse\(\)/);
-	assert.match(stage, /panel\.expand\(\)/);
-	assert.match(stage, /chrome\?:/);
-	assert.match(stage, /from "\.\.\/\.\.\/\.\.\/\.\.\/shared\/types"/);
-	// 分屏固定左右：不接受 props.orientation，面板组硬编码 horizontal，无 vertical 分支
-	assert.doesNotMatch(stage, /props\.orientation/);
-	assert.match(stage, /orientation="horizontal"/);
-	assert.match(app, /<WorkbenchStage/);
-	assert.match(app, /workbenchHasContent/);
-	assert.match(app, /WorkbenchContent/);
-	assert.match(app, /chrome=\{sessionTabsBarNode\}/);
-	// 尺寸必须字符串百分比 + defaultSize 恒定：react-resizable-panels v4 约束派生把
-	// 数字按 px 解析（minSize={20} → 2%），且 defaultSize 随 layout 切换会触发 Panel
-	// 重注册、丢失 expandToSize，导致 maximize→split 恢复成窄缝（回归点）。
-	assert.match(stage, /collapsedSize="0%"/);
-	assert.match(stage, /minSize="20%"/);
-	assert.match(stage, /defaultSize="48%"/);
-	assert.doesNotMatch(stage, /defaultSize=\{props\.layout === "maximize" \? 0 : 48\}/);
-	// 阅读面静态引入 FileDiffViewer：避免 lazy 动态 import 在 Electron/Vite 下偶发失败且无法重试恢复
-	assert.doesNotMatch(app, /lazy\(\(\) => import\("\.\/components\/app\/FileDiffViewer"/);
-	assert.doesNotMatch(content, /lazy\(\(\) =>/);
+test("files and conversation have independent always-mounted hosts", () => {
+	const shell = readFileSync("src/renderer/src/components/app/AppShell.tsx", "utf8");
+	assert.match(stage, /data-testid="file-workbench"/);
+	assert.match(stage, /data-testid="file-workbench-empty"/);
+	assert.match(stage, /orientation="vertical"/);
+	assert.match(stage, /id="file-main"/);
+	assert.match(stage, /id="file-terminal"/);
+	assert.doesNotMatch(stage, /props\.session|workbench-session/);
+	assert.match(shell, /id="files"[\s\S]*id="conversation"[\s\S]*id="drawer"/);
+	assert.doesNotMatch(shell, /<WorkspaceNavigationHost/);
+	assert.match(readFileSync("src/renderer/src/components/session/SessionTabsBar.tsx", "utf8"), /<WorkspaceNavigationHost/);
+	assert.match(app, /filePaneContent=\{filePaneContentNode\}/);
+	assert.match(app, /editorTabs=\{allEditorTabs\}/);
 	assert.match(content, /import \{ FileDiffViewer \} from "\.\.\/app\/FileDiffViewer"/);
 });
 
@@ -121,7 +110,7 @@ test("file tabs use preview/permanent strategy owned by useFileEditor", () => {
 	assert.match(tabsBar, /editorTabs\?:/);
 	assert.match(tabsBar, /EditorWorkbenchTab/);
 	assert.match(content, /chromeTabsExternal/);
-	assert.match(app, /editorTabs=\{simpleMode \? \[\] : workbenchEditorTabs\}/);
+	assert.match(app, /editorTabs=\{\[\]\}/);
 	assert.match(app, /<WorkbenchFileTabs tabs=\{workbenchEditorTabs\}/);
 
 	const viewer = readFileSync("src/renderer/src/components/app/FileDiffViewer.tsx", "utf8");

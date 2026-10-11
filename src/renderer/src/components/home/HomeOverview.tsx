@@ -7,6 +7,7 @@ import { overviewProjectPath, overviewUsage, type OverviewRange } from "./homeOv
 import type { SidebarActions } from "../sidebar/SidebarContent";
 import { Button } from "../ui-shadcn/button";
 import { HomeUsageTrend } from "./HomeUsageTrend";
+import { HomeProviders } from "./HomeProviders";
 import { formatCost, formatTokens } from "../app/usageStats/format";
 import { isChatProject, displayProjectDirectoryName } from "../../rendererUtils";
 import { workspaceSessions } from "../../utils/workspaceNavigation";
@@ -46,7 +47,7 @@ export function HomeOverview(props: { actions: SidebarActions; onRefresh: () => 
 	return (
 		<div className="h-full min-h-0 overflow-y-auto px-6 py-7 text-foreground" data-testid="home-overview">
 			<div className="mx-auto flex max-w-5xl flex-col gap-6">
-				<header className="flex items-start justify-between gap-3">
+				<header className="relative z-[930] flex items-start justify-between gap-3 [.custom-titlebar-enabled_&]:[-webkit-app-region:drag] [&_button]:[-webkit-app-region:no-drag]">
 					<div>
 						<p className="mb-1 text-caption text-muted-foreground">{t("overview.brand")}</p>
 						<h1 className="text-2xl font-semibold tracking-tight">{t("overview.title")}</h1>
@@ -147,6 +148,7 @@ export function HomeOverview(props: { actions: SidebarActions; onRefresh: () => 
 						</Button>
 					))}
 				</section>
+				<HomeProviders />
 			</div>
 		</div>
 	);

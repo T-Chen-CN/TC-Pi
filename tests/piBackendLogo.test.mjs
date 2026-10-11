@@ -85,9 +85,14 @@ test("切换 pi logo 风格不改变 DSH 或其他会话来源品牌", () => {
 	}
 });
 
-test("输入框后端选择、下拉选项和锁定按钮全部复用统一 PiLogo", () => {
+test("单一 pi 后端的输入框不显示 Harness 选择或锁定标识", () => {
 	const source = readFileSync("src/renderer/src/components/session/ComposerComponents.tsx", "utf8");
-	assert.match(source, /import\s*\{[^}]*\bPiLogo\b[^}]*\}\s*from\s*["']\.\/SessionSourceBadge["']/u);
-	assert.match(source, /function ComposerBackendPicker[\s\S]*?return null/);
-	assert.doesNotMatch(source, /viewBox\s*=\s*["']140 140 520 520["']/u);
+	assert.doesNotMatch(source, /ComposerBackendPicker|AcpToolControl|backendLockedHint|backendLockedNotice|<PiLogo\b|<DshLogo\b/u);
+	const area = readFileSync("src/renderer/src/components/session/ComposerArea.tsx", "utf8");
+	assert.doesNotMatch(area, /onChangeBackend\s*=|acpTool\s*=/u);
+});
+
+test("输入框移除 Harness 入口后不保留不可达的后端切换回调", () => {
+	const source = readFileSync("src/renderer/src/hooks/useSessionComposerController.ts", "utf8");
+	assert.doesNotMatch(source, /\bchangeBackend\b|\bchangeAcpTool\b/u);
 });

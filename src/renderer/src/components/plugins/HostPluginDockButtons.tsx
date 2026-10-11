@@ -4,7 +4,7 @@ import { hostPluginCatalogAtom, hostPluginPanelAtom } from "../../atoms/host-plu
 import { hostPluginPanelIcon } from "./hostPluginPanelIcon";
 
 /**
- * 侧栏顶部动作区的宿主插件入口（定时任务下方）：每个已启用面板一行。
+ * 文件树与底栏之间的宿主插件入口：每个已启用面板一行。
  * 点击与设置页/命令面板共用 hostPluginPanelAtom，同一条打开路径；
  * 无已启用面板时整体不渲染，不给侧栏留空区块。
  */
@@ -22,7 +22,7 @@ export function HostPluginDockButtons() {
 	}
 	if (rows.length === 0) return null;
 	return (
-		<>
+		<div className="flex max-h-[18vh] shrink-0 flex-col gap-0.5 overflow-y-auto border-t border-border/40 px-2 py-1 [&_button]:shrink-0">
 			{rows.map((row) => (
 				<button
 					key={row.key}
@@ -36,6 +36,6 @@ export function HostPluginDockButtons() {
 					<span className="min-w-0 flex-1 truncate font-medium">{row.title}</span>
 				</button>
 			))}
-		</>
+		</div>
 	);
 }

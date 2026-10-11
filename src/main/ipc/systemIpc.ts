@@ -66,9 +66,6 @@ import { saveUsageProbeForProvider } from "../config/userUsageProbes";
 import type { UsageProbeProviderConfig, UsageProbeTestInput } from "../../shared/types/providerUsage";
 import type { ProviderMigrationDirection } from "../../shared/types/providerMigration";
 import type { McpConfigFile, McpServerDefinition } from "../../shared/types/mcp";
-import type { HealthExportResult, HealthReport, HealthReportContext, HealthReportFormat } from "../../shared/types";
-import type { EnvironmentDoctor } from "../health/EnvironmentDoctor";
-import type { LogBundleExporter } from "../health/LogBundleExporter";
 
 /**
  * IPC 边界校验：RPC 日志条目必须字段齐全，防止渲染层传伪造对象写盘。
@@ -184,10 +181,6 @@ export type SystemIpcDeps = {
 	tokendancePayment?: TokendancePaymentStore;
 	/** TokenDance 一键安装（写入 pi models.json + DSH llm-pi-ai）；未装配 = 配置入口不可用。 */
 	tokendanceInstall?: (apiKey?: string) => Promise<TokendanceInstallResult>;
-	/** 环境体检编排器（问题反馈页一键排障）。 */
-	environmentDoctor?: EnvironmentDoctor;
-	/** 诊断产物导出器（Markdown / zip 日志包）。 */
-	logBundleExporter?: LogBundleExporter;
 	getMainWindow: () => Electron.BrowserWindow | null;
 	/** 当前托盘实例（index.ts 持有）；Logo 风格切换时一并刷新托盘图标，未创建/已销毁返回 null。 */
 	getTray?: () => Electron.Tray | null;
@@ -397,8 +390,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		tokendancePayment,
 		tokendanceInstall,
 		diagnosticsMonitor,
-		environmentDoctor,
-		logBundleExporter,
 	} = deps;
 
 	/** `pi mcp` CLI 封装（连接检测 / OAuth 登录登出）；惰性构造，无状态可安全复用。 */
@@ -1262,30 +1253,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 	ipcMain.handle(ipcChannels.logsOpenFolder, async () => appLogger.openFolder());
 	ipcMain.handle(ipcChannels.logsSize, async () => appLogger.getSize());
 
-	// ── 环境体检（问题反馈页一键排障）──────────────────────────────
-	// 依赖在装配层注入；未装配时（如 headless 测试）返回明确的降级错误，不静默失败。
-
-	ipcMain.handle(ipcChannels.healthCheck, async (): Promise<HealthReport> => {
-		if (!environmentDoctor) throw new Error("EnvironmentDoctor not injected");
-		return environmentDoctor.run();
-	});
-
-	ipcMain.handle(ipcChannels.healthExportReport, async (_event, markdown: unknown, reportJson?: unknown): Promise<HealthExportResult> => {
-		if (!logBundleExporter) throw new Error("LogBundleExporter not injected");
-		return logBundleExporter.exportReport({
-			markdown: typeof markdown === "string" ? markdown : "",
-			reportJson: typeof reportJson === "string" ? reportJson : undefined,
-		});
-	});
-
-	ipcMain.handle(ipcChannels.healthExportBundle, async (_event, markdown: unknown, reportJson: unknown): Promise<HealthExportResult> => {
-		if (!logBundleExporter) throw new Error("LogBundleExporter not injected");
-		return logBundleExporter.exportBundle({
-			markdown: typeof markdown === "string" ? markdown : "",
-			reportJson: typeof reportJson === "string" ? reportJson : "{}",
-		});
-	});
-
 	// ── RPC 日志 ─────────────────────────────────────────────────────
 
 	const resolveRpcRuntimeAgent = (target?: SessionRuntimeTarget) => {
@@ -1364,22 +1331,6 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			agentManager.setRpcLogWatching(agentId, watching);
 		}
 		return true;
-	});
-
-	// ── 反馈环境 ─────────────────────────────────────────────────────
-
-	ipcMain.handle(ipcChannels.appFeedbackEnvironment, async () => {
-		const settings = settingsStore.get();
-		const pi = await piLocator.check(settings.customPiPath, settings.wslEnabled, settings.wslDistro, settings.wslUser);
-		return {
-			appVersion: app.getVersion(),
-			platform: process.platform,
-			arch: process.arch,
-			electronVersion: process.versions.electron ?? "",
-			chromeVersion: process.versions.chrome ?? "",
-			nodeVersion: process.versions.node,
-			pi,
-		};
 	});
 
 	// ── 外部链接 / 重启 / 窗口控制 ──────────────────────────────────

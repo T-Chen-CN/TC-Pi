@@ -108,8 +108,10 @@ test("sidebar width can hydrate from durable settings when the renderer origin c
 });
 
 test("AppShell shares the list width bounds with the persistence clamp", () => {
-	assert.match(appShell, /LIST_WIDTH_MIN/);
-	assert.match(appShell, /LIST_WIDTH_MAX/);
+	const resize = readFileSync("src/renderer/src/hooks/useWorkbenchPanelResize.ts", "utf8");
+	assert.match(resize, /LIST_WIDTH_MIN/);
+	assert.match(resize, /LIST_WIDTH_MAX/);
+	assert.match(appShell, /minSize=\{layoutListWidth\}\s*maxSize=\{layoutListWidth\}/);
 	assert.doesNotMatch(appShell, /const LIST_MIN = 100;/);
 	assert.doesNotMatch(appShell, /const LIST_MAX = 440;/);
 });

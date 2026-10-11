@@ -8,6 +8,7 @@ const typescript = require("typescript");
 
 const host = readFileSync("src/renderer/src/components/workspace/WorkspaceDrawerHost.tsx", "utf8");
 const hook = readFileSync("src/renderer/src/hooks/useWorkspacePanels.ts", "utf8");
+const chrome = readFileSync("src/renderer/src/hooks/useWindowToolLayout.ts", "utf8");
 const editor = readFileSync("src/renderer/src/components/workspace/EditorSurface.tsx", "utf8");
 const browser = readFileSync("src/renderer/src/components/workspace/BrowserSurface.tsx", "utf8");
 const external = readFileSync("src/renderer/src/components/workspace/ExternalEditorOverlay.tsx", "utf8");
@@ -93,9 +94,9 @@ test("drawer visible-panel helper renders first opens and switches immediately b
 test("workspace panel hook exposes narrow drawer commands", () => {
 	assert.match(hook, /export function useWorkspacePanels/);
 	for (const command of ["openDrawer", "closeDrawer", "collapseDrawer", "expandDrawer", "toggleDrawerPinned"]) {
-		assert.match(hook, new RegExp(`const ${command} = useCallback`));
+		assert.match(`${hook}\n${chrome}`, new RegExp(`const ${command}\\s*=\\s*useCallback`));
 	}
-	// 钉住（pin）功能：合并对方抽屉重构后恢复——钉住面板禁折叠、可持久化
+	// 钉住面板禁折叠；窗口关闭后不恢复开合或钉住状态。
 	assert.match(hook, /drawerPinned/);
 	assert.match(hook, /drawerStoragePrefix/);
 	assert.match(hook, /projectIdRef\.current/);
@@ -156,19 +157,16 @@ test("drawer host renders an injected activity rail while open", () => {
 	assert.match(app, /const toggleRightDrawer = useCallback\(\(\) => \{\n\s*if \(workspace\.drawer\) \{\n\s*workspace\.closeDrawer\(\);/);
 });
 
-// 回归：项目上下文水合（null → 首个 projectId）不得重置用户已打开的抽屉；
-// 只有真实项目切换（A → B）才恢复目标项目的保存态。
-test("project hydration does not clobber a user-opened drawer", () => {
-	assert.match(hook, /prevProjectIdRef/);
-	assert.match(hook, /isInitialHydration = prevProjectId === null/);
-	assert.match(hook, /!isInitialHydration \|\| !drawerRef\.current/);
+// Window ownership is covered behaviorally by windowToolLayout.test.mjs, including first visits and hydration.
+test("workspace panels delegate chrome to a window owner rather than restoring project layouts", () => {
+	assert.match(hook, /useWindowToolLayout\s*\(\s*\{/);
+	assert.doesNotMatch(hook, /visitedProjectsRef|drawerPinnedByProject|pinnedPanelsByProject/);
 });
 
-test("drawer defaults closed on project load; pin restores per project", () => {
-	// 换项目 / 水合默认关闭；钉住面板按项目持久化恢复（合并对方抽屉重构）
-	assert.match(hook, /setDrawer\(null\)/);
-	assert.match(hook, /saved\?\.drawerPinned === true/);
-	assert.match(hook, /toggleDrawerPinned/);
+test("new windows start with tools closed and pin is an explicit window action", () => {
+	assert.match(chrome, /drawer:\s*null/);
+	assert.match(chrome, /drawerPinnedPanel:\s*undefined/);
+	assert.match(chrome, /const\s+toggleDrawerPinned\s*=\s*useCallback/);
 	const tabs = readFileSync("src/renderer/src/components/session/SessionTabsBar.tsx", "utf8");
 	assert.match(tabs, /header-drawer-toggle/);
 	assert.match(tabs, /PanelRight/);
@@ -180,18 +178,11 @@ test("drawer defaults closed on project load; pin restores per project", () => {
 	assert.doesNotMatch(surface, /onTogglePin/);
 });
 
-// 回归（2026-10 用户反馈「抽屉开关按钮点击无反应、文件/Git tab 切换无反应」）：
-// 水合绝不能从「保存的面板 ∈ pinnedPanels」推断工作区钉住——files/git 恒在默认
-// pinnedPanels 里，推断会让每个打开过抽屉的项目在启动/切换时自动钉死抽屉，
-// closeDrawer/collapseDrawer/openDrawer(其他面板) 全部静默 no-op。
-// 钉住只能恢复显式持久化的 drawerPinned 标志（toggleDrawerPinned 写入）。
-test("hydration never infers the workspace pin from panel membership", () => {
-	assert.match(hook, /restoredPinned = saved\?\.drawerPinned === true && saved\.panel && nextPinnedPanels\.includes\(saved\.panel\)/);
-	assert.doesNotMatch(hook, /restoredPinned = saved\?\.panel && /);
-	// 显式钉住要落盘，否则重启后钉住态丢失
-	assert.match(hook, /saveDrawerState\(id, currentDrawer, nextPanels, willPin\)/);
-	// 读旧存档（无 drawerPinned 字段）必须得到 false，天然向后兼容
-	assert.match(hook, /const drawerPinned = value\.drawerPinned === true/);
+// Legacy caches can migrate tab preferences, never open/pin state. Behaviour is tested through the hook.
+test("tool persistence is project-independent and stores only tab preferences", () => {
+	assert.match(chrome, /WINDOW_TOOL_LAYOUT_STORAGE_KEY\s*=\s*"pid:window-tool-layout"/);
+	assert.match(chrome, /JSON\.stringify\(\s*\{\s*pinnedPanels:\s*panels\s*\}\s*\)/);
+	assert.doesNotMatch(chrome, /saved\?\.drawerPinned|restoredPinned/);
 });
 
 // 回归（2026-10 用户反馈「新加 tab 的 remove 错位在加号后面」）：X 按钮必须与
@@ -218,7 +209,7 @@ test("drawer rail renders each remove button right after its tab", () => {
 test("closing the last browser tab syncs local state and collapses the sidebar", () => {
 	const panel = readFileSync("src/renderer/src/components/app/BrowserPanel.tsx", "utf8");
 	// closeBrowser 语义：关闭整个浏览器面板（退出全屏 + 关抽屉），区别于 minimizeBrowser
-	assert.match(hook, /const closeBrowser = useCallback\(\(\) => \{\s*setBrowserFullscreen\(false\);\s*closeDrawer\(\);\s*\}, \[closeDrawer\]\);/);
+	assert.match(hook, /const closeBrowser = useCallback\(\(\) => \{\s*setBrowserFullscreen\(false\);\s*closeDrawer\(\);\s*\}, \[closeDrawer, setBrowserFullscreen\]\);/);
 	assert.match(hook, /const minimizeBrowser = useCallback/);
 	// closeTab 最后 tab 分支：moduleState 与本地 state 同时清空，再调用 onClose
 	assert.match(panel, /if \(current\.length <= 1\) \{/);

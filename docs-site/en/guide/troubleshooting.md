@@ -1,17 +1,17 @@
 ---
 title: Troubleshooting | Diagnose PiDeck pi desktop issues
-description: "Troubleshooting guide for PiDeck: sessions failing to start, pi connection errors, blank screens, Git panel issues, terminal input problems — with environment report export."
+description: "Troubleshooting guide for PiDeck: sessions failing to start, pi connection errors, blank screens, Git panel issues, terminal input problems — with log inspection."
 ---
 
 # Troubleshooting Guide
 
-> Hit a problem? Follow the paths below — most cases resolve without reading logs. If yours isn't covered, use the **diagnostic report** at the bottom to bundle your environment info and ask for help with it.
+> Hit a problem? Follow the paths below. If yours isn't covered, inspect logs in settings storage management and collect the version, relevant errors, and reproduction steps before asking for help.
 
 ## 0. The General Routine (do this first)
 
 1. **Restart the app**: many stuck states (Agent processes, listeners, session caches) recover with a single restart.
 2. **Check the version**: Settings → Dev → "Check for updates" — make sure you're on a recent release. Most historical bugs are fixed.
-3. **Generate a diagnostic report**: Settings → Dev → Diagnostics → Generate. The report contains sanitized environment info, health checks, and recent error logs — no code or secrets. Export and share it directly with maintainers or in an Issue.
+3. **Inspect logs**: view application and RPC logs in settings storage management, then collect the relevant errors and reproduction steps.
 
 ---
 
@@ -187,7 +187,7 @@ Settings → Storage & logs:
 
 ### Privacy & telemetry
 
-PiDeck sends an **anonymous, low-frequency** `app_heartbeat` (version spread/platform/active installs) by default; no project paths, code, or message content. Disable in Settings → Dev → Privacy → telemetry. Review the diagnostic report before sharing (it's sanitized, but check anyway).
+PiDeck sends an **anonymous, low-frequency** `app_heartbeat` (version spread/platform/active installs) by default; no project paths, code, or message content. Disable in Settings → Dev → Privacy → telemetry. Check log excerpts for sensitive information before sharing.
 
 ---
 
@@ -200,7 +200,7 @@ Settings → Dev → Update source: switch gateway (ghfast / ghproxy.net / CN mi
 ### Problems after an update
 
 - Restart first; if it's a new-version regression: grab the previous release from GitHub Releases and reinstall (session data is not affected);
-- When reporting, attach the **diagnostic report** + reproduction steps.
+- When reporting, attach relevant errors, the app version, and reproduction steps.
 
 ---
 
@@ -220,8 +220,8 @@ Settings → Dev → Update source: switch gateway (ghfast / ghproxy.net / CN mi
 
 ## 10. Still stuck?
 
-1. Generate a **diagnostic report** (Settings → Dev → Diagnostics);
-2. Search or open an Issue at [GitHub Issues](https://github.com/ayuayue/PiDeck/issues) (attach report + version + repro steps);
+1. Inspect relevant error logs in settings storage management;
+2. Search or open an Issue at [GitHub Issues](https://github.com/ayuayue/PiDeck/issues) (attach relevant errors + version + repro steps);
 3. Join the community **QQ group: 1026218644** or add the author's **WeChat: caoayu97**.
 
 > When debugging, confirm the version first, then cross-check the [changelog](/en/changelog) for known issues.

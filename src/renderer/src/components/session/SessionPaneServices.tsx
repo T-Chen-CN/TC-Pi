@@ -101,6 +101,8 @@ export type SessionPaneServices = {
 		composerRef: RefObject<HTMLElement | null>;
 		composerOffsetHeight: number;
 		terminalRowHeight: number;
+		/** 文件工作台负责终端；快捷任务仍沿用会话内终端。 */
+		terminalInSession?: boolean;
 	};
 	/** 面板级退出分屏（全屏按钮）：该会话从布局移除，同组兄弟合并占据其位置 */
 	exitSessionSplit: (sessionId: string) => void;

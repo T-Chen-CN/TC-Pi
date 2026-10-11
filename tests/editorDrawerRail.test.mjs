@@ -24,14 +24,12 @@ test("drawer surface and ports no longer carry the editor panel", () => {
 	assert.doesNotMatch(drawerPorts, /input\.editorMode/);
 });
 
-test("closing the last editor tab resets workbench layout to settings default", () => {
-	// 分屏 workbench 的布局重置逻辑与抽屉无关，必须保留
-	assert.doesNotMatch(fileEditorHook, /editorTabs\.length === 0 && drawer === "editor"[\s\S]{0,200}?setDrawer\(null\)/);
-	const closeTabBlock = fileEditorHook.slice(fileEditorHook.indexOf("if (next.length === 0)"), fileEditorHook.indexOf("if (next.length === 0)") + 500);
-	assert.match(closeTabBlock, /contentOpenModeRef\.current/);
-	assert.match(closeTabBlock, /setEditorMode\(contentOpenModeRef\.current\)/);
-	const closeEditorBlock = fileEditorHook.slice(fileEditorHook.indexOf("const closeEditor = useCallback"), fileEditorHook.indexOf("const closeEditor = useCallback") + 500);
-	assert.match(closeEditorBlock, /setEditorMode\(contentOpenModeRef\.current\)/);
+test("closing a file uses its save barrier without changing conversation or tools", () => {
+	assert.match(fileEditorHook, /workspaceEditors\s*\.closeTab\(tabId\)/);
+	const state = readFileSync("src/renderer/src/hooks/useWorkspaceEditorState.ts", "utf8");
+	assert.match(state, /await guard\(\)/);
+	assert.match(state, /tabs\.filter\(\(tab\) => tab\.id !== id\)/);
+	assert.doesNotMatch(state, /setDrawer|selectSession/);
 });
 
 test("editor drawer empty-state copy is removed from both locales", () => {

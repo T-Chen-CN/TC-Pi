@@ -136,8 +136,10 @@ export function DrawerSurface(props: DrawerSurfaceProps) {
 				</div>
 			) : drawer === "rpcLog" && !drawerCollapsed ? (
 				// 实时日志面板（临时面板）：与消息区并排，边看日志边发消息；
-				// agentId 缺省（未打开）时不渲染，避免绑定到空 agent 的订阅。
-				<div className="drawer-content-frame flex min-h-0 flex-1 flex-col overflow-hidden">{rpcLog.agentId ? <RpcLogPanel agentId={rpcLog.agentId} loadHistory={rpcLog.loadHistory} getLogging={rpcLog.getLogging} setLogging={rpcLog.setLogging} onClose={rpcLog.onClose} /> : null}</div>
+				// 工作区切换后保留工具栏，并用空状态替代旧 agent 订阅。
+				<div className="drawer-content-frame flex min-h-0 flex-1 flex-col overflow-hidden">
+					{rpcLog.agentId ? <RpcLogPanel agentId={rpcLog.agentId} loadHistory={rpcLog.loadHistory} getLogging={rpcLog.getLogging} setLogging={rpcLog.setLogging} onClose={rpcLog.onClose} /> : <div className="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">{t("drawer.rpcLogNoRuntime")}</div>}
+				</div>
 			) : git.enableGitManagement && drawer === "git" && !drawerCollapsed && git.activeProjectId ? (
 				<div className="drawer-content-frame flex min-h-0 flex-1 flex-col overflow-hidden">
 					<div className="git-drawer-stack">
@@ -156,6 +158,8 @@ export function DrawerSurface(props: DrawerSurfaceProps) {
 						</div>
 					</div>
 				</div>
+			) : drawer === "git" && !drawerCollapsed ? (
+				<div className="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">{t("drawer.gitNoWorkspace")}</div>
 			) : drawer && drawer !== "browser" && drawer !== "git" && drawer !== "trajectory" && drawer !== "rpcLog" ? (
 				<LazyWrapper
 					// 滚动层上移到这里：files/sessions 面板自身不再滚动（见 timeline.css

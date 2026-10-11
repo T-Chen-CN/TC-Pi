@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePersistedPanelWidth } from "./usePersistedPanelWidth";
+import { useWindowToolLayout } from "./useWindowToolLayout";
 import type { BranchDiffResult, CommitDetail, CommitEntry, ExternalEditor, GitChangedFile, GitResourceGroupType, GitResourceGroups, GitWorkspaceFileDiff } from "../../../shared/types";
+export { DEFAULT_PINNED_DRAWER_PANELS } from "./useWindowToolLayout";
 
 export const DRAWER_ANIMATION_MS = 120;
 export const EDITOR_TAB_LIMIT = 5;
@@ -66,46 +68,18 @@ export type WorkspaceExternalEditorAdapter = {
 	openProject: (editor: ExternalEditor, projectPath: string) => Promise<void>;
 };
 
-export const DEFAULT_PINNED_DRAWER_PANELS: WorkspaceDrawerPanel[] = ["files", "git"];
-
 export type WorkspacePanelOptions = {
 	projectId?: string | null;
 	git?: WorkspaceGitResourceAdapter;
 	editors?: WorkspaceExternalEditorAdapter;
 	storage?: Pick<Storage, "getItem" | "setItem">;
+	/** One-version compatibility reader for old project tab preferences; never restores open/pin state. */
 	drawerStoragePrefix?: string;
 	/** durable settings 读取器；localStorage 只作为首屏缓存/旧版本迁移来源。 */
 	loadPersistedWidth?: () => Promise<unknown>;
 	/** durable settings 写入器；失败不应影响拖拽布局。 */
 	persistWidth?: (width: number) => void | Promise<unknown>;
 };
-
-function readDrawerState(storage: WorkspacePanelOptions["storage"], key: string) {
-	if (!storage) return null;
-	try {
-		const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
-		if (!parsed || typeof parsed !== "object") return null;
-		const value = parsed as { panel?: unknown; pinned?: unknown; pinnedPanels?: unknown; drawerPinned?: unknown };
-		const panel = value.panel === "editor" ? "files" : value.panel;
-		const validPanels = ["files", "sessions", "browser", "git", "trajectory", "branchTree", "rewind", "scratchPad"];
-		const validPanel = panel === null || validPanels.includes(String(panel));
-		const pinnedPanels = Array.isArray(value.pinnedPanels) ? value.pinnedPanels.filter((item): item is WorkspaceDrawerPanel => typeof item === "string" && validPanels.includes(item)) : typeof value.pinned === "boolean" && value.pinned && validPanel && panel ? [panel as WorkspaceDrawerPanel] : undefined;
-		// drawerPinned（工作区钉住）只能来自显式持久化；旧存档无此字段 → false（见下方水合注释）。
-		const drawerPinned = value.drawerPinned === true;
-		return validPanel && Array.isArray(pinnedPanels) ? { panel: panel as WorkspaceDrawerPanel | null, pinnedPanels, drawerPinned } : null;
-	} catch {
-		return null;
-	}
-}
-
-function writeDrawerState(storage: WorkspacePanelOptions["storage"], key: string, panel: WorkspaceDrawerPanel | null, pinnedPanels: readonly WorkspaceDrawerPanel[], drawerPinned: boolean) {
-	try {
-		// drawerPinned 仅在 true 时落盘：旧版本读到无此字段的存档会得到 false，天然向后兼容。
-		storage?.setItem(key, JSON.stringify(drawerPinned ? { panel, pinnedPanels, drawerPinned: true } : { panel, pinnedPanels }));
-	} catch {
-		// Storage is a convenience; panel commands must continue working when it is unavailable.
-	}
-}
 
 /** 抽屉宽度默认值与可调范围（AppShell 布局约束同源，禁止两处漂移）。
  * 下限 240：抽屉承载 Git 面板（repo 切换 + 文件状态列 + 提交区）、文件树、
@@ -154,7 +128,6 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 	const gitRef = useRef(options.git);
 	const editorsRef = useRef(options.editors);
 	const storageRef = useRef(options.storage ?? (typeof window !== "undefined" ? window.localStorage : undefined));
-	const drawerPrefixRef = useRef(options.drawerStoragePrefix ?? "pid:project-drawer:");
 	projectIdRef.current = projectId;
 	gitRef.current = options.git;
 	editorsRef.current = options.editors;
@@ -174,14 +147,19 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 		setGitDiffDisplayMode(next.displayMode);
 	}, []);
 
-	const [drawer, setDrawer] = useState<WorkspaceDrawerPanel | null>(null);
-	const [drawerCollapsed, setDrawerCollapsed] = useState(false);
-	// RPC 日志临时面板：agentId 绑定 + 打开前的面板（关闭还原，见 openRpcLogPanel / closeRpcLogPanel）
-	const [rpcLogAgentId, setRpcLogAgentId] = useState<string>();
+	const chrome = useWindowToolLayout({
+		storage: storageRef.current,
+		legacyStorageKey: projectId ? `${options.drawerStoragePrefix ?? "pid:project-drawer:"}${projectId}` : undefined,
+		onLeaveGit: invalidateGitDiff,
+	});
+	const { drawer, drawerCollapsed, drawerPinned, drawerPinnedPanel, drawerRef, drawerPinnedRef, drawerPinnedPanelRef, setDrawer, setDrawerCollapsed, collapseDrawer, expandDrawer, toggleDrawerPinned, toggleDrawerPanelPinned, pinnedPanels, browserFullscreen, setBrowserFullscreen } = chrome;
+	// Agent logs are content: immediately hide bindings from another workspace, keeping chrome intact.
+	const [rpcLogBinding, setRpcLogBinding] = useState<{ projectId: string | null; agentId: string } | null>(null);
+	const rpcLogAgentId = rpcLogBinding?.projectId === projectId ? rpcLogBinding?.agentId : undefined;
 	const rpcLogPreviousPanelRef = useRef<WorkspaceDrawerPanel | null>(null);
 	// 抽屉宽度：全局布局偏好（与项目无关），先从 localStorage 恢复并 clamp，
 	// 再由应用设置异步校准，解决开发 renderer origin 变化导致的缓存丢失。
-	// 写入方：AppShell 只在用户拖拽/键盘调整完成后经 shouldCommitPanelPixels 回写。
+	// 写入方：AppShell 只在用户拖拽/键盘调整完成后回写用户实际调整的目标栏宽度。
 	// 窗口/页面缩放不改变保存偏好，避免布局换算后的临时像素污染缓存。
 	const [drawerWidth, setDrawerWidth] = useState(() => readDrawerWidth(storageRef.current));
 	useEffect(() => {
@@ -194,71 +172,16 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 		loadPersistedWidth: options.loadPersistedWidth,
 		persistWidth: options.persistWidth,
 	});
-	const [drawerPinnedByProject, setDrawerPinnedByProject] = useState<Record<string, WorkspaceDrawerPanel>>({});
-	const drawerRef = useRef<WorkspaceDrawerPanel | null>(null);
-	const drawerPinnedByProjectRef = useRef<Record<string, WorkspaceDrawerPanel>>({});
-	const [pinnedPanelsByProject, setPinnedPanelsByProject] = useState<Record<string, WorkspaceDrawerPanel[]>>({});
-	const pinnedPanelsByProjectRef = useRef<Record<string, WorkspaceDrawerPanel[]>>({});
-	const drawerPinnedPanel = projectId ? drawerPinnedByProject[projectId] : undefined;
-	const drawerPinned = Boolean(drawerPinnedPanel && drawer === drawerPinnedPanel);
-	const drawerPinnedRef = useRef(false);
-	drawerRef.current = drawer;
-	drawerPinnedByProjectRef.current = drawerPinnedByProject;
-	drawerPinnedRef.current = drawerPinned;
-	pinnedPanelsByProjectRef.current = pinnedPanelsByProject;
-
-	const loadDrawerState = useCallback((id: string) => readDrawerState(storageRef.current, `${drawerPrefixRef.current}${id}`), []);
-	const saveDrawerState = useCallback((id: string, panel: WorkspaceDrawerPanel | null, pinnedPanels: readonly WorkspaceDrawerPanel[], drawerPinned: boolean) => writeDrawerState(storageRef.current, `${drawerPrefixRef.current}${id}`, panel, pinnedPanels, drawerPinned), []);
-	const pinnedPanels = projectId ? (pinnedPanelsByProject[projectId] ?? DEFAULT_PINNED_DRAWER_PANELS) : DEFAULT_PINNED_DRAWER_PANELS;
-
-	// 项目上下文水合（null → 首个 projectId）不得视为「切换项目」：
-	// 用户在水合完成前已手动打开的抽屉会被保存态重置误关（E2E 与快速操作均可复现）。
-	// 仅 A → B 的真实项目切换才重置/恢复抽屉；首次水合只在抽屉仍为空时应用保存态。
-	const prevProjectIdRef = useRef<string | null>(null);
-	useEffect(() => {
-		const prevProjectId = prevProjectIdRef.current;
-		prevProjectIdRef.current = projectId;
-		const isInitialHydration = prevProjectId === null;
-		if (!projectId) {
-			// 项目被移除/清空才重置；首次水合前的 null 阶段不动用户已打开的抽屉
-			if (!isInitialHydration) {
-				setDrawer(null);
-				setDrawerCollapsed(false);
-			}
-			return;
-		}
-		const saved = loadDrawerState(projectId);
-		const nextPinnedPanels = saved?.pinnedPanels?.length ? saved.pinnedPanels : DEFAULT_PINNED_DRAWER_PANELS;
-		if (!isInitialHydration || !drawerRef.current) {
-			setDrawer(saved?.panel ?? null);
-			setDrawerCollapsed(false);
-		}
-		setPinnedPanelsByProject((current) => ({ ...current, [projectId]: nextPinnedPanels }));
-		setDrawerPinnedByProject((current) => {
-			const next = { ...current };
-			// 工作区钉住只能恢复显式持久化的 drawerPinned 标志（toggleDrawerPinned 写入）。
-			// 绝不能从「保存的面板 ∈ pinnedPanels」推断：files/git 恒在默认 pinnedPanels 里，
-			// 推断会让每个曾打开过文件/Git 抽屉的项目在启动/切换时自动钉死抽屉——
-			// closeDrawer/collapseDrawer/openDrawer(其他面板) 全部静默 no-op，表现为
-			// 「抽屉开关按钮点击无反应、文件/Git tab 切换无反应」（2026-10 用户反馈）。
-			const restoredPinned = saved?.drawerPinned === true && saved.panel && nextPinnedPanels.includes(saved.panel) ? saved.panel : undefined;
-			if (restoredPinned) next[projectId] = restoredPinned;
-			else delete next[projectId];
-			return next;
-		});
-	}, [loadDrawerState, projectId]);
-
 	const openDrawer = useCallback(
 		(panel: WorkspaceDrawerPanel) => {
-			const pinnedPanel = projectIdRef.current ? drawerPinnedByProjectRef.current[projectIdRef.current] : undefined;
+			const pinnedPanel = drawerPinnedPanelRef.current;
 			if (pinnedPanel && pinnedPanel !== panel) return;
 			const next = drawerRef.current === panel && !drawerPinnedRef.current ? null : panel;
 			if (next !== "git") invalidateGitDiff();
-			if (projectIdRef.current) saveDrawerState(projectIdRef.current, next, pinnedPanelsByProjectRef.current[projectIdRef.current] ?? DEFAULT_PINNED_DRAWER_PANELS, drawerPinnedRef.current);
 			setDrawer(next);
 			setDrawerCollapsed(false);
 		},
-		[invalidateGitDiff, saveDrawerState],
+		[drawerPinnedPanelRef, drawerPinnedRef, drawerRef, invalidateGitDiff, setDrawer, setDrawerCollapsed],
 	);
 
 	/**
@@ -268,14 +191,13 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 	 */
 	const openDrawerForce = useCallback(
 		(panel: WorkspaceDrawerPanel) => {
-			const pinnedPanel = projectIdRef.current ? drawerPinnedByProjectRef.current[projectIdRef.current] : undefined;
+			const pinnedPanel = drawerPinnedPanelRef.current;
 			if (pinnedPanel && pinnedPanel !== panel) return;
 			if (panel !== "git") invalidateGitDiff();
-			if (projectIdRef.current) saveDrawerState(projectIdRef.current, panel, pinnedPanelsByProjectRef.current[projectIdRef.current] ?? DEFAULT_PINNED_DRAWER_PANELS, drawerPinnedRef.current);
 			setDrawer(panel);
 			setDrawerCollapsed(false);
 		},
-		[invalidateGitDiff, saveDrawerState],
+		[drawerPinnedPanelRef, drawerPinnedRef, drawerRef, invalidateGitDiff, setDrawer, setDrawerCollapsed],
 	);
 
 	/**
@@ -292,11 +214,11 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 			if (drawerRef.current !== "rpcLog") rpcLogPreviousPanelRef.current = drawerRef.current;
 			// 日志面板不是 git：无条件作废在途 diff 快照，防止旧响应落到日志之后打开的 git 面板上
 			invalidateGitDiff();
-			setRpcLogAgentId(agentId);
+			setRpcLogBinding({ projectId: projectIdRef.current, agentId });
 			setDrawer("rpcLog");
 			setDrawerCollapsed(false);
 		},
-		[invalidateGitDiff],
+		[drawerRef, invalidateGitDiff, setDrawer, setDrawerCollapsed],
 	);
 
 	/**
@@ -309,7 +231,7 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 		const previous = rpcLogPreviousPanelRef.current;
 		rpcLogPreviousPanelRef.current = null;
 		setDrawer(previous ?? null);
-	}, []);
+	}, [setDrawer]);
 
 	const closeDrawer = useCallback(() => {
 		if (drawerPinnedRef.current) return;
@@ -319,104 +241,62 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 			return;
 		}
 		invalidateGitDiff();
-		if (projectIdRef.current) saveDrawerState(projectIdRef.current, null, pinnedPanelsByProjectRef.current[projectIdRef.current] ?? DEFAULT_PINNED_DRAWER_PANELS, false);
 		setDrawer(null);
-	}, [closeRpcLogPanel, invalidateGitDiff, saveDrawerState]);
-
-	const collapseDrawer = useCallback(() => {
-		if (!drawerPinnedRef.current) setDrawerCollapsed(true);
-	}, []);
-
-	const expandDrawer = useCallback(() => setDrawerCollapsed(false), []);
-
-	const toggleDrawerPanelPinned = useCallback(
-		(panel: WorkspaceDrawerPanel) => {
-			const id = projectIdRef.current;
-			if (!id || panel === "rpcLog") return;
-			const current = pinnedPanelsByProjectRef.current[id] ?? DEFAULT_PINNED_DRAWER_PANELS;
-			const wasPinned = current.includes(panel);
-			const next = wasPinned ? current.filter((item) => item !== panel) : [...current, panel];
-			if (next.length === 0) return;
-			// X 的语义是「移除这个 tab 页」：取消钉住的面板正是当前展开的抽屉时同步收起抽屉，
-			// 只从 rail 消失而面板继续展开会让用户以为关闭失效（2026-10 分支面板反馈）。
-			// 抽屉整体被钉住（drawerPinned）时不收起，与 closeDrawer 同口径。
-			const closingActive = wasPinned && drawerRef.current === panel && !drawerPinnedRef.current;
-			if (closingActive) invalidateGitDiff();
-			pinnedPanelsByProjectRef.current = { ...pinnedPanelsByProjectRef.current, [id]: next };
-			setPinnedPanelsByProject((all) => ({ ...all, [id]: next }));
-			if (closingActive) setDrawer(null);
-			// 单次写入：drawerRef 要等重渲染才更新，关闭场景必须显式传 null。
-			saveDrawerState(id, closingActive ? null : drawerRef.current, next, closingActive ? false : drawerPinnedRef.current);
-		},
-		[invalidateGitDiff, saveDrawerState],
-	);
-
-	const toggleDrawerPinned = useCallback(() => {
-		const id = projectIdRef.current;
-		const currentDrawer = drawerRef.current;
-		if (!id || !currentDrawer) return;
-		const willPin = !drawerPinnedRef.current;
-		setDrawerPinnedByProject((current) => {
-			const next = { ...current };
-			if (willPin) next[id] = currentDrawer;
-			else delete next[id];
-			return next;
-		});
-		const currentPanels = pinnedPanelsByProjectRef.current[id] ?? DEFAULT_PINNED_DRAWER_PANELS;
-		const nextPanels = willPin ? (currentPanels.includes(currentDrawer) ? currentPanels : [...currentPanels, currentDrawer]) : currentPanels.filter((panel) => panel !== currentDrawer);
-		if (nextPanels.length === 0) return;
-		setPinnedPanelsByProject((all) => ({ ...all, [id]: nextPanels }));
-		// 钉住标志显式落盘：水合只认这个字段，不再从面板∈pinnedPanels 推断。
-		saveDrawerState(id, currentDrawer, nextPanels, willPin);
-	}, [saveDrawerState]);
+	}, [closeRpcLogPanel, drawerPinnedRef, drawerRef, invalidateGitDiff, setDrawer]);
 
 	const closeGitDiff = useCallback(() => {
 		invalidateGitDiff();
 	}, [invalidateGitDiff]);
 
-	const openWorkspaceFileDiff = useCallback(async (group: GitResourceGroupType, path: string) => {
-		const id = projectIdRef.current;
-		const request = ++gitRequestRef.current;
-		const diff = id ? await gitRef.current?.workspaceFileDiff(id, group, path) : null;
-		if (
-			!id ||
-			!isCurrentGitDiffResponse({
-				request,
-				currentRequest: gitRequestRef.current,
-				responseProjectId: id,
-				activeProjectId: projectIdRef.current,
-			})
-		)
-			return null;
-		if (!diff) return null;
-		setDrawer("git");
-		setDrawerCollapsed(false);
-		setGitDiffDisplayMode("drawer");
-		setGitDiff({ ...diff, projectId: id, label: diff.path.split(/[\\/]/).pop() ?? diff.path });
-		return diff;
-	}, []);
+	const openWorkspaceFileDiff = useCallback(
+		async (group: GitResourceGroupType, path: string) => {
+			const id = projectIdRef.current;
+			const request = ++gitRequestRef.current;
+			const diff = id ? await gitRef.current?.workspaceFileDiff(id, group, path) : null;
+			if (
+				!id ||
+				!isCurrentGitDiffResponse({
+					request,
+					currentRequest: gitRequestRef.current,
+					responseProjectId: id,
+					activeProjectId: projectIdRef.current,
+				})
+			)
+				return null;
+			if (!diff) return null;
+			setDrawer("git");
+			setDrawerCollapsed(false);
+			setGitDiffDisplayMode("drawer");
+			setGitDiff({ ...diff, projectId: id, label: diff.path.split(/[\\/]/).pop() ?? diff.path });
+			return diff;
+		},
+		[setDrawer, setDrawerCollapsed],
+	);
 
-	const openCommitFileDiff = useCallback(async (commit: CommitEntry, file: GitChangedFile) => {
-		const id = projectIdRef.current;
-		const request = ++gitRequestRef.current;
-		const diff = id ? await gitRef.current?.commitFileDiff(id, commit.hash, file.path, file.originalPath) : null;
-		if (
-			!id ||
-			!isCurrentGitDiffResponse({
-				request,
-				currentRequest: gitRequestRef.current,
-				responseProjectId: id,
-				activeProjectId: projectIdRef.current,
-			})
-		)
-			return null;
-		if (!diff) return null;
-		setDrawer("git");
-		setDrawerCollapsed(false);
-		setGitDiffDisplayMode("drawer");
-		setGitDiff({ ...diff, projectId: id, label: `${diff.path.split(/[\\/]/).pop() ?? diff.path} (${commit.shortHash})` });
-		return diff;
-	}, []);
+	const openCommitFileDiff = useCallback(
+		async (commit: CommitEntry, file: GitChangedFile) => {
+			const id = projectIdRef.current;
+			const request = ++gitRequestRef.current;
+			const diff = id ? await gitRef.current?.commitFileDiff(id, commit.hash, file.path, file.originalPath) : null;
+			if (
+				!id ||
+				!isCurrentGitDiffResponse({
+					request,
+					currentRequest: gitRequestRef.current,
+					responseProjectId: id,
+					activeProjectId: projectIdRef.current,
+				})
+			)
+				return null;
+			if (!diff) return null;
+			setDrawer("git");
+			setDrawerCollapsed(false);
+			setGitDiffDisplayMode("drawer");
+			setGitDiff({ ...diff, projectId: id, label: `${diff.path.split(/[\\/]/).pop() ?? diff.path} (${commit.shortHash})` });
+			return diff;
+		},
+		[setDrawer, setDrawerCollapsed],
+	);
 
 	const toggleGitDiffDisplayMode = useCallback(() => {
 		setGitDiffDisplayMode((mode) => {
@@ -425,7 +305,7 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 			setDrawerCollapsed(false);
 			return "drawer";
 		});
-	}, []);
+	}, [setDrawer, setDrawerCollapsed]);
 
 	const gitPanelAdapter = useMemo<WorkspaceGitResourceAdapter>(
 		() => ({
@@ -443,13 +323,12 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 		[],
 	);
 
-	const [browserFullscreen, setBrowserFullscreen] = useState(false);
 	const openBrowser = useCallback(() => {
 		invalidateGitDiff();
 		setDrawer("browser");
 		setDrawerCollapsed(false);
-	}, [invalidateGitDiff]);
-	const enterBrowserFullscreen = useCallback(() => setBrowserFullscreen(true), []);
+	}, [invalidateGitDiff, setDrawer, setDrawerCollapsed]);
+	const enterBrowserFullscreen = useCallback(() => setBrowserFullscreen(true), [setBrowserFullscreen]);
 	/**
 	 * 关闭浏览器面板（全屏 X / 关闭最后一个 tab 统一入口）：
 	 * 退出全屏并收起浏览器抽屉。区别于 minimizeBrowser（仅退出全屏、保留抽屉）。
@@ -458,11 +337,11 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 	const closeBrowser = useCallback(() => {
 		setBrowserFullscreen(false);
 		closeDrawer();
-	}, [closeDrawer]);
+	}, [closeDrawer, setBrowserFullscreen]);
 	const minimizeBrowser = useCallback(() => {
 		setBrowserFullscreen(false);
 		openBrowser();
-	}, [openBrowser]);
+	}, [openBrowser, setBrowserFullscreen]);
 
 	const [externalEditors, setExternalEditors] = useState<ExternalEditor[]>([]);
 	const [externalEditorsOpen, setExternalEditorsOpen] = useState(false);
@@ -509,7 +388,7 @@ export function useWorkspacePanels(options: WorkspacePanelOptions = {}) {
 	useEffect(() => {
 		invalidateGitDiff();
 		editorRequestRef.current += 1;
-		setBrowserFullscreen(false);
+		setRpcLogBinding(null);
 		setExternalEditorsOpen(false);
 		setExternalEditorsAnchor(null);
 		setExternalEditorsTargetPath(null);

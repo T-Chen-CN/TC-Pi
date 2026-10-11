@@ -94,7 +94,7 @@ export function readPetEnabledPreference(settings: Partial<AppSettings> = readDe
 /**
  * ready 前启动偏好的合并读取（index.ts 模块顶层）：一次文件读取返回三个启动快照值，
  * 替代三个 helper 各自 readFileSync+JSON.parse 的重复 IO（2026-10 启动审计）。
- * 启动后调用方（PetWindow/EnvironmentDoctor）继续走各 helper 的独立读取，语义不变。
+ * 启动后调用方（PetWindow）继续走各 helper 的独立读取，语义不变。
  */
 export function readBootPreferences() {
 	const settings = readDesktopSettingsSync();
@@ -192,7 +192,7 @@ Gitmoji 对应关系：
 	askNotificationEnabled: false,
 	// 人文关怀提醒默认开启：用户可在设置中随时关闭
 	agentCountReminderEnabled: true,
-	// 公告通知默认开启：新公告弹 toast 提醒（弹出时机另有忙碌延迟控制）
+	// 旧版本设置读取兼容：保留字段但不再驱动任何功能。
 	announcementNotificationEnabled: true,
 	// toast 展示时长：全局统一时长（见 AppSettings.toastDurationMs）
 	toastDurationMs: DEFAULT_TOAST_DURATION_MS,
@@ -455,7 +455,7 @@ export class SettingsStore {
 			if (typeof this.settings.autoSessionTitle !== "boolean") {
 				this.settings.autoSessionTitle = defaultSettings.autoSessionTitle;
 			}
-			// 公告通知开关同理：旧配置缺字段回落 true（默认开启），脏数据（字符串等）也回落。
+			// 仅兼容旧字段读取，非法旧值归一化后忽略。
 			if (typeof this.settings.announcementNotificationEnabled !== "boolean") {
 				this.settings.announcementNotificationEnabled = defaultSettings.announcementNotificationEnabled;
 			}

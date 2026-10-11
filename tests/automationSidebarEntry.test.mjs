@@ -2,25 +2,26 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-// 工作区布局：定时任务保留在文件树下面的次级入口、搜索之后。
 const sidebar = readFileSync("src/renderer/src/components/sidebar/SidebarContent.tsx", "utf8");
 
-test("automation entry stays visible below file navigation and search, before the dock", () => {
-	assert.match(sidebar, /import \{ AutomationDockButton \} from "\.\.\/automation\/AutomationDockButton";/);
-	const navigationIndex = sidebar.indexOf("<WorkspaceNavigation");
-	const filesIndex = sidebar.indexOf("{props.workspaceFiles}");
-	const searchIndex = sidebar.indexOf('aria-label={t("app.searchSessions")}');
-	const automationIndex = sidebar.indexOf("<AutomationDockButton />");
-	const dockIndex = sidebar.indexOf("<Dock size={32}");
-	assert.ok(navigationIndex > -1 && filesIndex > navigationIndex, "workspace navigation must precede the file explorer");
-	assert.ok(searchIndex > filesIndex, "secondary search must stay below the file explorer");
-	assert.ok(automationIndex > searchIndex && automationIndex < dockIndex, "automation remains a direct secondary entry");
+test("search and automation occupy the middle two dock items below the file explorer", () => {
+	const files = sidebar.indexOf("{props.workspaceFiles}");
+	const dock = sidebar.indexOf("<Dock size={32}");
+	const search = sidebar.indexOf('aria-label={t("app.searchSessions")}');
+	const automation = sidebar.indexOf("<AutomationDockButton />");
+	assert.ok(files < dock && dock < search && search < automation);
+	assert.equal((sidebar.match(/aria-label=\{t\("app.searchSessions"\)\}/g) ?? []).length, 1);
+	assert.equal((sidebar.match(/<AutomationDockButton\s*\/>/g) ?? []).length, 1);
+	// The positioning anchor has no keyboard or accessibility entry; its portal remains interactive.
+	assert.match(sidebar, /<div\s+aria-hidden="true"\s+inert\s+className="pointer-events-none fixed/);
 });
 
-test("dock no longer hosts the automation entry", () => {
-	const dockIndex = sidebar.indexOf("<Dock size={32}");
-	assert.ok(dockIndex > -1, "dock section missing");
-	assert.doesNotMatch(sidebar.slice(dockIndex), /AutomationDockButton/);
+test("automation uses an icon-only accessible button and styled tooltip", () => {
+	const source = readFileSync("src/renderer/src/components/automation/AutomationDockButton.tsx", "utf8");
+	assert.match(source, /<Button[\s\S]*?aria-label=\{label\}/);
+	assert.match(source, /<ListTodo\b/);
+	assert.match(source, /<TooltipContent[\s\S]*?\{label\}/);
+	assert.doesNotMatch(source, /title=\{label\}|<span[^>]*>\{t\("automation.title"\)\}/);
 });
 
 test("automation management is a modal, not a workbench-covering surface", () => {

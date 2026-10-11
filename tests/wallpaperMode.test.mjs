@@ -20,7 +20,7 @@ test("wallpaper mode: background image reveals through translucent panels", () =
 	assert.match(css, /body::before\s*\{[\s\S]*?background-image: var\(--app-bg-mask, none\), var\(--app-bg-image, none\);/);
 	assert.match(css, /--color-bg-popover: #ffffff;/);
 	assert.match(css, /--color-bg-popover: #171717;/);
-	assert.match(css, /:root\[data-bg-image="on"\] \.config-modal \.config-model-table,[\s\S]*?\.feedback-modal-shell \.feedback-actions[\s\S]*?\{\s*background:\s*transparent;/);
+	assert.match(css, /:root\[data-bg-image="on"\] \.config-modal \.config-model-table,[\s\S]*?\.environment-dialog \.environment-body\s*\{\s*background:\s*transparent;/);
 	assert.match(css, /background: var\(--color-chat-muted-bg\);/);
 	assert.match(css, /background: var\(--color-chat-table-bg, var\(--color-bg-panel\)\);/);
 });
@@ -57,21 +57,18 @@ test("large settings dialogs inherit page wallpaper transparency", () => {
 	assert.match(modelsSource, /config-provider-body/);
 	// 模型表格容器已内聚到共享组件 ModelsTable（展开卡片与编辑页共用）
 	assert.match(modelsTableSource, /config-model-table/);
-	assert.match(surfacesSource, /\.config-modal \.config-model-table[\s\S]*?\.feedback-modal-shell \.feedback-environment-content[\s\S]*?\.feedback-modal-shell \.feedback-actions/);
+	assert.match(surfacesSource, /\.config-modal \.config-model-table/);
 });
 
-test("Pi management and feedback dialogs inherit page wallpaper transparency", () => {
+test("Pi management dialogs inherit page wallpaper transparency", () => {
 	const piSource = readFileSync("src/renderer/src/ConfigModal.tsx", "utf8");
 	const environmentSource = readFileSync("src/renderer/src/components/overlays/OverlayComponents.tsx", "utf8");
-	const feedbackSource = readFileSync("src/renderer/src/features/feedback/FeedbackDialog.tsx", "utf8");
 
-	// Pi 环境管理和问题反馈都是完整业务面板，与设置/项目资源管理同档：走通用弹窗的
+	// Pi 环境管理是完整业务面板，与设置/项目资源管理同档：走通用弹窗的
 	// ≥90% 基线，不再各自按面板档降透明度；内部卡片继承主题 token 由 CSS 承担。
 	assert.doesNotMatch(piSource, /--wallpaper-dialog-alpha/);
 	assert.doesNotMatch(environmentSource, /--wallpaper-dialog-alpha/);
-	// FeedbackDialog 现在直接使用通用 dialog-content；壁纸透明度由 foundation.css 的
-	// 通用规则提供，业务组件不再在 overlay host 上注入旧的内联 alpha。
-	assert.match(feedbackSource, /<DialogContent[\s\S]*?className=\{cn\(/);
+	// 壁纸透明度由 foundation.css 的通用规则提供。
 	assert.match(css, /:root\[data-bg-image="on"\] \[data-slot="dialog-content"\][\s\S]*?--wallpaper-dialog-alpha: max\(90%, calc\(var\(--wallpaper-panel-alpha, 30%\) \+ 35%\)\);/);
 });
 

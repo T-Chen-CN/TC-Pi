@@ -48,6 +48,8 @@ import { BackgroundScanCoordinator } from "../sessions/BackgroundScanCoordinator
 import { DIRECTORY_IMPORT_MAX_SUMMARIES } from "../sessions/directorySessionImport";
 import type { DirectorySessionImporter } from "../sessions/DirectorySessionImporter";
 import { registerSessionImageMutationIpc } from "./sessionImageMutationIpc";
+import { switchWorkspaceRuntimes } from "../sessions/WorkspaceRuntimeSwitch";
+import type { WorkspaceRuntimeSwitchInput } from "../../shared/types/workspaceRuntime";
 
 function isDshModelDiscoveryInput(input: unknown): input is DshModelDiscoveryInput {
 	if (!isRecord(input) || typeof input.settingsNs !== "string" || !input.settingsNs.trim()) return false;
@@ -1311,6 +1313,28 @@ export function registerSessionIpc(deps: SessionIpcDeps): void {
 		sessionRuntimeCoordinator.setFocusedSession(typeof sessionId === "string" && sessionId.trim() ? sessionId.trim() : undefined);
 	});
 	ipcMain.handle(ipcChannels.sessionsRuntimeStop, (_event, target: SessionRuntimeTarget) => stopSessionRuntime(target));
+	ipcMain.handle(ipcChannels.sessionsWorkspaceSwitch, async (_event, input: unknown) => {
+		if (!isRecord(input) || typeof input.toProjectId !== "string" || typeof input.terminateBusy !== "boolean" || (input.fromProjectId !== undefined && typeof input.fromProjectId !== "string")) return { status: "failed", error: "Invalid workspace switch input" };
+		const request: WorkspaceRuntimeSwitchInput = { toProjectId: input.toProjectId, fromProjectId: input.fromProjectId, terminateBusy: input.terminateBusy };
+		if (!projectStore.get(request.toProjectId) || (request.fromProjectId && !projectStore.get(request.fromProjectId))) return { status: "failed", error: "Workspace not found" };
+		return switchWorkspaceRuntimes(request, {
+			listProject: (id) => agentManager.listWorkspaceAgents(id),
+			pauseProject: (id) => agentManager.pauseWorkspaceAgents(id),
+			resumeProject: (id) => agentManager.resumeWorkspaceAgents(id),
+			stopAgent: async (id) => {
+				// standby 不出现在 CompositeAgentGateway 的可见清单中；未绑定的 pi
+				// 进程由实际 owner 停止，已绑定会话仍走 coordinator 的 generation 收尾。
+				if (!sessionRuntimeCoordinator.getRuntimeBinding(id)) await agentManager.stop(id);
+				else {
+					const result = await sessionRuntimeCoordinator.stopAgentById(id);
+					if (!result.ok) throw new Error(result.error.debugDetails ?? result.error.code);
+					if (result.value) emitSessionRuntimeDetach(result.value);
+				}
+				terminalManager.closeAgent(id);
+			},
+			logFailure: (error) => void appLogger.error("workspace-runtime", "Workspace switch failed", { error: error instanceof Error ? error.message : String(error) }),
+		});
+	});
 	ipcMain.handle(ipcChannels.sessionsRuntimeAbort, (_event, target: SessionRuntimeTarget) => sessionRuntimeCoordinator.abortRuntime(target));
 	ipcMain.handle(ipcChannels.sessionsRuntimeRestart, async (_event, target: SessionRuntimeTarget) => {
 		terminalManager.closeAgent(target.agentId);

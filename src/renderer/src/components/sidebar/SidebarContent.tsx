@@ -18,7 +18,6 @@ import { Button } from "../ui-shadcn/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
 import { Dock, DockItem } from "../motion/dock";
 import { UpdateDotHint } from "./UpdateDotHint";
-import { AnnouncementCenter } from "./AnnouncementCenter";
 import { AutomationDockButton } from "../automation/AutomationDockButton";
 import { HostPluginDockButtons } from "../plugins/HostPluginDockButtons";
 import { BridgeGuiSlot } from "../bridge/BridgeSlot";
@@ -27,12 +26,12 @@ import { displayProjectDirectoryName, isChatProject } from "../../rendererUtils"
 import { formatAccelerator } from "../../../../shared/shortcuts";
 import { desktopApi } from "../../desktopApi";
 import { useShortcutBindings } from "../../hooks/useShortcutBindings";
-import { WorkspaceNavigation, type WorkspaceNavigationPort } from "./WorkspaceNavigation";
+import type { WorkspaceNavigationPort } from "./WorkspaceNavigation";
 
 export type SidebarActions = {
 	projects: {
 		add: () => Promise<string | undefined>;
-		select: (projectId: string) => void;
+		select: (projectId: string) => void | boolean | Promise<boolean>;
 		refresh: (projectId: string) => Promise<void>;
 		/** 重扫所有项目目录的存在性并刷新侧栏清单。 */
 		refreshAll: () => Promise<void>;
@@ -56,8 +55,8 @@ export type SidebarActions = {
 	};
 	sessions: {
 		simpleNavigation?: boolean;
-		/** 单击模式由App决定；仅标签模式支持双击晋升常驻。 */
-		open: (projectId: string, sessionId: string, tabMode?: "preview" | "permanent") => Promise<void>;
+		/** 显式返回 false 表示选择未成功；旧适配器返回 void 仍兼容。 */
+		open: (projectId: string, sessionId: string, tabMode?: "preview" | "permanent") => Promise<boolean | void>;
 		/**
 		 * 按需预加载会话 catalog：活动页「最近会话」要跨项目数据，而 catalog 平时只在
 		 * 展开/选中项目时才扫描。已在 loading/ready 的项目会被跳过，不会重复触发扫描。
@@ -139,7 +138,6 @@ export type SidebarContentProps = {
 	/** 「新建会话」：打开初始引导页（居中输入框 + 项目下拉切换），由 App 提供。 */
 	onOpenNewSession?: () => void;
 	onOpenSettings?: () => void;
-	onOpenFeedback?: () => void;
 	/** 底栏主题切换：当前主题模式 + 点击循环（浅色→暗色→跟随系统），由 App 提供。 */
 	themeMode?: AppThemeMode;
 	onToggleTheme?: () => void;
@@ -178,7 +176,7 @@ export function SidebarContent(props: SidebarContentProps) {
 	// 注意不能拿 menuAgent.sessionId 直接查 runtimeBySessionId：AgentTab.sessionId
 	// 是 pi 自身会话 id，而 runtimeBySessionId 的 key 是会话记录 id，必须按 agentId 反查。
 	const menuAgentCanRpcLog = menuAgent !== undefined && getBoundSidebarRuntimeAgentByAgentId(controller.catalog, menuAgent.id) !== undefined;
-	// 顶部「搜索」菜单项控制 MorphingSearch 命令面板的展开状态。
+	// 底栏图标与全局快捷键共用 MorphingSearch 命令面板状态。
 	const [searchOpen, setSearchOpen] = useState(false);
 	// 生效快捷键绑定（用户设置可改），kbd 提示跟随真实键位；设置保存后自动刷新
 	const { bindings: shortcutBindings, platform } = useShortcutBindings();
@@ -266,11 +264,10 @@ export function SidebarContent(props: SidebarContentProps) {
 			{/* 品牌区提到 body 外：贴侧栏顶边，不被 sidebar-body 的 px/py 顶开（logo 怼左上）。 */}
 			{props.chrome}
 			<div className="sidebar-body flex min-h-0 flex-1 flex-col gap-2 px-2 pt-2 pb-1">
-				<WorkspaceNavigation controller={controller} navigation={props.navigation} projectId={props.currentProjectId} sessionId={props.currentSessionId} removingWorktreePaths={props.removingWorktreePaths} worktreesByProject={props.worktreesByProject} branchByProject={props.branchByProject} />
 				{/* MorphingSearch 命令面板：锚点固定定位到视口水平居中、垂直约 1/5 处，
             （VSCode/Raycast 式 command 弹窗），而不是贴在搜索按钮旁。锚点不可见但保留
             真实尺寸供 getBoundingClientRect 测量，面板从锚点位置展开即居中。 */}
-				<div className="pointer-events-none fixed left-1/2 top-[16vh] z-50 w-[min(640px,calc(100vw-2rem))] -translate-x-1/2">
+				<div aria-hidden="true" inert className="pointer-events-none fixed left-1/2 top-[16vh] z-50 w-[min(640px,calc(100vw-2rem))] -translate-x-1/2">
 					<MorphingSearch
 						items={searchItems}
 						placeholder={t("app.searchSessions")}
@@ -296,28 +293,13 @@ export function SidebarContent(props: SidebarContentProps) {
 					<BridgeGuiSlot sessionId={props.currentSessionId} slot="sidebar.section" className="flex flex-col gap-2 px-2 py-2" />
 				</section>
 			</div>
-			<div className="flex max-h-[18vh] shrink-0 flex-col gap-0.5 overflow-y-auto border-t border-border/40 px-2 py-1 [&_button]:shrink-0">
-				<Button variant="ghost" className="h-7 justify-start gap-2 px-2 text-caption text-muted-foreground" aria-label={t("app.searchSessions")} onClick={() => setSearchOpen(true)}>
-					<Search className="size-3.5" />
-					{t("app.searchSessions")}
-					<kbd className="ml-auto text-micro">{searchKbd}</kbd>
-				</Button>
-				<AutomationDockButton />
-				<HostPluginDockButtons />
-			</div>
-			{/* 底栏 dock（beUI Dock）：设置/公告/反馈/主题切换收进浮动卡片，铺满底栏宽度
-          （w-full + justify-between 让四个动作均匀分布，侧栏最小宽 208px 时也不溢出）。
-          DockItem 只提供尺寸与居中容器，按钮本体仍是 shadcn ghost；四入口 hover 提示
-          统一走 styled Tooltip（side="right"/delay 300），不用原生 title——原生 title
-          会与 Tooltip 双弹且样式割裂（回归见 sidebarBottomButtons.test.mjs）。
-          行容器带 relative：首次解释气泡挂在整行上（左缘铺满行宽），不能寄生在 32px
-          的 DockItem 内——否则 224px 气泡会溢出侧栏左缘被裁剪（回归见 updateDotHintAnchor）。 */}
-			{!props.isLanWeb && (
-				<div className="relative flex shrink-0 items-center px-2 pb-2 pt-1">
-					{/* 首次解释气泡：圆点第一次出现时指向设置按钮（Material feature discovery），
-              与 Dock 同级挂载（铺满行宽，箭头指向最左侧的设置按钮） */}
-					<UpdateDotHint hasPendingUpdate={hasPendingUpdate} onOpenSettings={() => props.onOpenSettings?.()} />
-					<Dock size={32} className="w-full justify-between">
+			<HostPluginDockButtons />
+			{/* Four desktop actions share one dock. Web keeps its existing search/task access.
+               UpdateDotHint stays outside DockItem so it is not clipped to the icon. */}
+			<div className="relative flex shrink-0 items-center px-2 pb-2 pt-1" data-testid="sidebar-dock">
+				{!props.isLanWeb && <UpdateDotHint hasPendingUpdate={hasPendingUpdate} onOpenSettings={() => props.onOpenSettings?.()} />}
+				<Dock size={32} className="w-full justify-between">
+					{!props.isLanWeb && (
 						<DockItem>
 							<div className="relative size-full">
 								{/* 有可用更新时：圆点 + 富 tooltip 清单（谁有更新、版本号），点击进入设置页查看。
@@ -347,23 +329,24 @@ export function SidebarContent(props: SidebarContentProps) {
 								{hasPendingUpdate && <span className="pointer-events-none absolute right-1 top-1 size-2 rounded-full bg-[var(--color-accent)] ring-2 ring-[var(--color-bg-sidebar)]" aria-hidden="true" />}
 							</div>
 						</DockItem>
-						{/* 公告中心入口：未读红点在组件内部按 atom 派生（单一 owner） */}
-						<DockItem>
-							<AnnouncementCenter />
-						</DockItem>
-						<DockItem>
-							{/* 反馈入口：与设置/公告统一 styled Tooltip（原生 title 移除，防双弹）；aria-label 保留读屏契约 */}
-							<Tooltip delayDuration={300}>
-								<TooltipTrigger asChild>
-									<Button type="button" variant="ghost" className="size-full rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t("feedback.title")} onClick={props.onOpenFeedback}>
-										<MessageSquare className="size-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent side="right" sideOffset={6}>
-									{t("feedback.title")}
-								</TooltipContent>
-							</Tooltip>
-						</DockItem>
+					)}
+					<DockItem>
+						<Tooltip delayDuration={300}>
+							<TooltipTrigger asChild>
+								<Button type="button" variant="ghost" className="size-full rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t("app.searchSessions")} onClick={() => setSearchOpen(true)}>
+									<Search className="size-4" aria-hidden="true" />
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent side="right" sideOffset={6}>
+								<span>{t("app.searchSessions")}</span>
+								<kbd className="ml-2 text-micro">{searchKbd}</kbd>
+							</TooltipContent>
+						</Tooltip>
+					</DockItem>
+					<DockItem>
+						<AutomationDockButton />
+					</DockItem>
+					{!props.isLanWeb && (
 						<DockItem>
 							{/* 主题切换：Tooltip 文案随当前模式变化（主题：X（点击切换）），与其它入口同一观感 */}
 							<Tooltip delayDuration={300}>
@@ -377,9 +360,9 @@ export function SidebarContent(props: SidebarContentProps) {
 								</TooltipContent>
 							</Tooltip>
 						</DockItem>
-					</Dock>
-				</div>
-			)}
+					)}
+				</Dock>
+			</div>
 
 			{menuProject && menu?.kind === "project" && (
 				<ProjectContextMenu

@@ -82,7 +82,7 @@ test("typed text grows the editor up to a dsh-like cap then scrolls", () => {
 	assert.match(rendererUtils, /COMPOSER_TEXT_MAX_HEIGHT = 336/);
 	assert.match(composerArea, /--composer-text-max-height/);
 	assert.match(composerArea, /COMPOSER_TEXT_MAX_HEIGHT/);
-	assert.match(tipTapComposer, /tiptap-composer-host flex min-w-0 flex-1 flex-col overflow-hidden/);
+	assert.match(tipTapComposer, /tiptap-composer-host\s+grid\s+min-w-0\s+flex-1\s+overflow-hidden/);
 	assert.match(timelineCss, /\.composer \.tiptap-composer-host \.ProseMirror,\s*\.composer \.tiptap-composer-host \.rich-input \{[\s\S]*?max-height:\s*var\(--composer-text-max-height,\s*336px\);[\s\S]*?overflow-y:\s*auto;/);
 });
 

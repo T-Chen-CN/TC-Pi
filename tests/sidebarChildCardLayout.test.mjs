@@ -105,7 +105,8 @@ test("sidebar omits the redundant projects heading and tabs shrink to their titl
 
 	assert.doesNotMatch(sidebarContent, /FolderTree/);
 	// 四入口工作区导航替代旧分段；文件管理保留单一挂载点。
-	assert.match(sidebarContent, /<WorkspaceNavigation\s/);
+	assert.match(readFileSync("src/renderer/src/components/sidebar/AppSidebar.tsx", "utf8"), /<WorkspaceNavigationMount>\s*<WorkspaceNavigation\s/);
+	assert.doesNotMatch(sidebarContent, /<WorkspaceNavigation\s/);
 	assert.match(sidebarContent, /\{props\.workspaceFiles\}/);
 	assert.doesNotMatch(sidebarContent, /<TabsTrigger\s/);
 	// 固定 Tab 与普通 Tab 同宽策略：不再用 w-20 固定宽度（Pin 图标挤占标题空间）

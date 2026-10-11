@@ -33,8 +33,6 @@ import {
 	setSessionDraftAtom,
 	setSessionPasteFilesAtom,
 	setSessionSendStateAtom,
-	upsertSessionAtom,
-	acpToolsAtom,
 	type PastedTextFile,
 } from "../atoms";
 import {
@@ -65,8 +63,7 @@ import { formatBytes } from "../../../shared/formatBytes";
 import { t } from "../i18n";
 import { COMPOSER_IMAGE_MAX_BYTES, ComposerImageError, dataUrlToFile, getClipboardImageFiles, getDroppedImageFiles, imageMimeTypeFromPath, isImageFilePath, processComposerImageFile } from "../utils/composerImages";
 import { PASTE_TO_FILE_MIN_CHARS } from "../rendererUtils";
-import { resolveBackendSwitchDefaults } from "../utils/backendSwitchDefaults";
-import { GUIDE_BOOTSTRAP_SESSION_ID, readWelcomeBackendPreference, readWelcomeDshModelPreference, readWelcomeModelPreference, resolveGuidePageBackend, WELCOME_BACKEND_KEY } from "../utils/chatSessionBootstrap";
+import { GUIDE_BOOTSTRAP_SESSION_ID, readWelcomeBackendPreference, readWelcomeDshModelPreference, readWelcomeModelPreference, resolveGuidePageBackend } from "../utils/chatSessionBootstrap";
 import { showNotice } from "../utils/notice";
 import { requireSessionCommand, toSessionRuntimeTarget } from "../utils/sessionCommands";
 import { buildDraftResourceCommands, draftResourceCommandsForProject, selectComposerSuggestionCommands, standbyPreviewCommandsForProject, type DraftResourceCommandSnapshot, type StandbyPreviewCommandSnapshot } from "../utils/draftResourceCommands";
@@ -309,12 +306,11 @@ export function useSessionComposerController(options: UseSessionComposerControll
 
 	// DSH：plan 由 host 持有；goal 由本地选择或进行中/阻塞的目标驱动（切回普通会 pause）。
 	// 生图为独立供应商配置，不属于 pi/dsh 任一后端，两种后端均可用。
-	// 引导页虚拟会话的后端显式选择：无 record、不落 catalog，后端切换走
-	// localStorage 偏好（与 pickModel/pickThinking 的引导页分支同构），首次发送
-	// 由 App.ensureSessionForSend 读取同一份偏好创建真实会话。仅在引导页初始化，
+	// 保留读取旧版引导页后端偏好以兼容已有配置；单 pi 版本不提供切换入口。
+	// 首次发送仍由 App.ensureSessionForSend 读取同一份偏好。仅在引导页初始化，
 	// 真实会话（record 短暂未就绪）不受 localStorage 残留影响。
 	const isGuideBootstrapSession = sessionId === GUIDE_BOOTSTRAP_SESSION_ID;
-	const [guideBackendOverride, setGuideBackendOverride] = useState<AgentBackend | undefined>(() => (isGuideBootstrapSession ? readWelcomeBackendPreference() : undefined));
+	const [guideBackendOverride] = useState<AgentBackend | undefined>(() => (isGuideBootstrapSession ? readWelcomeBackendPreference() : undefined));
 	const isDshBackend = record?.backend === "dsh" || runtime?.backend === "dsh" || (isGuideBootstrapSession && guideBackendOverride === "dsh");
 	const hasImageGenHistory = (messageCache?.messages ?? []).some((message) => Boolean(message.meta?.imageGen));
 	// 生图供应商/模型来自独立 imagegen.json，与会话 LLM 模型无关。
@@ -1682,83 +1678,6 @@ export function useSessionComposerController(options: UseSessionComposerControll
 		setSendStateAtom({ sessionId, state: { status: "idle" } });
 	}, [sessionId, setSendStateAtom]);
 
-	const upsertSession = useSetAtom(upsertSessionAtom);
-
-	/**
-	 * 切换后端（pi ↔ dsh）：仅草稿期可用。
-	 * 会话一旦激活（有 runtime 或 record 已 active）即锁定后端——pi 会话文件（JSONL）
-	 * 与 DSH 会话（host session log）格式不同，中途切换会导致时间线消息来源混乱、
-	 * 同步渲染不可靠。激活后 UI 不再渲染切换器（changeBackend 返回 undefined）。
-	 * imagegen 后端同样锁定：生图会话不可切回 pi/dsh（互不影响）。
-	 */
-	const backendLocked = Boolean(runtime?.agentId) || record?.status === "active" || record?.backend === "imagegen";
-	const changeBackend = useCallback(
-		async (next: AgentBackend, explicitAcpToolId?: string) => {
-			if (backendLocked) return;
-			// 引导页虚拟会话（无 catalog record）：与 pickModel/pickThinking 的引导页
-			// 分支同构——显式选择写 localStorage 偏好并本地即时回显，不走 IPC。
-			// 直接 updateRecord("renderer:guide-bootstrap") 在主进程必然查不到会话，
-			// 报「会话不存在，请刷新会话列表后重试」（2026-09 用户反馈的新建页切 DSH 报错）。
-			// 首次发送时 App.ensureSessionForSend 读取同一份偏好创建真实会话，选择不丢失。
-			if (isGuideBootstrapSession) {
-				setGuideBackendOverride(next);
-				try {
-					localStorage.setItem(WELCOME_BACKEND_KEY, next);
-				} catch {
-					// localStorage 不可用时静默；本次页面内仍由 guideBackendOverride 即时生效
-				}
-				return;
-			}
-			try {
-				// ACP：切换时必须带上工具预选（激活链 spawn 按工具表取命令行），
-				// 默认沿用会话已选或登记表第一项；工具表为空（开关刚被关）不切换。
-				let acpToolId: string | undefined;
-				if (next === "acp") {
-					const tools = store.get(acpToolsAtom);
-					// picker 两页式弹层内选定的工具优先；否则沿用会话已选 ?? 登记表第一项
-					acpToolId = explicitAcpToolId ?? record?.acpToolId ?? tools[0]?.id;
-					if (!acpToolId) {
-						showNotice(t("app.acpNoTools"), 4000);
-						return;
-					}
-				}
-				// 切回 pi 时按 pi 配置重新解析默认模型/思考档位（与 createDraft 缺省填充
-				// 同一解析器 launchDefaults），而不是直接清空——否则用户 pi 配置里的
-				// defaultProvider/defaultModel 不会出现在切回后的会话（底栏回退残留 DSH 默认）。
-				// dsh/imagegen/acp 后端模型由各自部署默认决定，record 保持清空。
-				const resolved = next === "pi" ? await desktopApi.sessions.resolveLaunchDefaults({ backend: "pi" }).catch(() => undefined) : undefined;
-				const defaults = resolveBackendSwitchDefaults(next, resolved);
-				const updated = await desktopApi.sessions.updateRecord(sessionId, {
-					backend: next,
-					model: defaults.model,
-					thinkingLevel: defaults.thinkingLevel,
-					...(next === "acp" && acpToolId ? { acpToolId } : {}),
-				});
-				upsertSession(updated);
-			} catch (error) {
-				showNotice(error instanceof Error ? error.message : String(error), 4000);
-			}
-		},
-		[backendLocked, isGuideBootstrapSession, record, sessionId, store, upsertSession],
-	);
-
-	/**
-	 * ACP 工具二级选择（仅草稿期；激活后工具即固定，UI 不再渲染选择器）：
-	 * 写 record.acpToolId，激活链据此从工具表取命令行 spawn。
-	 */
-	const changeAcpTool = useCallback(
-		async (toolId: string) => {
-			if (backendLocked || record?.backend !== "acp") return;
-			try {
-				const updated = await desktopApi.sessions.updateRecord(sessionId, { acpToolId: toolId });
-				upsertSession(updated);
-			} catch (error) {
-				showNotice(error instanceof Error ? error.message : String(error), 4000);
-			}
-		},
-		[backendLocked, record?.backend, sessionId, upsertSession],
-	);
-
 	const compact = useCallback(async () => {
 		const target = toSessionRuntimeTarget(sessionId, runtime);
 		if (!target) {
@@ -1854,13 +1773,9 @@ export function useSessionComposerController(options: UseSessionComposerControll
 		sessionId,
 		record,
 		runtime,
-		// 引导页优先回显显式切换（guideBackendOverride），否则退回上次偏好/默认 pi；
+		// 引导页兼容读取上次偏好（guideBackendOverride），否则使用默认 pi；
 		// 真实会话以 record 为准。
 		backend: record?.backend ?? (isGuideBootstrapSession ? guideBackendOverride : undefined) ?? "pi",
-		/** 草稿期可切换后端；激活后锁定（undefined → UI 隐藏切换器）。 */
-		changeBackend: backendLocked ? undefined : changeBackend,
-		// ACP 工具二级选择（草稿期；激活后 UI 不再渲染选择器）
-		acpTool: record?.backend === "acp" ? { toolId: record.acpToolId, onChange: backendLocked ? undefined : changeAcpTool } : undefined,
 		/** DSH 部署默认模型（settings.yaml agent-default-model）；仅 dsh 后端时展示，
 		 *  离开 dsh 时清空（否则残留值会随 defaultModel 泄漏到 pi 会话底栏）。 */
 		dshDefaultModel: isDshBackend && dshDefault ? { provider: dshDefault.provider, modelId: dshDefault.model, modelName: dshDefault.model } : undefined,

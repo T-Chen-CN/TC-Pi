@@ -50,12 +50,23 @@ export const TipTapComposer = forwardRef<HTMLDivElement, TipTapComposerProps>(fu
 					ref={setHostRef}
 					// overflow-hidden：把滚动关进 ProseMirror；否则 EditorContent 中间层
 					// 不传高度约束时，内容会直接撑出 composer-box。
-					className="tiptap-composer-host flex min-w-0 flex-1 flex-col overflow-hidden"
+					className="tiptap-composer-host grid min-w-0 flex-1 overflow-hidden"
 					data-placeholder={props.placeholder}
 					onFocus={props.onFocus}
 					onBlur={props.onBlur}
 				>
-					<EditorContent editor={editor} className="tiptap-composer-surface flex min-w-0 flex-1 flex-col overflow-hidden" />
+					<EditorContent editor={editor} className="tiptap-composer-surface flex min-w-0 flex-1 flex-col overflow-hidden [grid-area:1/1]" />
+					{/* 空提示和编辑器共享 grid 单元：提示换行参与固有高度，点击仍落到编辑器。
+					    不能把提示放进编辑器文档，也不能绝对定位后让空正文裁掉它。 */}
+					{!props.value && props.placeholder && (
+						<div
+							aria-hidden="true"
+							data-testid="composer-placeholder"
+							className="pointer-events-none min-h-12 max-h-[var(--composer-text-max-height,336px)] overflow-hidden whitespace-pre-wrap break-words px-3 py-2.5 text-[length:var(--font-size-input)] leading-[var(--line-height-input)] text-text-secondary opacity-[.82] [grid-area:1/1] [.shell-mode_&]:pl-[18px] [.shell-silent-mode_&]:pl-[18px] [.plan-mode_&]:pl-[18px] [.goal-mode_&]:pl-[18px]"
+						>
+							{props.placeholder}
+						</div>
+					)}
 				</div>
 			</ContextMenuTrigger>
 			<ContextMenuContent alignOffset={-6}>

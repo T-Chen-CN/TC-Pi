@@ -2,7 +2,6 @@ import { Button } from "./components/ui-shadcn/button";
 import { NoticeHistoryDialog } from "./components/ui-shadcn/notice-history-dialog";
 import { useSessionNavigation } from "./hooks/useSessionNavigation";
 import { WorkbenchFileTabs } from "./components/workspace/WorkbenchFileTabs";
-import { ArrowLeft, ArrowRight, PanelLeft } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { toggleThemeMode } from "./themeAppearance";
@@ -50,9 +49,10 @@ import {
 } from "./atoms";
 import { type SidebarActions } from "./components/sidebar/SidebarContent";
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation";
+import { useWorkspaceSwitch } from "./hooks/useWorkspaceSwitch";
+import { WorkspaceSwitchDialog } from "./components/sidebar/WorkspaceSwitchDialog";
 import { useHomeOverview } from "./hooks/useHomeOverview";
 import { HomeOverview } from "./components/home/HomeOverview";
-import { HomeProviders } from "./components/home/HomeProviders";
 import { WorkspaceFileExplorer } from "./components/sidebar/WorkspaceFileExplorer";
 import { AppSidebar } from "./components/sidebar/AppSidebar";
 import { AppBootstrap } from "./components/app/AppBootstrap";
@@ -63,10 +63,8 @@ import { useProjectRuntimeCapabilities } from "./hooks/useRuntimeCapabilities";
 import { useSessionRuntimeBridge } from "./hooks/useSessionRuntimeBridge";
 import { useAgentLoadNotice } from "./hooks/useAgentLoadNotice";
 import { useArchMismatchNotice } from "./hooks/useArchMismatchNotice";
-import { useAnnouncementNotifier } from "./hooks/useAnnouncementNotifier";
 import { useModelsVerifyNotifier } from "./hooks/useModelsVerifyNotifier";
 import { useBackgroundAskPatrol } from "./hooks/useBackgroundAskPatrol";
-import { announcementCenterOpenAtom, announcementNotificationEnabledAtom } from "./atoms/announcement-atoms";
 import { logoStyleAtom } from "./atoms/app-ui-atoms";
 import { LOGO_STYLE_STORAGE_KEY, resolveLogoStyle } from "./components/app/piTuiLogoData";
 import { openProviderLoginAtom } from "./atoms/providerLoginAtoms";
@@ -162,7 +160,6 @@ import { HostPluginPanelHost } from "./components/plugins/HostPluginPanelHost";
 import { HostPluginPageOverlay } from "./components/plugins/HostPluginPageOverlay";
 import { useHostPluginPageTab } from "./hooks/useHostPluginPageTab";
 import { useHostPluginNavigation } from "./hooks/plugins/useHostPluginNavigation";
-import { TerminalDockPanel } from "./components/terminal/TerminalDockPanel";
 import { ResizablePanel, ResizablePanelGroup } from "./components/ui-shadcn/resizable";
 import { AppShell } from "./components/app/AppShell";
 import { WorkspaceDrawerRail } from "./components/workspace/WorkspaceDrawerRail";
@@ -767,7 +764,7 @@ export function App() {
 
 	const activeProjectRuntimeCapabilities = useProjectRuntimeCapabilities(activeProjectId);
 	const activeProject = projects.find((project) => project.id === activeProjectId);
-	const overlays = useOverlayActions({ activeProject, appInfo, showToast });
+	const overlays = useOverlayActions();
 	const sessionsProject = projects.find((project) => project.id === sessionsProjectId);
 	const displayAgents = useMemo(() => {
 		const realIds = new Set(agents.map((agent) => agent.id));
@@ -871,20 +868,6 @@ export function App() {
 		}
 	}, [settings.logoStyle, setLogoStyle]);
 
-	// 公告通知开关 → 渲染层镜像 atom：通知调度与侧栏入口显隐共用同一数据源，
-	// 设置保存后即时生效（settings.get 首拉与 onSettingsApplied 都经此处同步）
-	const setAnnouncementNotifyEnabled = useSetAtom(announcementNotificationEnabledAtom);
-	useEffect(() => {
-		setAnnouncementNotifyEnabled(settings.announcementNotificationEnabled);
-		// 关闭通知时若公告弹窗恰好开着（弹窗与设置弹窗互斥，理论少见），一并收起，
-		// 避免重新开启后残留的 open=true 让弹窗自动弹开
-		if (!settings.announcementNotificationEnabled) {
-			store.set(announcementCenterOpenAtom, false);
-		}
-	}, [settings.announcementNotificationEnabled, setAnnouncementNotifyEnabled, store]);
-
-	// 公告通知调度（读镜像 atom）：输入/Agent 运行中/模态打开/窗口不活跃时自动延后弹出（不打扰操作，见 hook 注释）
-	useAnnouncementNotifier();
 	// toast 展示时长同步给 notice helper（全局统一口径；保存设置即时生效）
 	useEffect(() => {
 		configureNoticeDefaults({ toastDurationMs: settings.toastDurationMs });
@@ -944,27 +927,6 @@ export function App() {
 
 	// Runtime editor text is applied by useSessionComposerController, which owns the draft guard.
 
-	// Layout calculation delegated to useSessionLayout (refs + ResizeObserver + math).
-	// 布局的 terminalRequestedHeight 只看「是否有任一 owner 的终端展开」：分屏下非聚焦栏
-	// 的 dock 也按各自 owner 持续显示，不能随聚焦会话的 open 状态把全局行高打成 0
-	// （否则非聚焦栏的终端面板 defaultSize 变成 0）。
-	const anyTerminalDockOpen = useMemo(() => Object.values(terminalStatesByOwner).some((state) => state.open), [terminalStatesByOwner]);
-	const sessionLayout = useSessionLayout({
-		terminalRequestedHeight: terminalHeight,
-		terminalOpen: anyTerminalDockOpen,
-		// 关闭信号不再让布局行高归零：分屏下其它栏的 dock 仍需要高度；关闭动画期间
-		// 该栏面板已随 open=false 立即卸载，行高保留到 180ms 动画结束不影响布局。
-		terminalClosing: false,
-		terminalCollapsed,
-		queuedPromptCount: activeQueuedPrompts.length,
-	});
-	const { chatPaneRef: sessionChatPaneRef, headerRef: sessionHeaderRef, composerRef: sessionComposerRef, terminalRowHeight, availableTerminalHeight } = sessionLayout;
-
-	// Alias hook refs to the names App.tsx expects.
-	const chatPaneRef = sessionChatPaneRef;
-	const chatHeaderRef = sessionHeaderRef;
-	const composerRef = sessionComposerRef;
-
 	// Gate 4.5 — streaming signal / abort helpers
 	const { listWidth, setListWidth, listCollapsed, setListCollapsed, toggleListCollapsed } = useResize({
 		loadPersistedWidth: loadSidebarWidth,
@@ -1005,9 +967,10 @@ export function App() {
 	const flatFiles = useMemo(() => flattenFiles(files), [files]);
 	// === file editor hook ===
 	const {
-		editorMode,
-		toggleEditorMode,
 		editorTabs,
+		allEditorTabs,
+		markEditorTabDirty,
+		registerEditorCloseGuard,
 		activeTabId,
 		activeTab,
 		readEditorFileContent,
@@ -1023,12 +986,10 @@ export function App() {
 		diffFilePath,
 		openWorkspaceFileDiff,
 		openCommitFileDiff,
-		closeGitDiff,
 		dismissGitDiff,
 		gitDiffDisplayMode,
 		gitDrawerDiff,
 		toggleGitDiffDisplayMode,
-		closeEditor,
 	} = useFileEditor({
 		activeProjectId,
 		activeProjectIdRef,
@@ -1038,8 +999,8 @@ export function App() {
 		modifiedFiles,
 		setDrawer,
 		setDrawerCollapsed,
-		preserveTabsForGit: settings.navigationMode === "simple",
-		contentOpenMode: settings.navigationMode === "simple" ? "split" : (settings.workspaceContentOpenMode ?? "split"),
+		preserveTabsForGit: true,
+		contentOpenMode: "split",
 		showToast,
 		readFileContent: api.files.readContent,
 		readGitOriginalContent: api.git.originalContent,
@@ -1063,11 +1024,12 @@ export function App() {
 		viewFilePath,
 		workspace,
 		gitDrawerDiff,
-		closeGitDiff,
+		closeGitDiff: dismissGitDiff,
 		refreshVisibleFiles,
 		restoreExpandedDirs,
 	});
 
+	const workspaceSwitch = useWorkspaceSwitch(activeProjectId);
 	const workspaceChrome = useSessionWorkspaceChrome({
 		currentSessionId,
 		activeProjectId,
@@ -1086,6 +1048,7 @@ export function App() {
 		createSessionDraft: runCreateSessionDraft,
 		dismissSessionTree,
 	} = useSessionActions({
+		prepareProjectSelection: workspaceSwitch.prepare,
 		openSessionRequestRef,
 		creatingSessionDraftRef,
 		activeProjectId,
@@ -1164,6 +1127,27 @@ export function App() {
 
 	const quickTask = useQuickTask({ ready: settingsLoaded, backend: effectiveAgentBackend, upsertSession, selectSession: selectSessionCommand, registerSession: workspaceChrome.registerOpenSession, refreshProjects, getSessionRecord });
 
+	// Layout calculation delegated to useSessionLayout (refs + ResizeObserver + math).
+	// 布局的 terminalRequestedHeight 只看「是否有任一 owner 的终端展开」：分屏下非聚焦栏
+	// 的 dock 也按各自 owner 持续显示，不能随聚焦会话的 open 状态把全局行高打成 0
+	// （否则非聚焦栏的终端面板 defaultSize 变成 0）。
+	const anyTerminalDockOpen = useMemo(() => Object.values(terminalStatesByOwner).some((state) => state.open), [terminalStatesByOwner]);
+	const sessionLayout = useSessionLayout({
+		terminalRequestedHeight: terminalHeight,
+		terminalOpen: quickTask.active && anyTerminalDockOpen,
+		// 关闭信号不再让布局行高归零：分屏下其它栏的 dock 仍需要高度；关闭动画期间
+		// 该栏面板已随 open=false 立即卸载，行高保留到 180ms 动画结束不影响布局。
+		terminalClosing: false,
+		terminalCollapsed,
+		queuedPromptCount: activeQueuedPrompts.length,
+	});
+	const { chatPaneRef: sessionChatPaneRef, headerRef: sessionHeaderRef, composerRef: sessionComposerRef, terminalRowHeight, availableTerminalHeight } = sessionLayout;
+
+	// Alias hook refs to the names App.tsx expects.
+	const chatPaneRef = sessionChatPaneRef;
+	const chatHeaderRef = sessionHeaderRef;
+	const composerRef = sessionComposerRef;
+
 	// 桌面插件发起的会话导航：broker 已验权限/归属，这里只注入现有选中动作（复用唯一选中路径）
 	useHostPluginNavigation(selectSessionCommand);
 
@@ -1210,21 +1194,6 @@ export function App() {
 			return session;
 		},
 		[runCreateSessionDraft, workspaceChrome],
-	);
-
-	/**
-	 * 问题反馈「新建会话分析」：在活动项目新建草稿会话并选中，把 AI 提示词预填进
-	 * 该会话输入框（composer 草稿）。pi 启动后会自动加载项目 AGENTS.md 与技能，
-	 * 提示词里的诊断报告 + 项目上下文可让 pi 在正确约束下排查。
-	 */
-	const handleFeedbackCreateSession = useCallback(
-		async (prompt: string): Promise<boolean> => {
-			const session = await createSessionDraftWithTab();
-			if (!session) return false;
-			setSessionDraft({ sessionId: session.id, value: prompt });
-			return true;
-		},
-		[createSessionDraftWithTab, setSessionDraft],
 	);
 
 	/** 侧栏/分支打开：选中成功后按 preview|permanent 登记 Tab */
@@ -1665,8 +1634,9 @@ export function App() {
 		// 先同步 DSH：新目录注册后，原先按 cwd 找不到项目的外部会话才能挂进来。
 		await syncDshForeignSessionsIfEnabled();
 		await refreshProjects();
-		setActiveProjectId(project.id);
-		await refreshProjectSessions(project.id);
+		if (!(await selectProjectCommand(project.id))) return;
+		// 已接受的目录选择先交给导航呈现，catalog 后台加载不能把首页留在旧画面。
+		void refreshProjectSessions(project.id).catch((error) => showToast(error instanceof Error ? error.message : String(error), 4000));
 		return project.id;
 	}
 
@@ -1907,12 +1877,13 @@ export function App() {
 		projects: {
 			add: addProject,
 			select: (projectId) => {
-				selectProjectCommand(projectId);
+				const selection = selectProjectCommand(projectId);
 				// 点开目录只选中项目并显示引导页：不自动创建会话，避免每点一个目录都
 				// 悄悄新建一个 agent 会话 tab。创建由用户手动点「启动 Agent / 临时对话」
 				// 触发；启动时首项目自动选中除外（见 bootstrapProps.onProjectsChanged）。
 				// 项目点击选中即按需加载 catalog（已加载/加载中的跳过）。
 				ensureProjectCatalogLoaded(projectId);
+				return selection;
 			},
 			refresh: async (projectId) => {
 				const project = projects.find((candidate) => candidate.id === projectId);
@@ -1953,7 +1924,7 @@ export function App() {
 			// 简洁模式没有临时预览；标签模式保留原设置及双击晋升。
 			simpleNavigation: settings.navigationMode === "simple",
 			open: async (projectId, sessionId, tabMode) => {
-				await openSidebarSessionByIdWithTab(projectId, sessionId, settings.navigationMode === "simple" ? "permanent" : (tabMode ?? settings.sessionTabOpenMode));
+				return Boolean(await openSidebarSessionByIdWithTab(projectId, sessionId, settings.navigationMode === "simple" ? "permanent" : (tabMode ?? settings.sessionTabOpenMode)));
 			},
 			// 活动页「最近会话」跨项目展示：后台静默预热尚未扫描的项目 catalog。
 			ensureCatalogsLoaded: (projectIds) => {
@@ -2075,7 +2046,7 @@ export function App() {
 		},
 	};
 
-	const workspaceNavigation = useWorkspaceNavigation(sidebarActions, activeProjectId, currentSessionId);
+	const workspaceNavigation = useWorkspaceNavigation(sidebarActions, activeProjectId, currentSessionId, workspaceSwitch.prepare);
 	const refreshHomeOverview = useHomeOverview(workspaceNavigation.page === "home" && !quickTask.active);
 
 	// Gate 4.6 — Session view wrapped in SessionRuntimeInjector / ChatSessionPane
@@ -2247,22 +2218,8 @@ export function App() {
 		onClose: workspaceChrome.closeTab,
 		onCloseOthers: workspaceChrome.closeOtherTabs,
 		onCloseAll: workspaceChrome.closeAllTabs,
-		// Tab 栏 “+” 下拉的新建目标：聊天对话区置顶，其余按侧栏项目顺序
-		newSessionTargets: projects
-			.map((project) => ({
-				projectId: project.id,
-				label: isChatProject(project) ? t("app.chatProject") : project.name,
-				isChat: isChatProject(project),
-			}))
-			.sort((a, b) => Number(b.isChat) - Number(a.isChat)),
-		onNewSessionInProject: (projectId: string) => {
-			void createSessionDraftWithTab(projectId);
-		},
-		// ACP 工具会话入口（Tab 栏 + 下拉尾部，工具→项目二级）：走 sidebarActions.createAcp，
-		// 与设置页共用同一条创建链（backend=acp + acpToolId）。
-		onNewAcpSession: (projectId: string, toolId: string) => {
-			void sidebarActions.sessions.createAcp(projectId, toolId);
-		},
+		// 会话栏的新建范围与当前工作区一致，独立聊天同样使用自己的项目身份。
+		onNewSession: activeProjectId ? () => void createSessionDraftWithTab(activeProjectId) : undefined,
 		onTogglePin: workspaceChrome.togglePin,
 		onReorder: workspaceChrome.reorderTab,
 		// 分屏组胶囊：分屏内会话聚合为组（颜色标记 + 展开/收起）
@@ -2294,8 +2251,6 @@ export function App() {
 		onOpenProxySetting: currentSessionId ? () => setProxyDialogSessionId(currentSessionId) : undefined,
 		onToggleDrawer: toggleRightDrawer,
 		drawerOpen: Boolean(drawer && !drawerCollapsed),
-		listCollapsed,
-		onToggleListCollapsed: toggleListCollapsed,
 		onDragSessionChange: (sessionId: string | null) => {
 			if (sessionId) workspaceChrome.beginDrag(sessionId);
 			else workspaceChrome.endDrag();
@@ -2307,9 +2262,10 @@ export function App() {
 			chatHeaderRef,
 			composerRef,
 			composerOffsetHeight,
-			terminalRowHeight,
+			terminalRowHeight: quickTask.active ? terminalRowHeight : 0,
+			terminalInSession: quickTask.active,
 		}),
-		[composerOffsetHeight, terminalRowHeight],
+		[composerOffsetHeight, terminalRowHeight, quickTask.active],
 	);
 	// App 级激活 owner 键（聚焦会话/runtime 对应桶）：分屏各栏用它做“同 owner 去重”参照；
 	// 先算成稳定字符串再进 memo 依赖，避免 terminalOwner 每次渲染新建对象把 memo 打穿。
@@ -2456,60 +2412,20 @@ export function App() {
 					/>
 				</div>
 			) : (
-				// 无当前会话（普通项目点开 / 所有 Tab 关闭）时，普通项目与 Chat 项目
-				// 共享统一空态；快捷操作新建 Agent / 匿名聊天，无项目时引导添加项目。
-				// 引导页同样可以打开项目级终端（owner=project）：与有会话视图同构的
-				// 垂直分屏形态，分隔条拖拽调高，高度经 localStorage 持久化跨重启恢复。
-				// key 随终端挂载变化：面板数变化必须重建 Group（同 sessionResizableGroupKey）。
-				<ResizablePanelGroup key={`empty-terminal-${terminalDockVisible ? "docked" : "solo"}`} orientation="vertical" className="min-h-0 flex-1">
-					<ResizablePanel id="empty-main" minSize={200} className="flex min-h-0 flex-col">
-						{/* 无会话空态：引导页 = 新建页面形态（居中 ComposerArea + 虚拟会话），
-                不登记 Tab；首次发送才由 ensureSessionForSend 创建真实会话并落 Tab */}
-						<ProjectEmptyState activeProject={activeProject} projects={projects} onAddProject={() => void addProject()} onSelectProject={selectProjectCommand} />
-					</ResizablePanel>
-					{!isLanWeb && terminalDockVisible && terminalTarget && (
-						<TerminalDockPanel
-							target={terminalTarget}
-							open={terminalOpen}
-							closing={terminalDockClosing}
-							collapsed={terminalCollapsed}
-							height={terminalRowHeight}
-							maxHeight={availableTerminalHeight ?? 120}
-							terminal={api.terminal}
-							terminalSettings={terminalSettings}
-							onThemeChange={setTerminalTheme}
-							ownerKey={terminalOwner ? terminalOwnerKey(terminalOwner) : undefined}
-							onOpenChange={setTerminalOpenForOwner}
-							onCollapsedChange={setTerminalCollapsedForOwner}
-							onHeightChange={setTerminalHeight}
-						/>
-					)}
-				</ResizablePanelGroup>
+				<ProjectEmptyState activeProject={activeProject} projects={projects} onAddProject={() => void addProject()} onSelectProject={selectProjectCommand} />
 			)}
 		</SessionPaneServicesProvider>
 	);
 
 	const workbenchTheme: "dark" | "light" = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 
-	// Git Diff 优先于文件编辑器（同一时刻只挂一份阅读面）
+	// Git Diff 优先呈现，所有文件实例保持挂载以保留工作区撤销历史。
 	const workbenchHasGitDiff = Boolean(gitDrawerDiff && gitDrawerDiff.projectId === activeProjectId);
 	const workbenchHasEditor = Boolean(activeTab) && !workbenchHasGitDiff;
 	const workbenchHasContent = workbenchHasGitDiff || workbenchHasEditor;
-	// 工作台内容区宽度：分屏（文件/Diff 在右）时右缘刻度轴需贴消息区右缘，
-	// 由 WorkbenchStage 实时上报（split 分屏才上报；solo/maximize 归零）。
-	const [workbenchContentWidth, setWorkbenchContentWidth] = useState(0);
-	const handleWorkbenchContentWidth = useCallback((width: number) => {
-		setWorkbenchContentWidth((current) =>
-			// 相同宽度跳过，避免拖拽分隔条时反复重渲染
-			current === width ? current : width,
-		);
-	}, []);
 	const simpleMode = settings.navigationMode === "simple";
-	const [simpleContentExpanded, setSimpleContentExpanded] = useState(false);
-	useEffect(() => setSimpleContentExpanded(false), [activeTabId, gitDrawerDiff?.filePath, simpleMode]);
-	const workbenchLayout = simpleMode ? (simpleContentExpanded ? "maximize" : "split") : workbenchHasGitDiff ? gitDiffDisplayMode : editorMode;
 
-	// 文件/Diff Tab 挂进总 SessionTabsBar：与会话共用一条栏，内容区不再另起绿条 Tab
+	// 文件/Diff 标签只属于中央；会话标签在常驻右侧，彼此不抢选中态。
 	const fileTabs = editorTabs.map((tab) => ({
 		id: tab.id,
 		label: tab.label ?? tab.filePath.split(/[/\\]/).pop() ?? tab.filePath,
@@ -2517,7 +2433,7 @@ export function App() {
 		preview: tab.id === previewEditorTabId,
 		active: !workbenchHasGitDiff && tab.id === activeTabId,
 	}));
-	const workbenchEditorTabs = [...(simpleMode || !workbenchHasGitDiff ? fileTabs : []), ...(workbenchHasGitDiff && gitDrawerDiff ? [{ id: `git-diff:${gitDrawerDiff.filePath}`, label: gitDrawerDiff.label, title: gitDrawerDiff.filePath, active: true }] : [])];
+	const workbenchEditorTabs = [...fileTabs, ...(workbenchHasGitDiff && gitDrawerDiff ? [{ id: `git-diff:${gitDrawerDiff.filePath}`, label: gitDrawerDiff.label, title: gitDrawerDiff.filePath, active: true }] : [])];
 
 	// 工具开关上收会话 Tab 栏（原右侧悬浮工具条入口的唯一挂载点）：
 	// 草稿纸 / 终端 / 外部编辑器，与抽屉开关同排。
@@ -2590,11 +2506,9 @@ export function App() {
 	};
 	const closeWorkbenchTab = (id: string) => {
 		if (id.startsWith("git-diff:")) {
-			if (simpleMode) dismissGitDiff();
-			else closeGitDiff();
+			dismissGitDiff();
 		} else closeEditorTab(id);
 	};
-	const toggleSimpleContent = () => setSimpleContentExpanded((value) => !value);
 	// 页面式插件面板伪 Tab：tab 模式下挂进 SessionTabsBar（打开时会话 Tab 退非选中，
 	// 点任意会话 Tab 即收起）；simple 模式不挂（插件页直接铺满会话区，由 Overlay 承担）。
 	const hostPluginPageTab = useHostPluginPageTab();
@@ -2614,63 +2528,67 @@ export function App() {
 			sessionActions={tabsSessionActions}
 			contextSessionActions={buildTabsSessionActions}
 			toolActions={sessionToolActions}
-			editorTabs={simpleMode ? [] : workbenchEditorTabs}
-			onSelectEditorTab={(tabId) => {
-				if (workbenchHasGitDiff) return;
-				selectEditorTab(tabId);
-			}}
-			onCloseEditorTab={(tabId) => {
-				if (workbenchHasGitDiff) {
-					closeGitDiff();
-					return;
-				}
-				closeEditorTab(tabId);
-			}}
-			onPromoteEditorPreview={promotePreviewEditorTab}
+			editorTabs={[]}
 		/>
 	);
 
-	const workbenchContentNode = workbenchHasContent ? (
+	const workbenchContentNode = (
 		<WorkbenchContent
 			theme={workbenchTheme}
 			maxFileSizeMB={settings.maxEditorFileSizeMB}
-			editorTabs={editorTabs}
-			onDirty={promotePreviewEditorTab}
+			editorTabs={allEditorTabs}
+			onDirty={(id) => markEditorTabDirty(id, true)}
+			onSaved={(id) => markEditorTabDirty(id, false)}
+			registerCloseGuard={registerEditorCloseGuard}
 			gitDiff={workbenchHasGitDiff && gitDrawerDiff ? gitDrawerDiff : null}
-			gitDiffDisplayMode={simpleMode ? workbenchLayout : gitDiffDisplayMode}
-			onToggleGitDiffMode={simpleMode ? toggleSimpleContent : toggleGitDiffDisplayMode}
-			onCloseGitDiff={simpleMode ? dismissGitDiff : closeGitDiff}
+			gitDiffDisplayMode="split"
+			onCloseGitDiff={dismissGitDiff}
 			activeTab={activeTab}
-			editorMode={simpleMode ? workbenchLayout : editorMode}
-			onToggleEditorMode={simpleMode ? toggleSimpleContent : activeTab?.preserveDrawer ? undefined : toggleEditorMode}
+			editorMode="split"
 			onCloseEditor={() => {
-				if (simpleMode && activeTab) closeEditorTab(activeTab.id);
-				else closeEditor();
+				if (activeTab) closeEditorTab(activeTab.id);
 			}}
 			readContent={readEditorFileContent}
 			readOriginalContent={readEditorOriginalContent}
 			saveContent={saveEditorFileContent}
 		/>
-	) : null;
+	);
 
-	const chatPaneContentNode = (
+	const filePaneContentNode = (
 		<WorkbenchStage
-			simple={simpleMode}
 			contentChrome={<WorkbenchFileTabs tabs={workbenchEditorTabs} onSelect={selectWorkbenchTab} onClose={closeWorkbenchTab} onPromote={promotePreviewEditorTab} />}
-			chrome={sessionTabsBarNode}
-			layout={workbenchLayout}
 			hasContent={workbenchHasContent}
-			// 插件页面式面板：以工作区会话列上的非模态覆盖层呈现（presentation:"page"），
-			// 会话树保持挂载，关闭覆盖层即原样还原（滚动/草稿/终端内存态不丢）。
-			session={
-				<div className="relative flex h-full min-h-0 min-w-0 flex-col">
-					{chatPaneSessionNode}
-					<HostPluginPageOverlay projectId={activeProject?.id} sessionId={currentSessionId} />
-				</div>
-			}
+			hasWorkspace={Boolean(activeProject && !isChatProject(activeProject))}
 			content={workbenchContentNode}
-			onContentWidthChange={handleWorkbenchContentWidth}
+			terminal={
+				!isLanWeb && terminalTarget
+					? {
+							target: terminalTarget,
+							open: terminalOpen,
+							closing: terminalDockClosing,
+							collapsed: terminalCollapsed,
+							height: terminalHeight,
+							maxHeight: availableTerminalHeight ?? 120,
+							terminal: api.terminal,
+							terminalSettings,
+							onThemeChange: setTerminalTheme,
+							ownerKey: terminalOwner ? terminalOwnerKey(terminalOwner) : undefined,
+							onOpenChange: setTerminalOpenForOwner,
+							onCollapsedChange: setTerminalCollapsedForOwner,
+							onHeightChange: setTerminalHeight,
+						}
+					: undefined
+			}
 		/>
+	);
+	const chatPaneContentNode = (
+		<div className="relative flex h-full min-h-0 min-w-0 flex-col">
+			{sessionTabsBarNode}
+			<div className="relative flex min-h-0 flex-1 flex-col">
+				{chatPaneSessionNode}
+				<HostPluginPageOverlay projectId={activeProject?.id} sessionId={currentSessionId} />
+			</div>
+		</div>
 	);
 
 	// ── DrawerSurface port objects (stable via useMemo) ──
@@ -2681,7 +2599,7 @@ export function App() {
 		openCommitFileDiff,
 		openWorkspaceFileDiff,
 		toggleGitDiffDisplayMode,
-		closeGitDiff,
+		closeGitDiff: dismissGitDiff,
 		dismissGitDiff,
 		gitApi: api.git,
 		gitInfo,
@@ -2792,6 +2710,7 @@ export function App() {
 	const sidebarContentNode = (
 		<AppSidebar
 			navigation={workspaceNavigation}
+			historyNavigation={navigation}
 			workspaceFiles={<WorkspaceFileExplorer projectId={activeProjectId} files={drawerPorts.files} />}
 			simple={settings.navigationMode === "simple"}
 			listCollapsed={listCollapsed}
@@ -2809,7 +2728,6 @@ export function App() {
 			onOpenNewSession={() => {
 				if (activeProjectId) workspaceNavigation.welcome(activeProjectId);
 			}}
-			onOpenFeedback={() => overlays.setFeedbackOpen(true)}
 			settingsExpandedProjectIds={settings.sidebarExpandedProjectIds}
 			settingsPinnedSessionIds={settings.pinnedSessionIds}
 			settingsLoaded={settingsLoaded}
@@ -2835,22 +2753,9 @@ export function App() {
 		<FileLinkBaseProvider baseDir={activeAgent?.cwd ?? activeProject?.path} projectId={activeProject?.id} projectRoot={activeProject?.path} sessionId={currentSessionId}>
 			<>
 				<AppBootstrap {...bootstrapProps} />
+				<WorkspaceSwitchDialog busyCount={workspaceSwitch.busyCount} onRespond={workspaceSwitch.respond} />
 				<AppShell
-					navigationChrome={
-						simpleMode ? (
-							<div className="simple-navigation-bar flex h-8 shrink-0 items-center gap-0.5 bg-(--simple-shell-surface) px-2 [&_button]:[-webkit-app-region:no-drag]">
-								<Button variant="ghost" size="icon-sm" className="size-6.5" type="button" aria-label={listCollapsed ? t("app.expandList") : t("app.collapseList")} title={listCollapsed ? t("app.expandList") : t("app.collapseList")} onClick={toggleListCollapsed}>
-									<PanelLeft size={14} />
-								</Button>
-								<Button variant="ghost" size="icon-sm" className="size-6.5" type="button" aria-label={t("navigation.back")} title={t("navigation.back")} disabled={!navigation.canBack} onClick={navigation.back}>
-									<ArrowLeft size={14} />
-								</Button>
-								<Button variant="ghost" size="icon-sm" className="size-6.5" type="button" aria-label={t("navigation.forward")} title={t("navigation.forward")} disabled={!navigation.canForward} onClick={navigation.forward}>
-									<ArrowRight size={14} />
-								</Button>
-							</div>
-						) : undefined
-					}
+					simple
 					compactContent={
 						quickTask.active ? (
 							<QuickTaskSurface task={quickTask}>
@@ -2866,12 +2771,13 @@ export function App() {
 					useNativeTitleBar={settings.useNativeTitleBar}
 					platform={appInfo.platform}
 					chatPaneRef={chatPaneRef}
-					terminalRowHeight={terminalRowHeight}
+					terminalRowHeight={0}
 					chatContentWidthPct={settings.chatContentWidthPct}
-					outlineContentOffset={workbenchContentWidth}
+					outlineContentOffset={0}
 					sidebarContent={sidebarContentNode}
 					chatPaneContent={chatPaneContentNode}
-					overview={workspaceNavigation.page === "home" ? { content: <HomeOverview actions={workspaceNavigation.actions} onRefresh={refreshHomeOverview} />, sidebar: <HomeProviders /> } : undefined}
+					filePaneContent={filePaneContentNode}
+					overview={workspaceNavigation.page === "home" ? <HomeOverview actions={workspaceNavigation.actions} onRefresh={refreshHomeOverview} /> : undefined}
 					drawerRail={
 						<WorkspaceDrawerRail
 							addLabel={t("drawer.addPanel")}
@@ -3207,24 +3113,7 @@ export function App() {
 						/>
 					</EnvironmentOverlay>
 					<SettingsFeatureRoot settings={settings} piUpdate={piUpdate} webServiceChanging={webServiceChanging} onRestartWebService={restartWebService} appInfo={appInfo} onChange={updateSettings} projects={projects} projectId={activeProject?.id} projectKind={activeProject?.kind} projectName={activeProject?.name} />
-					{/*
-					 * 问题反馈弹窗的「新建会话分析」依赖 App 级会话创建能力（createSessionDraftWithTab），
-					 * 在装配层组合：useOverlayActions 只持开关状态，会话创建与预填在此处注入。
-					 */}
-					<SessionActionOverlays
-						{...overlays.overlayProps}
-						feedback={
-							overlays.overlayProps.feedback
-								? {
-										...overlays.overlayProps.feedback,
-										props: {
-											...overlays.overlayProps.feedback.props,
-											onCreateSessionWithPrompt: handleFeedbackCreateSession,
-										},
-									}
-								: undefined
-						}
-					/>
+					<SessionActionOverlays {...overlays.overlayProps} />
 					{previewImage && <ImagePreviewModal image={previewImage} onClose={() => setPreviewImage(null)} />}
 					{/* 项目外文件链接二次确认（安全等级：敏感文件 / 限定目录 / 配置不可读时才弹） */}
 					{externalPathOpenDialog}

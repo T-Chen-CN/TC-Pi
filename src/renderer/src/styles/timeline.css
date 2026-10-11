@@ -1337,23 +1337,7 @@
   opacity: 0.82;
   pointer-events: none;
 }
-/* TipTap：占位用绝对定位，避免旧 float:left 把光标「点子」挤飞/看不见。 */
-.composer .rich-input.is-editor-empty {
-  position: relative;
-}
-.composer .rich-input.is-editor-empty::before {
-  content: attr(data-placeholder);
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 10px;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-input);
-  line-height: var(--line-height-input);
-  opacity: 0.82;
-  pointer-events: none;
-  white-space: pre-wrap;
-}
+/* TipTap 的空提示由视图壳同格叠放，参与高度计算；旧 RichInput 的 :empty 提示仍保留。 */
 /* TipTap 比 RichInput 多一层 EditorContent wrapper。必须把 flex 高度约束
    传到 .ProseMirror，否则 overflow-y:auto 永不触发，继续输入会把正文「顶」出框外。 */
 .composer .tiptap-composer-host {
@@ -1596,12 +1580,6 @@
 .composer-box.goal-mode .ProseMirror {
   padding-left: 18px;
 }
-.composer-box.shell-mode .rich-input.is-editor-empty::before,
-.composer-box.shell-silent-mode .rich-input.is-editor-empty::before,
-.composer-box.plan-mode .rich-input.is-editor-empty::before,
-.composer-box.goal-mode .rich-input.is-editor-empty::before {
-  left: 18px;
-}
 .composer-box.shell-mode .composer-bottom-bar {
   border-top-color: color-mix(in srgb, var(--color-warning) 20%, transparent);
 }
@@ -1779,28 +1757,12 @@
   }
 }
 @container (max-width: 620px) {
-  /* 底栏恒单行：left(模式/模板/附件) + center(模型/思考/compact) + right(发送)。
-     不再 wrap —— 旧规则在窄栏把 center 整行折到第二行（模型选型掉到发送按钮
-     下方），且 left 可 grow 会把 right 挤到换行（发送按钮从最右往左偏）。 */
-  .composer-bottom-layout {
-    flex-wrap: nowrap;
-  }
-  .composer-bottom-left {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
+  /* flex 布局由 ComposerComponents 的 Tailwind 控制，避免窄会话栏的两行布局冲突。 */
   /* 模式按钮文字先截断，极窄档再隐藏（见 440px 断点） */
   .composer-bottom-left .composer-bar-btn span {
     max-width: 6rem;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .composer-bottom-center {
-    flex: 1 1 auto;
-    min-width: 0;
-    justify-content: flex-start;
-    overflow-x: auto;
-    padding-bottom: 1px;
   }
   .composer-bottom-left .feishu-link-indicator {
     max-width: min(132px, 38cqi);
@@ -2273,7 +2235,6 @@
   inset: var(--window-drag-height) 0 0 0;
   z-index: 940;
 }
-.custom-titlebar-enabled .feedback-modal,
 .custom-titlebar-enabled .settings-modal,
 .custom-titlebar-enabled .config-modal {
   max-height: calc(100vh - 56px);

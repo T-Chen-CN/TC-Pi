@@ -1,8 +1,8 @@
 import { useAtomValue } from "jotai";
-import { Check, ChevronDown, ChevronRight, CircleStop, CircleX, Copy, FileDown, FileText, Fingerprint, Folder, Globe, Link2, MessagesSquare, MoreHorizontal, Pencil, PanelLeft, PanelRight, Pin, PinOff, Play, Plus, RefreshCw, RotateCw, Terminal, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, CircleStop, CircleX, Copy, FileDown, FileText, Fingerprint, Globe, Link2, MoreHorizontal, Pencil, PanelLeft, PanelRight, Pin, PinOff, Play, Plus, RefreshCw, RotateCw, X } from "lucide-react";
 import { Fragment, useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion, useReducedMotion, type Transition } from "motion/react";
-import { sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionRecordsAtom, projectInventoryByIdAtom, projectByIdAtomFamily, acpEnabledAtom, acpToolsAtom } from "../../atoms";
+import { sessionRecordByIdAtomFamily, sessionRuntimeBySessionIdAtomFamily, sessionRecordsAtom, projectInventoryByIdAtom, projectByIdAtomFamily } from "../../atoms";
 import { t } from "../../i18n";
 import { displayProjectDirectoryName } from "../../rendererUtils";
 import { copyTextWithCopiedNotice } from "../../utils/clipboardNotice";
@@ -12,7 +12,7 @@ import { canRunSessionAction, type SessionRunAction, type SessionRunCapabilities
 import { sessionDisplayName } from "../../utils/sessionDisplayName";
 import { Button } from "../ui-shadcn/button";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../ui-shadcn/context-menu";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui-shadcn/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../ui-shadcn/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-shadcn/tooltip";
 import { cn } from "../../lib/utils";
@@ -20,6 +20,7 @@ import { SessionBackendBadge } from "./SessionSourceBadge";
 import { TitleScrollText } from "../sidebar/TitleScrollText";
 import { SessionHeader } from "./SessionHeader";
 import { SessionActivityIndicator } from "./SessionActivityIndicator";
+import { WorkspaceNavigationHost } from "../sidebar/WorkspaceNavigationHost";
 
 import { SESSION_TAB_DRAG_MIME } from "../../utils/sessionSplitEdge";
 import { buildProjectTabGroups, type ProjectTabGroup } from "../../utils/sessionTabGroups";
@@ -60,7 +61,7 @@ const TAB_INDICATOR_INSTANT: Transition = { duration: 0 };
  * - 点击 Tab = 切换会话（只改 currentSessionId，不启动/停止任何 Agent）；
  * - 关闭 Tab = 仅从列表移除，**不 kill Agent**——后台 Agent 保持运行，
  *   再次打开同一会话时复用已绑定运行时并重新加载最新历史；
- * - 全部 Agent 只在应用整体退出时统一停止（main 进程 before-quit 路径）。
+ * - 离开工作区时关闭该工作区 Agent；忙碌确认、空闲静默，另由 before-quit 统一清理。
  *
  * 固定（pin）与排序：
  * - 固定 Tab 前置、宽度更小、无关闭按钮，右键/下拉菜单可取消固定；
@@ -73,13 +74,7 @@ const TAB_INDICATOR_INSTANT: Transition = { duration: 0 };
  * - 当前 Tab 识别：灰色柔和实底（选中态背景 = --color-bg-active，与左侧 SessionTree 选中态
  *   同一套语义），由共享 layoutId 的 motion.span 滑动呈现；不做浮起/阴影/底部横条
  *   （曾因过粗被弃用）。
-
-/** “+” 下拉里的新建目标：聊天对话区或已打开项目 */
-export type NewSessionTarget = {
-	projectId: string;
-	label: string;
-	isChat: boolean;
-};
+ */
 
 /** 工作台文件/Diff Tab：与会话 Tab 共用同一条栏、同一套视觉（不再单独绿条栏） */
 export type WorkbenchEditorTabItem = {
@@ -119,11 +114,8 @@ export type SessionTabsBarProps = {
 	onClose: (sessionId: string) => void;
 	onCloseOthers: (sessionId: string) => void;
 	onCloseAll: () => void;
-	/** 新建会话目标（聊天区置顶 + 已打开项目），由 App 从项目库存装配 */
-	newSessionTargets: readonly NewSessionTarget[];
-	onNewSessionInProject: (projectId: string) => void;
-	/** 新建 ACP 工具会话（acpEnabled 门控后由 App 提供；菜单里按工具→项目二级选择） */
-	onNewAcpSession?: (projectId: string, toolId: string) => void;
+	/** 直接在当前工作区新建；未选中工作区时禁用入口。 */
+	onNewSession?: () => void;
 	onTogglePin: (sessionId: string) => void;
 	onReorder: (sourceId: string, targetId: string, position: "before" | "after") => void;
 	/** 右侧抽屉总开关：打开/关闭整块右侧面板（活动栏在抽屉内、系统按钮下方）。 */
@@ -608,9 +600,8 @@ export function SessionTabsBar(props: SessionTabsBarProps) {
 						// 分隔线已由 emitDivider 在构建 nodes 时按组边界插入，这里直接平铺输出。
 						return nodes;
 					})()}
-					{/* 浏览器式新建入口：跟在最后一张标签后面，下拉选择新建到哪个项目。
-            （新建会话保留独立「+」按钮；⋯ 菜单只收运行控制与工具） */}
-					{!props.simple && <NewSessionMenu targets={props.newSessionTargets} onSelect={props.onNewSessionInProject} onNewAcpSession={props.onNewAcpSession} />}
+					{/* 会话栏只呈现当前工作区，“+” 与该范围保持一致。 */}
+					{!props.simple && <NewSessionButton onNewSession={props.onNewSession} />}
 					{/* 页面式插件面板伪 Tab：始终选中态（它就是当前呈现的视图），与会话 Tab 之间加竖线分隔 */}
 					{!props.simple && props.pluginTab ? (
 						<>
@@ -639,6 +630,7 @@ export function SessionTabsBar(props: SessionTabsBarProps) {
           Tab 级操作（固定/关闭等）保留在 Tab 右键菜单。 */}
 			{props.onToggleDrawer || props.actions != null || (props.toolActions && props.toolActions.length > 0) || props.runControl || props.sessionActions ? (
 				<div className="session-tabs-actions flex shrink-0 items-center gap-1 border-l border-border/30 pl-1">
+					<WorkspaceNavigationHost />
 					{props.actions}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -1228,72 +1220,21 @@ function SessionTab(props: {
 	);
 }
 
-/**
- * 新建会话入口（浏览器式 “+”）：固定在标签带末端，下拉选择新建目标。
- * 聊天对话区置顶，之后是已打开的工作区项目；目标列表由 App 装配好传入，
- * 这里只做展示与选择回调，不接触项目库存。
- * （2026-08 收敛调整：仅 Tab 上的小箭头下拉被移除，运行控制上收 ⋯ 菜单；
- *   「+」新建是高频入口，保留独立按钮。）
- */
-function NewSessionMenu(props: { targets: readonly NewSessionTarget[]; onSelect: (projectId: string) => void; onNewAcpSession?: (projectId: string, toolId: string) => void }) {
-	const chatTargets = props.targets.filter((target) => target.isChat);
-	const projectTargets = props.targets.filter((target) => !target.isChat);
-	// ACP 入口是 opt-in：仅开关开启且登记了工具时出现；工具→项目二级选择，
-	// 只列真实项目（chat 区不是文件项目，作为 ACP 工作目录无意义）。
-	const acpEnabled = useAtomValue(acpEnabledAtom);
-	const acpTools = useAtomValue(acpToolsAtom);
-	const acpVisible = Boolean(props.onNewAcpSession) && acpEnabled && acpTools.length > 0 && projectTargets.length > 0;
+/** 标签带末端的新建按钮：仅转发当前工作区创建事件，不提供跨工作区选择。 */
+function NewSessionButton(props: { onNewSession?: () => void }) {
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button type="button" variant="ghost" size="icon-sm" className="session-tabs-new ml-0.5 inline-grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground" title={t("tabs.new")} aria-label={t("tabs.new")}>
-					<Plus className="size-3.5" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" side="bottom" className="min-w-44">
-				{chatTargets.map((target) => (
-					<DropdownMenuItem key={target.projectId} onSelect={() => props.onSelect(target.projectId)}>
-						<span className="inline-flex items-center gap-2">
-							<MessagesSquare className="size-3.5 text-muted-foreground" aria-hidden="true" />
-							{target.label}
-						</span>
-					</DropdownMenuItem>
-				))}
-				{chatTargets.length > 0 && projectTargets.length > 0 && <DropdownMenuSeparator />}
-				{projectTargets.map((target) => (
-					<DropdownMenuItem key={target.projectId} onSelect={() => props.onSelect(target.projectId)}>
-						<span className="inline-flex min-w-0 items-center gap-2">
-							<Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-							<span className="truncate">{target.label}</span>
-						</span>
-					</DropdownMenuItem>
-				))}
-				{acpVisible ? (
-					<>
-						<DropdownMenuSeparator />
-						<DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("app.newAcpSession")}</DropdownMenuLabel>
-						{acpTools.map((tool) => (
-							<DropdownMenuSub key={tool.id}>
-								<DropdownMenuSubTrigger className="gap-2">
-									<Terminal className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-									<span className="truncate">{tool.name}</span>
-								</DropdownMenuSubTrigger>
-								<DropdownMenuSubContent>
-									{projectTargets.map((target) => (
-										<DropdownMenuItem key={target.projectId} onSelect={() => props.onNewAcpSession?.(target.projectId, tool.id)}>
-											<span className="inline-flex min-w-0 items-center gap-2">
-												<Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-												<span className="truncate">{target.label}</span>
-											</span>
-										</DropdownMenuItem>
-									))}
-								</DropdownMenuSubContent>
-							</DropdownMenuSub>
-						))}
-					</>
-				) : null}
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon-sm"
+			className="session-tabs-new ml-0.5 inline-grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+			title={t("tabs.new")}
+			aria-label={t("tabs.new")}
+			disabled={!props.onNewSession}
+			onClick={props.onNewSession}
+		>
+			<Plus className="size-3.5" aria-hidden="true" />
+		</Button>
 	);
 }
 

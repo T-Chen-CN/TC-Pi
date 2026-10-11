@@ -22,6 +22,9 @@ const BINARY_EXTENSIONS = new Set([
 	"mkv",
 	"mov",
 	"webm",
+	// Blender 与二进制 glTF 不属于 UTF-8 源文件，不能误交给自动保存编辑器。
+	"blend",
+	"glb",
 	"zip",
 	"tar",
 	"gz",

@@ -1,5 +1,6 @@
 import { app, dialog, shell, type BrowserWindow, Notification } from "electron";
 import { randomUUID } from "node:crypto";
+import { ProjectRuntimeFence } from "./ProjectRuntimeFence";
 import { stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
@@ -156,6 +157,7 @@ export class AgentManager {
 	/** pi 后端支持全部可选能力。 */
 	readonly capabilities: ReadonlySet<AgentGatewayCapability> = new Set(["compact", "fork", "getForkMessages", "editMessage", "deleteMessage", "getCommands", "exportHtml"]);
 	private readonly agents = new Map<string, AgentRuntime>();
+	private readonly projectRuntimeFence = new ProjectRuntimeFence();
 	/** 桥原生服务是否已注入（幂等标记，见 registerBridgeSession）。 */
 	private bridgeServicesInstalled = false;
 	private readonly messages = new Map<string, ChatMessage[]>();
@@ -831,6 +833,8 @@ export class AgentManager {
 		state: RpcResponse;
 	}> {
 		const runtime = this.agents.get(agentId);
+		// stop 已摘掉 runtime 时，扩展回退/重连不得再创建无归属的子进程。
+		if (!runtime || this.projectRuntimeFence.isPaused(runtime.tab.projectId)) throw new Error("Workspace Agent startup was cancelled");
 		const existing = runtime?.process;
 		// 只复用 createUnlocked 预置、从未 start 的占位进程（diagnostics 仍为 null）。
 		// 已退出的旧进程不能复用：再 attach 会叠监听，reattach 必须换新实例。
@@ -973,6 +977,7 @@ export class AgentManager {
 	 * 幂等：池里已有同项目条目或创建进行中时直接返回；真正的 spawn 在后台完成。
 	 */
 	ensureStandbyAgent(projectId: string): void {
+		if (this.projectRuntimeFence.isPaused(projectId)) return;
 		if (!this.settingsStore.get().standbyRuntimeEnabled) return;
 		if (this.standbyPool.has(projectId) || this.standbySpawnPending) return;
 		this.standbySpawnPending = true;
@@ -988,7 +993,7 @@ export class AgentManager {
 	 * 服务不了这类会话，直接拒绝认领。
 	 */
 	async claimStandbyAgent(input: { projectId: string; sessionId?: string; noSession?: boolean }): Promise<AgentTab | null> {
-		if (!this.settingsStore.get().standbyRuntimeEnabled || input.noSession) return null;
+		if (this.projectRuntimeFence.isPaused(input.projectId) || !this.settingsStore.get().standbyRuntimeEnabled || input.noSession) return null;
 		const project = this.getProject(input.projectId);
 		if (!project) return null;
 		const proxyMode = this.resolveSessionProxy?.(input.sessionId);
@@ -1012,12 +1017,17 @@ export class AgentManager {
 	/** 后台 spawn 一个 standby：完整走 createUnlocked（信任/扩展回退/握手），成功后登记进池。 */
 	private async createStandbyAgent(projectId: string): Promise<void> {
 		try {
+			const generation = this.projectRuntimeFence.capture(projectId);
 			const project = this.getProject(projectId);
 			if (!project) return;
 			// 需要用户交互决策信任的项目不做后台池化（绝不后台弹窗）。
 			if ((await this.projectTrust.resolveTrustWithoutPrompt(project)) === null) return;
 			const fingerprint = this.computeStandbyFingerprintFor(project);
 			const tab = await this.createUnlocked({ projectId, standby: true });
+			if (!this.projectRuntimeFence.valid(projectId, generation)) {
+				await this.stop(tab.id);
+				return;
+			}
 			this.standbyPool.put({ projectId, fingerprint, agentId: tab.id });
 			void this.appLogger?.info("agent", "Standby agent ready", { agentId: tab.id, projectId });
 		} catch (error) {
@@ -1633,6 +1643,7 @@ export class AgentManager {
 	}
 
 	private async createUnlocked(input: CreateAgentInput) {
+		const generation = this.projectRuntimeFence.capture(input.projectId);
 		const t0 = Date.now();
 		const project = this.getProject(input.projectId);
 		if (!project) throw new Error(`Project not found: ${input.projectId}`);
@@ -1679,6 +1690,7 @@ export class AgentManager {
 
 		const t1 = Date.now();
 		const trustOverride = await this.projectTrust.ensureProjectTrust(project);
+		if (!this.projectRuntimeFence.valid(project.id, generation)) throw new Error("Workspace changed during Agent startup");
 		const t2 = Date.now();
 
 		void this.appLogger?.info("agent", "Agent pi process start", { agentId: id });
@@ -1701,6 +1713,7 @@ export class AgentManager {
 			});
 		} catch (error) {
 			// start() 同步失败（非法 cwd、spawn 抛错等）也要落到会话错误卡，而不是 IPC 裸抛。
+			if (!this.projectRuntimeFence.valid(project.id, generation)) throw error;
 			tab.status = "error";
 			const rawMessage = error instanceof Error ? error.message : String(error);
 			const failedProcess = this.agents.get(id)?.process;
@@ -1720,6 +1733,10 @@ export class AgentManager {
 			return tab;
 		}
 		const { process, fallbackFromExtensions } = handshake;
+		if (!this.projectRuntimeFence.valid(project.id, generation)) {
+			await this.stop(id);
+			throw new Error("Workspace changed during Agent startup");
+		}
 		const t3 = Date.now();
 		const diag = process.getDiagnostics();
 		void this.appLogger?.info("agent", "Pi process spawned", {
@@ -3434,6 +3451,7 @@ export class AgentManager {
 
 	async restart(agentId: string): Promise<AgentTab> {
 		const runtime = this.requireRuntime(agentId);
+		this.projectRuntimeFence.capture(runtime.tab.projectId);
 		void this.appLogger?.info("agent", "Agent restart requested", {
 			agentId,
 			projectId: runtime.tab.projectId,
@@ -3771,6 +3789,22 @@ export class AgentManager {
 			sessionPath: runtime.tab.sessionPath,
 		});
 		return true;
+	}
+
+	/** 包含不可见的 standby；状态读取只用宿主已有快照，不另开 pi 通道。 */
+	listWorkspaceAgents(projectId: string): Array<{ id: string; busy: boolean }> {
+		return [...this.agents.values()].filter(({ tab }) => tab.projectId === projectId).map(({ tab }) => ({ id: tab.id, busy: tab.status === "running" || this.streamingAgents.has(tab.id) || Boolean(this.toolExecutingByAgent.get(tab.id)) || this.compactingAgents.has(tab.id) || this.rpcCompactingAgents.has(tab.id) }));
+	}
+
+	/** 离开工作区同时失效在途预热；池 timer 与 stop 生命周期在原清理路径结算。 */
+	pauseWorkspaceAgents(projectId: string): void {
+		this.projectRuntimeFence.pause(projectId);
+		if (this.standbyPool.has(projectId)) this.standbyPool.clear();
+	}
+
+	/** 重新选中工作区后，只允许新的启动请求。 */
+	resumeWorkspaceAgents(projectId: string): void {
+		this.projectRuntimeFence.resume(projectId);
 	}
 
 	async stop(agentId: string) {
@@ -5886,7 +5920,7 @@ export class AgentManager {
  *  preload 新增订阅时必须同步此白名单（tests/agentManagerDirectEmitChannels.test.mjs 锁死一致性）。 */
 export const DIRECT_EMIT_CHANNELS: ReadonlySet<string> = new Set([ipcChannels.agentsRpcLog]);
 
-/** unknown → Record 收窄谓词（与 AnnouncementService.ts 同型）：
+/** unknown → Record 收窄谓词：
  *  RPC 事件负载形状不可信，统一经此谓词后再逐字段判型。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;

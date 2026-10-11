@@ -109,9 +109,9 @@ Three pills switch the sidebar view; the selection is remembered:
 ### Bottom dock
 
 - **Settings** (gear): opens settings; shows a red dot when an update is available.
-- **Feedback** (bubble icon): opens the feedback page.
-- **Website**: opens pideck.caoayu.top.
-- **Theme toggle**: cycles light / dark / follow system / scheduled.
+- **Search sessions** (magnifier): opens global search; also available with `Ctrl/Cmd+F`.
+- **Scheduled tasks** (checklist icon): opens task management; shows an indicator while tasks are running.
+- **Theme toggle**: switches light / dark; automatic themes are configured in settings.
 
 > The terminal dock lives at the **bottom of the center area**, not the sidebar.
 

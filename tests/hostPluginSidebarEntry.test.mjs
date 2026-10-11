@@ -10,13 +10,13 @@ const host = readFileSync("src/renderer/src/components/plugins/HostPluginPanelHo
 const sharedIcons = readFileSync("src/shared/hostPluginIcons.ts", "utf8");
 const rendererIcons = readFileSync("src/renderer/src/components/plugins/hostPluginPanelIcon.tsx", "utf8");
 
-test("host plugin dock entry renders under the automation entry in the sidebar action block", () => {
+test("host plugin entries remain between the file explorer and dock", () => {
 	assert.match(sidebar, /import \{ HostPluginDockButtons \} from "\.\.\/plugins\/HostPluginDockButtons";/);
-	const automationIndex = sidebar.indexOf("<AutomationDockButton />");
+	const filesIndex = sidebar.indexOf("{props.workspaceFiles}");
 	const pluginIndex = sidebar.indexOf("<HostPluginDockButtons />");
 	const dockIndex = sidebar.indexOf("<Dock size={32}");
-	assert.ok(automationIndex > -1, "automation entry missing");
-	assert.ok(pluginIndex > automationIndex, "plugin entries should sit below the automation entry");
+	assert.ok(filesIndex > -1, "file explorer missing");
+	assert.ok(pluginIndex > filesIndex, "plugin entries should sit below the file explorer");
 	assert.ok(pluginIndex < dockIndex, "plugin entries should remain direct secondary actions before the dock");
 });
 

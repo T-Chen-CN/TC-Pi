@@ -70,4 +70,4 @@
 - 其他五个目标平台的归档完整性与真实启动不在本次已通过范围；需各自对应 runner 补齐。
 - 未验证安装包内的 Electron utilityProcess、真实供应商请求/工具执行及人工 UI smoke；无凭据环境的 RPC/存储验证不能替代这些项目。
 - 未上传 runtime sidecar 或发布应用/公告。在线 Release 仍需同时提供新版各平台 tgz 与索引，否则新版本门控会拒绝旧 runtime。
-- 发版时通过 `announcements-md` → `npm run build:announcements` 发布重新下载及 V4 回退边界提醒；安装包/sidecar 和中英文发布说明按项目发版流程处理。
+- 发版时在更新说明中提供重新下载及 V4 回退边界提醒；安装包/sidecar 和中英文发布说明按项目发版流程处理。

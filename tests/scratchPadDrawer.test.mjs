@@ -124,14 +124,14 @@ test("scratch pad keyboard shortcut stays global, Escape respects consumed event
 	assert.equal(harness.timers.size, 0);
 });
 
-test("scratch pad renders only inside DrawerSurface and is included in drawer restoration", () => {
+test("scratch pad renders only inside DrawerSurface and is included in window tool tabs", () => {
 	const app = readFileSync("src/renderer/src/App.tsx", "utf8");
 	const surface = readFileSync("src/renderer/src/components/workspace/DrawerSurface.tsx", "utf8");
-	const panels = readFileSync("src/renderer/src/hooks/useWorkspacePanels.ts", "utf8");
+	const chrome = readFileSync("src/renderer/src/hooks/useWindowToolLayout.ts", "utf8");
 	assert.match(app, /useScratchPad\(workspace\)/);
 	assert.match(app, /<DrawerSurface\s[^>]*scratchPad=\{scratchPad\}/);
 	assert.doesNotMatch(app, /<ScratchPadOverlay/);
 	assert.match(surface, /drawer\s*===\s*"scratchPad"\s*&&\s*!drawerCollapsed/);
 	assert.match(surface, /<ScratchPadDrawer\s+controller=\{scratchPad\}/);
-	assert.match(panels, /const\s+validPanels\s*=\s*\[[^\]]*"scratchPad"/);
+	assert.match(chrome, /\[\s*"files"[^\]]*"scratchPad"/);
 });

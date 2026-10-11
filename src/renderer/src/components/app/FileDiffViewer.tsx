@@ -10,10 +10,9 @@ import { defaultUrlTransform } from "../session/MarkdownLinkCore";
 import { defaultRehypePlugins } from "streamdown";
 import rehypeKatex from "rehype-katex";
 import { remarkGfmNoSingleTilde } from "../../utils/markdownPlugins";
-// CodeMirrorEditor 静态链上挂着整个 CodeMirror 6 全家桶（view/state/commands/
-// autocomplete/search/lint/lang-json），经 WorkbenchContent 静态 import 进主 chunk，
-// App 启动即解析。与 CodeDiffView 同款懒加载：首次打开编辑器才拉 chunk。
-const CodeMirrorEditor = lazy(() => import("./CodeMirrorEditor").then((m) => ({ default: m.CodeMirrorEditor })));
+// 文件编辑是工作台的核心入口：随工作台加载，避免 Vite 的延迟模块请求失败
+// 被 React.lazy 缓存后，使 JSON、隐藏配置文件等全部触发应用级错误边界。
+import { CodeMirrorEditor } from "./CodeMirrorEditor";
 // CodeDiffView 静态链上挂着 @pierre/diffs + shiki（WASM 重库），懒加载后这些模块
 // 移出首屏初始 chunk（约 -500KB 解析量），仅在用户打开 diff 时才拉取。
 const CodeDiffView = lazy(() => import("./CodeDiffView").then((m) => ({ default: m.CodeDiffView })));
@@ -40,6 +39,8 @@ function fileLoadErrorMessage(error: unknown): string {
 export function FileDiffViewer(props: {
 	active?: boolean;
 	onDirty?: () => void;
+	onSaved?: () => void;
+	registerCloseGuard?: (id: string, guard: () => Promise<boolean>) => () => void;
 	filePath: string;
 	mode?: ViewMode;
 	/** 展示模式：drawer=窄抽屉；split/maximize=中间栏宿主；modal=遗留全屏弹层 */
@@ -91,6 +92,7 @@ export function FileDiffViewer(props: {
 	const [original, setOriginal] = useState("");
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [saveError, setSaveError] = useState<string | null>(null);
 	const [sideBySide, setSideBySide] = useState(props.displayMode !== "drawer");
 	// diff 模式为只读对比视图（第三方渲染库），无需编辑态切换
 	const [dirty, setDirty] = useState(false);
@@ -101,6 +103,10 @@ export function FileDiffViewer(props: {
 	// 编辑器的 input 事件先于 React render；debounce timer 不能捕获旧 render 的 content。
 	// 这个 ref 是编辑内容的实时镜像，保存时始终从它读取最新文本。
 	const contentRef = useRef(content);
+	const savedCallbackRef = useRef(props.onSaved);
+	savedCallbackRef.current = props.onSaved;
+	// 自动保存与关闭前保存按触发顺序写盘，较慢的旧请求不能覆盖新文本。
+	const saveWritesRef = useRef<Promise<void>>(Promise.resolve());
 
 	const isDiffMode = props.mode === "diff";
 	const fileName = props.filePath.split(/[/\\]/).pop() ?? props.filePath;
@@ -131,6 +137,7 @@ export function FileDiffViewer(props: {
 		async function load() {
 			setLoading(true);
 			setError(null);
+			setSaveError(null);
 			setDirty(false);
 			try {
 				// 图片/PDF：仅 view 模式读取二进制转 Blob URL 预览（不文本读取）；
@@ -276,26 +283,44 @@ export function FileDiffViewer(props: {
 		const savePath = props.filePath;
 		setSaving(true);
 		try {
-			await props.saveContent(savePath, latest, props.fileAccessScope);
+			const write = props.saveContent;
+			const task = saveWritesRef.current.catch(() => undefined).then(() => write(savePath, latest, props.fileAccessScope));
+			saveWritesRef.current = task;
+			await task;
 			// Tab 已切换时，旧请求即使完成也不能改动新 Tab 的 dirty/content 状态。
 			if (saveGeneration !== saveGenerationRef.current) return true;
 			lastSavedRef.current = latest;
+			setSaveError(null);
 			// 保存期间用户可能继续输入；只有没有更新过才可以清除 dirty，
 			// 绝不能把保存开始时的快照重新 set 回编辑器。
 			if (contentRef.current === latest) {
 				setDirty(false);
+				savedCallbackRef.current?.();
 			}
 			return true;
 		} catch (e) {
 			if (saveGeneration === saveGenerationRef.current) {
 				// 保存失败保留 dirty，用户可继续编辑后由下一次自动保存/Ctrl+S 重试
-				setError(e instanceof Error ? e.message : String(e));
+				// 写入失败只提示，不走加载错误分支卸载编辑器；撤销和未保存内容必须保留。
+				setSaveError(e instanceof Error ? e.message : String(e));
 			}
 			return false;
 		} finally {
 			if (saveGeneration === saveGenerationRef.current) setSaving(false);
 		}
 	}, [getLatestContent, isDiffMode, props.saveContent, props.filePath, props.fileAccessScope?.projectId]);
+
+	const saveNowRef = useRef(saveNow);
+	saveNowRef.current = saveNow;
+	useEffect(() => {
+		if (!props.activeTabId || !props.registerCloseGuard) return;
+		// 标签关闭先保存最新输入；保存失败保持实例，避免卸载吞掉 debounce 中的修改。
+		return props.registerCloseGuard(props.activeTabId, async () => {
+			const saved = await saveNowRef.current();
+			// 保存等待期间仍可输入；只有最新文本已经落盘，关闭才可释放编辑器。
+			return saved && (isDiffMode || !props.saveContent || contentRef.current === lastSavedRef.current);
+		});
+	}, [props.activeTabId, props.registerCloseGuard, isDiffMode, props.saveContent]);
 
 	// 更新安装会直接终止 Electron；把活跃文本编辑器的防抖保存提升为可等待的前置任务。
 	useEffect(() => {
@@ -486,6 +511,11 @@ export function FileDiffViewer(props: {
 					</div>
 				)}
 				{error && <div className="file-diff-error">{error}</div>}
+				{saveError && (
+					<div role="alert" className="shrink-0 px-4 py-2 text-caption text-destructive">
+						{saveError}
+					</div>
+				)}
 				{!loading && !error && (
 					<>
 						{/* 图片预览：Blob URL（base64 经主进程读取，dev/prod 一致） */}
@@ -512,26 +542,9 @@ export function FileDiffViewer(props: {
 						)}
 						{!isDiffMode && preview && isHtml && <HtmlPreview content={content} />}
 						{/* view 模式、非预览：常规编辑器（CodeMirror 6） */}
-						{!isDiffMode && !preview && (
+						{!isDiffMode && !preview && !isImage && !isPdf && (
 							<div style={{ height: "100%", flexDirection: "column" }}>
-								{/* lazy 边界：首次打开编辑器才拉取 CodeMirror chunk，期间轻量占位 */}
-								<Suspense
-									fallback={
-										<div
-											style={{
-												height: "100%",
-												display: "grid",
-												placeItems: "center",
-											}}
-											className="flex items-center justify-center gap-2 text-caption text-foreground/50"
-										>
-											<Loader2 size={14} className="animate-pideck-spin" aria-hidden="true" />
-											{t("common.loading")}
-										</div>
-									}
-								>
-									<CodeMirrorEditor value={content} language={language} readOnly={false} initialLine={props.initialLine} onChange={handleEditorChange} onAttachSelection={handleAttachSelection} />
-								</Suspense>
+								<CodeMirrorEditor value={content} language={language} readOnly={false} initialLine={props.initialLine} onChange={handleEditorChange} onAttachSelection={handleAttachSelection} />
 							</div>
 						)}
 						{/* diff 模式：只读差异对比（分栏 / 单栏由 sideBySide 切换），

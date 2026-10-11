@@ -151,6 +151,7 @@ export const ipcChannels = {
 	sessionsRuntimeList: "sessions:runtime-list",
 	sessionsRuntimeActivate: "sessions:runtime-activate",
 	sessionsRuntimeStop: "sessions:runtime-stop",
+	sessionsWorkspaceSwitch: "sessions:workspace-switch",
 	sessionsRuntimeAbort: "sessions:runtime-abort",
 	sessionsRuntimeRestart: "sessions:runtime-restart",
 	sessionsRuntimeCompact: "sessions:runtime-compact",
@@ -541,9 +542,6 @@ export const ipcChannels = {
 	appUpdateSkipVersion: "app:update-skip-version",
 	/** 探测内置更新镜像的可用性与速度（设置页「更新源」自动体检用）。 */
 	appCheckUpdateMirrors: "app:check-update-mirrors",
-	appFeedbackEnvironment: "app:feedback-environment",
-	/** 问题反馈「新建会话分析」：读取项目根 AGENTS.md（截断）与项目级技能列表。 */
-	appFeedbackProjectContext: "app:feedback-project-context",
 	appOpenExternal: "app:open-external",
 	/** 拉取 CHANGELOG 正文（atomgit 优先，GitHub 回退；失败时 markdown=null 由 UI 降级打开浏览器）。 */
 	appGetChangelog: "app:get-changelog",
@@ -567,15 +565,6 @@ export const ipcChannels = {
 	diagnosticsOpenFolder: "system:diagnostics-open-folder",
 	/** 进程监控里手动停止某个 pi agent（按 agentId 走 AgentManager 正常停止流程） */
 	stopAgent: "system:stop-agent",
-	/**
-	 * 环境体检：采集版本/平台/内存磁盘/pi 安装状态/最近报错，产出脱敏的诊断报告。
-	 * 与 system:diagnostics-snapshot（性能剖析）不是一回事，供「问题反馈」页一键排障。
-	 */
-	healthCheck: "system:health-check",
-	/** 把体检报告（Markdown 形态）保存到用户选择的路径 */
-	healthExportReport: "system:health-export-report",
-	/** 把完整日志（脱敏）+ 报告 + 环境 JSON 打包成 zip 存到用户选择的路径 */
-	healthExportBundle: "system:health-export-bundle",
 	preloadReady: "preload:ready",
 	preloadError: "preload:error",
 	rendererLog: "renderer:log",
@@ -917,20 +906,6 @@ export const ipcChannels = {
 	voiceTranscriptionRuntimeProgress: "voice-transcription:runtime-progress",
 	/** 取消进行中的运行时/模型下载（同一时刻只有一个安装任务）。 */
 	voiceTranscriptionInstallCancel: "voice-transcription:install-cancel",
-
-	// ===== 应用公告（无服务器拉取） =====
-	/** 渲染层 → 主进程：拉取当前公告快照（主进程返回缓存，不做网络请求） */
-	announcementList: "announcement:list",
-	/** 渲染层 → 主进程：立即刷新公告（设置页/手动刷新入口；带随机抖动防集中打源） */
-	announcementRefresh: "announcement:refresh",
-	/** 渲染层 → 主进程：标记公告已读（存储持久化到 userData） */
-	announcementMarkRead: "announcement:mark-read",
-	/** 渲染层 → 主进程：标记全部公告已读 */
-	announcementMarkAllRead: "announcement:mark-all-read",
-	/** 渲染层 → 主进程：记录已弹过提醒的公告（持久化，保证每条公告只弹一次） */
-	announcementMarkNotified: "announcement:mark-notified",
-	/** 主进程 → 渲染层：推送公告快照（定时拉取成功/缓存加载完成后广播） */
-	announcementChanged: "announcement:changed",
 
 	// ===== 系统剪贴板（必须走主进程；Electron 38 废弃渲染进程/preload 直连 clipboard） =====
 	clipboardReadText: "clipboard:read-text",

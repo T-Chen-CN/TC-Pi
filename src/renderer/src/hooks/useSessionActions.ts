@@ -30,6 +30,8 @@ export interface UseSessionActionsOptions {
 	openSessionRequestRef: MutableRefObject<number>;
 	creatingSessionDraftRef: MutableRefObject<Set<string>>;
 	activeProjectId: string | undefined;
+	/** 工作区退出的进程闸；取消时所有选择和创建操作必须留在原工作区。 */
+	prepareProjectSelection?: (projectId: string) => Promise<boolean>;
 	sessionsProjectId: string | undefined;
 	projects: Project[];
 	setActiveProjectId: (value: React.SetStateAction<string | undefined>) => void;
@@ -67,20 +69,24 @@ export interface UseSessionActionsOptions {
 export function useSessionActions(options: UseSessionActionsOptions) {
 	const { openSessionRequestRef, creatingSessionDraftRef, activeProjectId, sessionsProjectId, projects, setActiveProjectId, setCurrentSessionId, getSessionRecord, getProjectSessionRecords, upsertSession, removeSessionState, removeSessionComposerState, closeTabs, refreshProjectSessions, api, showToast } = options;
 
-	function commitSessionSelection(projectId: string, sessionId: string | undefined, scrollToEnd: boolean) {
+	async function commitSessionSelection(projectId: string, sessionId: string | undefined, scrollToEnd: boolean, requestSequence = openSessionRequestRef.current): Promise<boolean> {
+		if (requestSequence !== openSessionRequestRef.current) return false;
+		if (options.prepareProjectSelection && !(await options.prepareProjectSelection(projectId))) return false;
+		// 闸门接受后必须完成选择：随后被闸门拒绝的重复点击不能作废已经停止源进程的切换。
 		setActiveProjectId(projectId);
 		setCurrentSessionId(sessionId);
 		void scrollToEnd;
+		return true;
 	}
 
 	function selectProject(projectId: string) {
 		++openSessionRequestRef.current;
-		commitSessionSelection(projectId, undefined, false);
+		return commitSessionSelection(projectId, undefined, false);
 	}
 
 	function selectSession(projectId: string, sessionId: string, scrollToEnd = true) {
 		++openSessionRequestRef.current;
-		commitSessionSelection(projectId, sessionId, scrollToEnd);
+		return commitSessionSelection(projectId, sessionId, scrollToEnd);
 	}
 
 	async function copySession(sessionId: string, projectId = sessionsProjectId ?? activeProjectId) {
@@ -204,7 +210,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 			}
 		}
 		if (!record || requestSequence !== openSessionRequestRef.current) return undefined;
-		commitSessionSelection(projectId, record.id, true);
+		if (!(await commitSessionSelection(projectId, record.id, true, requestSequence))) return undefined;
 		return record.id;
 	}
 
@@ -223,7 +229,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 			}
 		}
 		if (!record || requestSequence !== openSessionRequestRef.current) return undefined;
-		commitSessionSelection(projectId, record.id, true);
+		if (!(await commitSessionSelection(projectId, record.id, true, requestSequence))) return undefined;
 		return record.id;
 	}
 
@@ -247,6 +253,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 		if (!project) return undefined;
 		creatingSessionDraftRef.current.add(projectId);
 		try {
+			if (options.prepareProjectSelection && !(await options.prepareProjectSelection(projectId))) return undefined;
 			const session = await api.sessions.createDraft({
 				projectId,
 				title: backend === "dsh" ? `${project.name} DSH` : `${project.name} agent`,
@@ -254,7 +261,7 @@ export function useSessionActions(options: UseSessionActionsOptions) {
 				...preferences,
 			});
 			upsertSession(session);
-			commitSessionSelection(projectId, session.id, true);
+			if (!(await commitSessionSelection(projectId, session.id, true))) return undefined;
 			return session;
 		} catch (error) {
 			showToast(error instanceof Error ? error.message : String(error), 4000);

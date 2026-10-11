@@ -105,8 +105,8 @@ test("worktree removal keeps a fade-out animation (removingWorktreePaths -> work
 	assert.match(worktreeTree, /normalizeWorkspacePath/);
 	assert.match(projectTree, /removingWorktreePaths\?: ReadonlySet<string>/);
 	assert.match(projectTree, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
-	assert.match(sidebarContent, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
-	const navigation = readFileSync("src/renderer/src/components/sidebar/WorkspaceNavigation.tsx", "utf8");
+	assert.match(readFileSync("src/renderer/src/components/sidebar/AppSidebar.tsx", "utf8"), /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
+	const navigation = readFileSync("src/renderer/src/components/sidebar/WorkspaceProjectNavigation.tsx", "utf8");
 	assert.match(navigation, /removingWorktreePaths\?:\s*ReadonlySet<string>/);
 	assert.match(navigation, /removingWorktreePaths=\{props\.removingWorktreePaths\}/);
 	const projectList = readFileSync("src/renderer/src/components/sidebar/WorkspaceProjectList.tsx", "utf8");

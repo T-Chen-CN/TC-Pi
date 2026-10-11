@@ -69,8 +69,6 @@
     "check:prompts-manifest": "node scripts/generate-content-manifests.mjs --domain prompts --check",
     "generate:skills-manifest": "node scripts/generate-content-manifests.mjs --domain skills",
     "check:skills-manifest": "node scripts/generate-content-manifests.mjs --domain skills --check",
-    "build:announcements": "node scripts/build-announcements.js",
-    "check:announcements": "node scripts/build-announcements.js --check",
     "check:electron": "node scripts/check-electron.mjs",
     "pack:dev": "node scripts/pack-dev.js",
     "pack": "npm run build && electron-builder --dir",

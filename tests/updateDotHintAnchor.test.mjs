@@ -31,7 +31,7 @@ test("气泡挂在带 relative 的 dock 行容器，不再寄生在 32px 的 Doc
 	// 行容器提供相对定位锚点（气泡 bottom-full 相对整行而非单个按钮）。
 	assert.match(sidebar, /relative flex shrink-0 items-center px-2 pb-2 pt-1/);
 	// UpdateDotHint 直接挂在行容器、Dock 之前。
-	assert.match(sidebar, /<UpdateDotHint[\s\S]*?\/>\s*<Dock size=\{32\}/);
+	assert.match(sidebar, /<UpdateDotHint[\s\S]*?\/>\s*\}\s*<Dock size=\{32\}/);
 	// DockItem 内不再渲染气泡。
 	assert.doesNotMatch(sidebar, /<DockItem>[\s\S]*?<UpdateDotHint/);
 });

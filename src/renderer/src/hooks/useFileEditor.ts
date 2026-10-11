@@ -7,11 +7,14 @@ import type { WorkspaceContentOpenMode } from "../../../shared/types/settings";
 import type { DrawerPanel, SessionModifiedFile } from "../components/app/AppParts";
 import { openPermanentEditorTab, openPreviewEditorTab, promotePreviewEditorTab as nextPreviewAfterPromote, type EditorTabOpenMode } from "../utils/editorTabs";
 import { resolveFileLinkPath } from "../utils/filePathLinks";
+import { useWorkspaceEditorState } from "./useWorkspaceEditorState";
+import { workspacePageAtom } from "../atoms/workspace-navigation-atoms";
 
 const EDITOR_TAB_LIMIT = 5;
 const EDITOR_TAB_TEXT_BUDGET = 24 * 1024 * 1024;
 
 interface EditorTab {
+	dirty?: boolean;
 	id: string;
 	filePath: string;
 	mode: "view" | "diff";
@@ -90,6 +93,9 @@ export interface UseFileEditorOutput {
 	editorMode: WorkspaceContentOpenMode;
 	toggleEditorMode: () => void;
 	editorTabs: EditorTab[];
+	allEditorTabs: EditorTab[];
+	markEditorTabDirty: (id: string, dirty: boolean) => void;
+	registerEditorCloseGuard: (id: string, guard: () => Promise<boolean>) => () => void;
 	activeTabId: string | null;
 	activeTab: EditorTab | null;
 	editorTabAccessSequenceRef: React.MutableRefObject<number>;
@@ -155,10 +161,9 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 
 	// ---- editor tabs ----
 	const editorTabAccessSequenceRef = useRef(0);
-	const [editorTabs, setEditorTabs] = useState<EditorTab[]>([]);
-	const [activeTabId, setActiveTabId] = useState<string | null>(null);
+	const workspaceEditors = useWorkspaceEditorState<EditorTab>(activeProjectId);
+	const { tabs: editorTabs, allTabs: allEditorTabs, setTabs: setEditorTabs, activeTabId, setActiveTabId, previewTabId: previewEditorTabId, setPreviewTabId: setPreviewEditorTabId } = workspaceEditors;
 	/** VS Code 式预览 Tab：至多一个；单击打开会替换它 */
-	const [previewEditorTabId, setPreviewEditorTabId] = useState<string | null>(null);
 	// tabs / preview 同步 ref：openEditorTab/closeEditorTab 需要在 updater 外计算 next——
 	// StrictMode 双调用 updater 内的 crypto.randomUUID/setActiveTabId 会产生两个
 	// 不同 id，导致 activeTabId 与 editorTabs 不一致 → 首次打开文件空白
@@ -170,6 +175,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 	// 活跃文件路径同步到 atom：文件抽屉树行高亮「当前预览/编辑中的文件」（含预览 tab），
 	// tab 全关时回写 null 让高亮消失。见 activeEditorFileAtom 注释。
 	const setActiveEditorFile = useSetAtom(activeEditorFileAtom);
+	const setWorkspacePage = useSetAtom(workspacePageAtom);
 	useEffect(() => {
 		setActiveEditorFile(activeTab?.filePath ?? null);
 	}, [activeTab, setActiveEditorFile]);
@@ -205,7 +211,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 		const next = [...tabs];
 		let textBytes = next.reduce((sum, tab) => sum + editorTabTextBytes(tab), 0);
 		while (next.length > 1 && (next.length > EDITOR_TAB_LIMIT || textBytes > EDITOR_TAB_TEXT_BUDGET)) {
-			const candidates = next.filter((tab) => tab.id !== protectedId);
+			const candidates = next.filter((tab) => tab.id !== protectedId && !tab.dirty);
 			if (candidates.length === 0) break;
 			const oldest = candidates.reduce((left, right) => (left.lastAccess <= right.lastAccess ? left : right));
 			const index = next.findIndex((tab) => tab.id === oldest.id);
@@ -215,76 +221,79 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 		return next;
 	};
 
-	const openEditorTab = useCallback((path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave = true, tabKey?: string, label?: string, preserveDrawer = false, openMode: EditorTabOpenMode = "permanent", initialLine?: number, fileAccessScope?: ProjectFileAccessScope) => {
-		// updater 纯化：StrictMode 双调用下，updater 内 crypto.randomUUID/嵌套
-		// setState 会产生两个不同 id → activeTabId 与 editorTabs 不一致 → 首次空白。
-		// 改为在闭包内读同步 ref 计算 next，setState 传值（幂等，双调用安全）
-		// 预览/常驻名单由 editorTabs 纯策略决定；内容字段再写回 active tab。
-		const prev = editorTabsRef.current;
-		const previewId = previewEditorTabIdRef.current;
-		const candidate: EditorTab = {
-			id: crypto.randomUUID(),
-			filePath: path,
-			mode,
-			originalContent: originalContent ?? "",
-			modifiedContent,
-			allowSave,
-			tabKey,
-			label,
-			preserveDrawer,
-			...(initialLine !== undefined ? { initialLine } : {}),
-			fileAccessScope,
-			lastAccess: ++editorTabAccessSequenceRef.current,
-		};
-		const strategy = openMode === "preview" ? openPreviewEditorTab(prev, previewId, candidate) : openPermanentEditorTab(prev, previewId, candidate);
+	const openEditorTab = useCallback(
+		(path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave = true, tabKey?: string, label?: string, preserveDrawer = false, openMode: EditorTabOpenMode = "permanent", initialLine?: number, fileAccessScope?: ProjectFileAccessScope) => {
+			// updater 纯化：StrictMode 双调用下，updater 内 crypto.randomUUID/嵌套
+			// setState 会产生两个不同 id → activeTabId 与 editorTabs 不一致 → 首次空白。
+			// 改为在闭包内读同步 ref 计算 next，setState 传值（幂等，双调用安全）
+			// 预览/常驻名单由 editorTabs 纯策略决定；内容字段再写回 active tab。
+			const prev = editorTabsRef.current;
+			const previewId = previewEditorTabIdRef.current;
+			const candidate: EditorTab = {
+				id: crypto.randomUUID(),
+				filePath: path,
+				mode,
+				originalContent: originalContent ?? "",
+				modifiedContent,
+				allowSave,
+				tabKey,
+				label,
+				preserveDrawer,
+				...(initialLine !== undefined ? { initialLine } : {}),
+				fileAccessScope,
+				lastAccess: ++editorTabAccessSequenceRef.current,
+			};
+			const strategy = openMode === "preview" ? openPreviewEditorTab(prev, previewId, candidate) : openPermanentEditorTab(prev, previewId, candidate);
 
-		let nextTabs = strategy.tabs.map((tab) =>
-			tab.id === strategy.activeId
-				? {
-						...tab,
-						mode,
-						originalContent: originalContent ?? "",
-						modifiedContent,
-						allowSave,
-						tabKey,
-						label,
-						preserveDrawer,
-						...(initialLine !== undefined ? { initialLine } : {}),
-						fileAccessScope,
-						lastAccess: candidate.lastAccess,
-					}
-				: tab,
-		);
-		nextTabs = trimEditorTabs(nextTabs, strategy.activeId);
-		// trim 可能挤掉预览 Tab；预览 id 必须以仍在列表中的为准
-		const nextPreview = strategy.previewId && nextTabs.some((tab) => tab.id === strategy.previewId) ? strategy.previewId : null;
+			let nextTabs = strategy.tabs.map((tab) =>
+				tab.id === strategy.activeId
+					? {
+							...tab,
+							mode,
+							originalContent: originalContent ?? "",
+							modifiedContent,
+							allowSave,
+							tabKey,
+							label,
+							preserveDrawer,
+							...(initialLine !== undefined ? { initialLine } : {}),
+							fileAccessScope,
+							lastAccess: candidate.lastAccess,
+						}
+					: tab,
+			);
+			nextTabs = trimEditorTabs(nextTabs, strategy.activeId);
+			// 所有现有文件都未保存时，拒绝新开文件，不能靠自动淘汰丢掉修改。
+			if (nextTabs.length > EDITOR_TAB_LIMIT || nextTabs.reduce((sum, tab) => sum + editorTabTextBytes(tab), 0) > EDITOR_TAB_TEXT_BUDGET) {
+				showToast(t("workbench.saveBeforeOpening"));
+				return;
+			}
+			// trim 可能挤掉预览 Tab；预览 id 必须以仍在列表中的为准
+			const nextPreview = strategy.previewId && nextTabs.some((tab) => tab.id === strategy.previewId) ? strategy.previewId : null;
 
-		setEditorTabs(nextTabs);
-		setActiveTabId(strategy.activeId);
-		setPreviewEditorTabId(nextPreview);
-	}, []);
+			if (!setEditorTabs(nextTabs)) {
+				showToast(t("workbench.saveBeforeOpening"));
+				return;
+			}
+			editorTabsRef.current = nextTabs;
+			previewEditorTabIdRef.current = nextPreview;
+			setActiveTabId(strategy.activeId);
+			setPreviewEditorTabId(nextPreview);
+			setWorkspacePage("workspace");
+		},
+		[setEditorTabs, setActiveTabId, setPreviewEditorTabId, showToast, t, setWorkspacePage],
+	);
 
 	const closeEditorTab = useCallback(
 		(tabId: string) => {
-			// updater 纯化（同上）：副作用移出
-			const prev = editorTabsRef.current;
-			const idx = prev.findIndex((t) => t.id === tabId);
-			if (idx < 0) return;
-			const next = prev.filter((t) => t.id !== tabId);
-			setEditorTabs(next);
-			setPreviewEditorTabId((current) => (current === tabId ? null : current));
-			if (next.length === 0) {
-				setActiveTabId(null);
-				setPreviewEditorTabId(null);
-				// 关闭最后一个 tab 后复位为设置默认布局，避免残留 maximize
-				editorModeRef.current = contentOpenModeRef.current;
-				setEditorMode(contentOpenModeRef.current);
-			} else if (tabId === activeTabId) {
-				const neighborIdx = Math.min(idx, next.length - 1);
-				setActiveTabId(next[neighborIdx].id);
-			}
+			void workspaceEditors
+				.closeTab(tabId)
+				.then((closed) => {
+					if (!closed) showToast(t("workbench.saveFailed"));
+				})
+				.catch(() => showToast(t("workbench.saveFailed")));
 		},
-		[activeTabId],
+		[workspaceEditors.closeTab, showToast, t],
 	);
 
 	const selectEditorTab = useCallback((tabId: string) => {
@@ -394,6 +403,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 				editorModeRef.current = mode;
 				setEditorMode(mode);
 				setGitDiffDisplayMode(mode);
+				setWorkspacePage("workspace");
 				setGitDrawerDiff({
 					projectId,
 					filePath: diff.path,
@@ -407,7 +417,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 				}
 			}
 		},
-		[activeProjectId, activeProjectIdRef, workspaceFileDiff, showToast, t],
+		[activeProjectId, activeProjectIdRef, workspaceFileDiff, showToast, t, setWorkspacePage],
 	);
 
 	const openCommitFileDiffFn = useCallback(
@@ -431,6 +441,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 				editorModeRef.current = mode;
 				setEditorMode(mode);
 				setGitDiffDisplayMode(mode);
+				setWorkspacePage("workspace");
 				setGitDrawerDiff({
 					projectId,
 					filePath: diff.path,
@@ -444,13 +455,16 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 				}
 			}
 		},
-		[activeProjectId, activeProjectIdRef, commitFileDiff, showToast, t],
+		[activeProjectId, activeProjectIdRef, commitFileDiff, showToast, t, setWorkspacePage],
 	);
 
 	return {
 		editorMode,
 		toggleEditorMode,
 		editorTabs,
+		allEditorTabs,
+		markEditorTabDirty: workspaceEditors.markDirty,
+		registerEditorCloseGuard: workspaceEditors.registerCloseGuard,
 		activeTabId,
 		activeTab,
 		editorTabAccessSequenceRef,

@@ -120,13 +120,13 @@ test("window control hover uses solid hover surface", () => {
 	assert.match(foundation, /\.window-control:hover \{[\s\S]*?background:\s*var\(--color-bg-hover\);/);
 });
 
-test("brand lockup is larger inside the 40px titlebar", () => {
-	// 品牌区：官方 pi canvas logo + PiDeck 字标；
-	// 功能分支时分支名只保留在 title/aria-label，不上视觉
+test("sidebar brand reserves vertical space for the wordmark and branch", () => {
+	// 两行品牌在左栏局部留白，不扩大整页的窗口控制栏。
 	assert.match(brand, /PiLogoCanvas size=\{18\}/);
 	assert.match(brand, /brand-wordmark/);
 	assert.match(brand, /PiDeck · \$\{branch\}/);
-	assert.match(sidebar, /list-toolbar flex h-10/);
+	assert.match(sidebar, /list-toolbar\s+flex\s+h-14\b/);
+	assert.match(sidebar, /list-toolbar[^"\n]*\bpy-2\b/);
 	assert.doesNotMatch(sidebar, /list-toggle-native floating/);
 });
 
@@ -148,13 +148,14 @@ test("mac custom titlebar uses system traffic lights and insets collapsed tabs",
 	assert.match(sidebar, /pl-\[max\(0\.625rem,var\(--traffic-lights-width/);
 });
 
-test("collapsed sidebar keeps 14px gutter; restore lives in tab bar", () => {
+test("collapsed sidebar retains its restore entry on the left edge", () => {
 	assert.match(shell, /LIST_COLLAPSED_SIZE = 0/);
 	assert.match(foundation, /\.list-collapsed \.shell-panel-list/);
 	assert.match(foundation, /\.list-collapsed \.chat-list-pane \{\s*display:\s*none;/);
 	assert.doesNotMatch(foundation, /list-toggle-native\.floating/);
-	assert.match(tabs, /listCollapsed && props\.onToggleListCollapsed/);
-	assert.match(tabs, /PanelLeft/);
+	assert.match(shell, /listCollapsed\s*&&\s*\([\s\S]*?data-testid="sidebar-restore-rail"/);
+	assert.match(shell, /onClick=\{onToggleListCollapsed\}/);
+	assert.match(shell, /PanelLeft/);
 	// Tab 栏必须压过透明拖拽层，否则展开按钮点不到
 	assert.match(foundation, /\.custom-titlebar-enabled \.session-tabs-bar \{[\s\S]*?z-index:\s*930;/);
 });
@@ -170,7 +171,7 @@ test("drawer toggle stays on session tab bar right; no gap when drawer open", ()
 	// drawer-open 必须同时要求未折叠：折叠后聊天区顶到窗口右缘，Tab 栏仍须让位，
 	// 否则抽屉开关会与关闭按钮重叠。
 	assert.match(shell, /hasDrawer\s*&&\s*!drawerCollapsed\s*\?\s*"drawer-open"\s*:\s*""/);
-	assert.match(shell, /const\s+hasDrawer\s*=\s*Boolean\(drawer\)\s*\|\|\s*Boolean\(props\.overview\)/);
+	assert.match(shell, /const\s+hasDrawer\s*=\s*Boolean\(drawer\)\s*;/);
 	assert.match(foundation, /\.custom-titlebar-enabled \.session-tabs-bar \{[\s\S]*?margin-right:\s*var\(--window-controls-width\);/);
 	assert.match(foundation, /\.custom-titlebar-enabled \.shell-panel-drawer \.detail-drawer \{[\s\S]*?padding-top:\s*var\(--window-drag-height\);/);
 });

@@ -41,7 +41,7 @@ test("overlay roots expose narrow contracts and never subscribe to raw UI reques
 // DialogClose / ESC / 遮罩关闭都依赖 onOpenChange(false) 真正调用 onClose；
 // 写成 `!next && onClose` 只会返回函数引用，不会关弹层。
 test("dialog onOpenChange handlers invoke onClose instead of returning the callback", () => {
-	const files = ["components/overlays/OverlayComponents.tsx", "features/feedback/FeedbackDialog.tsx", "components/app/ImportModals.tsx", "components/app/ProjectResourcesModal.tsx", "components/session/WorkspaceSurface.tsx"];
+	const files = ["components/overlays/OverlayComponents.tsx", "components/app/ImportModals.tsx", "components/app/ProjectResourcesModal.tsx", "components/session/WorkspaceSurface.tsx"];
 	for (const file of files) {
 		const source = read(file);
 		// 禁止 `!next && onClose` / `!next && props.onClose` 这种未调用写法

@@ -13,7 +13,7 @@ import { defaultExpandedSidebarProjects, readExpandedSidebarProjects } from "../
 /** Settings overlay visibility is shared by Sidebar, Pi environment flow, and Session surface. */
 export const settingsOpenAtom = atom(false);
 
-/** Logo 风格的渲染层镜像（App.tsx 在 settings 变化时同步写入，照 announcement-atoms 模式）。
+/** Logo 风格的渲染层镜像（App.tsx 在 settings 变化时同步写入）。
  *  LogoMark / PiTuiLogo / AppParts 侧栏 / AboutPopover 订阅，避免 settings props 透传链；
  *  Web 独立环境无人写入，保持默认 pi-tui（与 settings 默认同源），不引入额外通道。 */
 export const logoStyleAtom = atom<"classic" | "pi-tui">("pi-tui");

@@ -18,7 +18,7 @@ export function HomeProviders() {
 		.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.model;
 	const providers = [...new Set([...overview.providers.map((provider) => provider.id), ...(usage?.providers.map((provider) => provider.provider) ?? [])])];
 	return (
-		<aside className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-border/50 bg-sidebar px-4 pb-6 pt-14 text-sidebar-foreground" data-testid="home-providers" aria-label={t("overview.providers")}>
+		<aside className="flex min-h-0 flex-col rounded-xl border border-border/60 bg-card p-4 text-foreground" data-testid="home-providers" aria-label={t("overview.providers")}>
 			<h2 className="mb-4 flex items-center gap-2 text-body font-semibold">
 				<Boxes className="size-4" />
 				{t("overview.providers")}

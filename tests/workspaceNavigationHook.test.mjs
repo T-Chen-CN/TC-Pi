@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 /** 最小 hook 调度器：测试公开导航动作与 catalog 异步结算，不加载窗口或 pi。 */
-function harness() {
+function harness(prepareProjectSelection) {
 	const atoms = { sessionRecordsAtom: {}, sessionCatalogLoadStateAtom: {} };
 	const navigationAtoms = { workspacePageAtom: {}, workspaceListsAtom: {}, workspaceLastSessionsAtom: {} };
 	const pluginAtom = {};
@@ -85,7 +85,7 @@ function harness() {
 	};
 	const render = () => {
 		cursor = 0;
-		const result = useWorkspaceNavigation(rawActions, projectId, sessionId);
+		const result = useWorkspaceNavigation(rawActions, projectId, sessionId, prepareProjectSelection);
 		effects.splice(0).forEach((effect) => effect());
 		return result;
 	};
@@ -111,6 +111,47 @@ test("late catalogs cannot restore a previously selected workspace", async () =>
 		[["open", "beta", "beta-session"]],
 	);
 });
+
+test("cancelled workspace switch preserves the selected session and navigation page", async () => {
+	let allowed = true;
+	const h = harness(async () => allowed);
+	await h.render().actions.sessions.open("alpha", "existing");
+	h.render().home();
+	allowed = false;
+	assert.equal(await h.render().actions.projects.select("beta"), false);
+	assert.equal(h.render().page, "home");
+	assert.deepEqual(h.calls, [["open", "alpha", "existing"]]);
+});
+
+test("cancelling independent chat does not expand its session list", async () => {
+	const h = harness(async () => false);
+	h.render().chat("builtin-chat");
+	await Promise.resolve();
+	await Promise.resolve();
+	assert.equal(h.render().lists.sessions, false);
+	assert.equal(h.render().page, "home");
+	assert.deepEqual(h.calls, []);
+});
+
+test("a rejected duplicate click cannot invalidate an accepted pending switch", async () => {
+	let resolve;
+	let pending = false;
+	const h = harness(() => {
+		if (pending) return Promise.resolve(false);
+		pending = true;
+		return new Promise((answer) => {
+			resolve = answer;
+		});
+	});
+	const first = h.render().actions.projects.select("alpha");
+	assert.equal(await h.render().actions.projects.select("beta"), false);
+	resolve(true);
+	assert.equal(await first, true);
+	assert.deepEqual(h.calls, [
+		["select", "alpha"],
+		["load", "alpha"],
+	]);
+});
 test("returning home cancels pending restoration without clearing the selected session or creating one", () => {
 	const h = harness();
 	h.render().actions.projects.select("alpha");
@@ -121,12 +162,12 @@ test("returning home cancels pending restoration without clearing the selected s
 	assert.equal(h.calls.filter(([action]) => action === "open" || action === "create").length, 0);
 	assert.equal(h.calls.filter(([action]) => action === "select").length, 1);
 });
-test("independent chat opens the session list without adding a workspace or creating a conversation", () => {
+test("independent chat selects its workspace without automatically opening a session picker", () => {
 	const h = harness();
 	h.render().chat("builtin-chat");
 	const navigation = h.render();
 	assert.equal(navigation.page, "workspace");
-	assert.equal(navigation.lists.sessions, true);
+	assert.equal(navigation.lists.sessions, false);
 	assert.deepEqual(h.calls, [
 		["select", "builtin-chat"],
 		["load", "builtin-chat"],

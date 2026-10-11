@@ -190,7 +190,6 @@ src/
 | 领域 | 硬约束 | 详见 maintenance-domains.md 小节 |
 |------|--------|------|
 | README/官网共用图片 | 唯一数据源 `docs/images/`，不复制到 docs-site | README 与官网共用图片 |
-| 公告 | 只编辑 `announcements-md/*.md`，json 由脚本生成，禁止手写 | 公告维护与发布 |
 | 提示词库 xueprompts.db | `content`/`description` 是 gzip BLOB，SQL LIKE 中文恒不命中，必须应用层 gunzip 后匹配 | 商店提示词库维护 |
 | 内置扩展热更新 | 判据是逐文件 sha256 不是版本号；覆盖层必须完整快照 + vendored 依赖；磁盘根统一走 `resolveBuiltInExtensionRoots()` | 内置扩展热更新 |
 | 生图存储 | **base64 不进 JSONL**（只存 ref）；读取永远有字节上界；`<img src>` 只走 `imageContentSrc()` | 生图会话存储 |

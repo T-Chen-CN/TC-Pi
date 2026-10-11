@@ -50,10 +50,6 @@ export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 		{ value: "external", label: t("settings.linkOpenMode.external") },
 		{ value: "internal", label: t("settings.linkOpenMode.internal") },
 	];
-	const workspaceContentOpenModeOptions: SelectOption[] = [
-		{ value: "split", label: t("settings.workspaceContentOpenMode.split") },
-		{ value: "maximize", label: t("settings.workspaceContentOpenMode.maximize") },
-	];
 	const busySendDeliveryOptions: SelectOption[] = [
 		{ value: "steer", label: t("settings.busySendDeliverySteer") },
 		{ value: "followUp", label: t("settings.busySendDeliveryFollowUp") },
@@ -242,36 +238,7 @@ export const CommonTab = memo(function CommonTab(props: CommonTabProps) {
 						</SelectContent>
 					</Select>
 				</SettingRow>
-				<SettingRow
-					title={
-						<>
-							<span>{t("settings.workspaceContentOpenMode")}</span>
-							<DirtyMarker dirty={isDirty("workspaceContentOpenMode")} label={t("settings.workspaceContentOpenMode")} />
-						</>
-					}
-					description={t("settings.workspaceContentOpenModeDesc")}
-					alignEnd={false}
-				>
-					<Select
-						value={draft.workspaceContentOpenMode ?? "split"}
-						onValueChange={(value) =>
-							updateDraft({
-								workspaceContentOpenMode: value as AppSettings["workspaceContentOpenMode"],
-							})
-						}
-					>
-						<SelectTrigger className="w-full">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{workspaceContentOpenModeOptions.map((option) => (
-								<SelectItem key={option.value} value={option.value}>
-									{option.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</SettingRow>
+
 				{/* 流式对话设置：中间过程与本轮修改文件的默认展示行为。 */}
 				<SettingSwitchRow anchor="common-expand-interim-during-stream" title={t("settings.expandInterimDuringStream")} description={t("settings.expandInterimDuringStreamDesc")} checked={draft.expandInterimDuringStream} onChange={(checked) => updateDraft({ expandInterimDuringStream: checked })} />
 				{/* 过程组显示：开启后连续思考/工具调用合并成过程组，关闭则保持平铺显示 */}

@@ -133,8 +133,9 @@ test("rpc log panel lives in the workspace drawer as a transient panel with rest
 	const controller = readFileSync("src/renderer/src/hooks/useSidebarController.ts", "utf8");
 	// 面板类型包含 rpcLog；持久化白名单刻意不含它（绑定 agentId，跨重启必然失效）
 	assert.match(panels, /export type WorkspaceDrawerPanel =[\s\S]{0,120}"rpcLog";/);
-	assert.match(panels, /const validPanel = panel === null \|\| validPanels\.includes\(String\(panel\)\);/);
-	assert.doesNotMatch(panels, /const validPanels = \[[^\]]*rpcLog/);
+	const chrome = readFileSync("src/renderer/src/hooks/useWindowToolLayout.ts", "utf8");
+	assert.doesNotMatch(chrome, /\[\s*"files"[^\]]*"rpcLog"/);
+	assert.match(chrome, /if\s*\(panel\s*===\s*"rpcLog"\)\s*return/);
 	// 打开：记住打开前的面板且不写项目存档
 	assert.match(panels, /if \(drawerRef\.current !== "rpcLog"\)\s*rpcLogPreviousPanelRef\.current = drawerRef\.current;/);
 	// 关闭：还原打开前的面板；closeDrawer 也必须路由到还原（否则会把 null 落到用户的常驻面板选择上）

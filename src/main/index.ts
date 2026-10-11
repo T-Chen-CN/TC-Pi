@@ -13,8 +13,6 @@ import { downgradeRunningStartedBefore, downgradeStaleRunning } from "./pi/deriv
 import { SoundAlertService } from "./sounds/SoundAlertService";
 import { registerSoundIpc } from "./ipc/soundIpc";
 import { registerSoundProtocol } from "./sounds/soundProtocol";
-import { AnnouncementService } from "./announcements/AnnouncementService";
-import { registerAnnouncementIpc } from "./ipc/announcementIpc";
 import { AutomationStore } from "./automation/AutomationStore";
 import { AutomationScheduler } from "./automation/AutomationScheduler";
 import { AutomationRunCoordinator } from "./automation/AutomationRunCoordinator";
@@ -375,8 +373,6 @@ import { registerEnhanceIpc } from "./ipc/enhanceIpc";
 import { detectExternalEditors, listConfiguredExternalEditors, mergeDetectedExternalEditors, openProjectInEditor, validateExternalEditorCommand } from "./editors/EditorDetector";
 import { startMemoryProfile, isMemoryProfileEnabled, type MemoryProfileHandle } from "./memory/MemoryMonitor";
 import { DiagnosticsMonitor } from "./diagnostics/DiagnosticsMonitor";
-import { EnvironmentDoctor } from "./health/EnvironmentDoctor";
-import { LogBundleExporter } from "./health/LogBundleExporter";
 import { QuitCleanupRegistry } from "./lifecycle/QuitCleanupRegistry";
 import type { FeishuChatBinding } from "../shared/types";
 import { createRealAutoUpdater } from "./update/createAutoUpdater";
@@ -458,8 +454,6 @@ let remoteAccessManager: RemoteAccessManager;
 let terminalManager: TerminalSessionManager;
 /** 声音提醒服务（完成/出错/等待输入提示音）；null = 未初始化 */
 let soundAlertService: SoundAlertService | null = null;
-/** 应用公告服务（无服务器拉取模式）；null = 未初始化 */
-let announcementService: AnnouncementService | null = null;
 /** 定时任务与自动化服务；null = 未初始化 */
 let automationStore: AutomationStore | null = null;
 let automationScheduler: AutomationScheduler | null = null;
@@ -470,10 +464,6 @@ let rpcLogger: RpcLogger;
 let memoryProfileHandle: MemoryProfileHandle | null = null;
 /** 设置开关控制的开发诊断（内存 CSV + 事件循环延迟 + 关键耗时） */
 let diagnosticsMonitor: DiagnosticsMonitor | null = null;
-/** 环境体检编排器（问题反馈页一键排障） */
-let environmentDoctor: EnvironmentDoctor | null = null;
-/** 诊断产物导出器（Markdown / zip 日志包） */
-let logBundleExporter: LogBundleExporter | null = null;
 // 退出清理路径与 IPC 域共用同一槽位（见 ipc/feishuIpc.ts）。
 let usageStatsService: UsageStatsService | null = null;
 /**
@@ -2206,8 +2196,6 @@ function registerIpc() {
 			extract: createTarExtractor((scope, message, detail) => void appLogger.warn(scope, message, detail)),
 		},
 		diagnosticsMonitor: diagnosticsMonitor ?? undefined,
-		environmentDoctor: environmentDoctor ?? undefined,
-		logBundleExporter: logBundleExporter ?? undefined,
 		// 进程监控停止 agent：按 agentId 走完整会话停止链路（含 detach 推送）
 		stopAgentFromMonitor,
 		modelCapabilityCache: piModelCapabilityCache,
@@ -2692,15 +2680,6 @@ app
 				void appLogger?.warn("skill", "Usage probe skill template auto-install failed", { error: result.error });
 			}
 		});
-		// 环境诊断技能启动时自动落到用户全局技能目录，用户可 /skill:pideck-doctor 让 pi 读诊断报告排障。
-		// fire-and-forget，失败不阻塞启动。
-		void skillManager.installPideckDoctorTemplate().then((result) => {
-			if (result.success) {
-				void appLogger?.info("skill", "Pideck-doctor skill template auto-installed", { path: result.path });
-			} else {
-				void appLogger?.warn("skill", "Pideck-doctor skill template auto-install failed", { error: result.error });
-			}
-		});
 		extensionManager = new ExtensionManager(
 			piLocator,
 			() => settingsStore.get(),
@@ -2892,15 +2871,6 @@ app
 			diagnosticsMonitor?.recordTiming(name, startedAt, detail);
 		});
 		quitCleanup.register("diagnostics-monitor", () => diagnosticsMonitor?.stop());
-		// 环境体检（问题反馈页一键排障）与诊断产物导出器：依赖齐全后构造，注入 systemIpc。
-		// 两者都只读 appLogger/piLocator/settingsStore/configManager，无独立生命周期。
-		environmentDoctor = new EnvironmentDoctor({
-			appLogger,
-			piLocator,
-			settingsStore,
-			configManager,
-		});
-		logBundleExporter = new LogBundleExporter({ appLogger });
 		// 实时 RPC 日志广播器（DSH 后端用）：镜像 pi AgentManager 的 80ms 节流批量推送语义，
 		// 窗口销毁后静默丢弃；观看登记由 rpcLogsSetWatching IPC 按面板挂载/卸载成对驱动。
 		const rpcLogLiveBroadcaster = new RpcLogLiveBroadcaster({
@@ -3734,26 +3704,6 @@ app
 		quitCleanup.register("sound-alert", () => {
 			soundAlertService?.detach();
 			soundAlertService = null;
-		});
-
-		// 应用公告：无服务器拉取（仓库 announcements.json，jsDelivr → 内置镜像 → raw 兜底），
-		// 2h 周期 + 启动抖动；快照变化推给主窗口，已读集合持久化在 userData。
-		announcementService = new AnnouncementService({
-			userDataDir: app.getPath("userData"),
-			appVersion: app.getVersion(),
-			log: (domain, message, details) => void appLogger.info(domain, message, details),
-			onSnapshot: (state) => {
-				// 推送前判空 + isDestroyed：窗口销毁后 send 会抛
-				const win = mainWindow;
-				if (win && !win.isDestroyed()) win.webContents.send(ipcChannels.announcementChanged, state);
-			},
-		});
-		announcementService.start();
-		registerAnnouncementIpc(() => announcementService);
-		// 退出清理登记（before-quit 统一 runAll）：停定时器，避免退出阶段仍触发拉取
-		quitCleanup.register("announcement", () => {
-			announcementService?.stop();
-			announcementService = null;
 		});
 
 		// 启动后异步检查 RPC 超时时间，如果小于 600 秒则自动修正为 600 秒

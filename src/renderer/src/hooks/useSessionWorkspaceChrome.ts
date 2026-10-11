@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useProjectSessionChrome } from "./useProjectSessionChrome";
+import { projectSessionTabs, mergeProjectSessionTabs, projectSplitLayout } from "../utils/projectSessionChrome";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { currentSessionIdAtom, sessionRecordByIdAtomFamily, sessionRecordsAtom, sessionTabIdsAtom } from "../atoms";
 import { cycleSessionTab, openPermanentSessionTab, openPreviewSessionTab, reorderSessionTabs, togglePinSessionTab, type SessionTabOpenMode } from "../utils/sessionTabs";
@@ -30,9 +32,20 @@ export type SessionWorkspaceFocusHandlers = {
 export function useSessionWorkspaceChrome(options: { currentSessionId: string | undefined; activeProjectId: string | undefined }) {
 	const { currentSessionId, activeProjectId } = options;
 	const store = useStore();
-	const sessionTabIds = useAtomValue(sessionTabIdsAtom);
-	const setSessionTabIds = useSetAtom(sessionTabIdsAtom);
+	const allSessionTabIds = useAtomValue(sessionTabIdsAtom);
+	const setAllSessionTabIds = useSetAtom(sessionTabIdsAtom);
 	const sessionRecords = useAtomValue(sessionRecordsAtom);
+	const sessionTabIds = useMemo(() => projectSessionTabs(allSessionTabIds, sessionRecords, activeProjectId), [allSessionTabIds, sessionRecords, activeProjectId]);
+	const setSessionTabIds = useCallback(
+		(update: SetStateAction<string[]>) => {
+			setAllSessionTabIds((all) => {
+				const records = store.get(sessionRecordsAtom);
+				const scoped = projectSessionTabs(all, records, activeProjectId);
+				return mergeProjectSessionTabs(all, typeof update === "function" ? update(scoped) : update, records, activeProjectId);
+			});
+		},
+		[activeProjectId, setAllSessionTabIds, store],
+	);
 
 	const focusHandlersRef = useRef<SessionWorkspaceFocusHandlers>({
 		focusSession: () => undefined,
@@ -48,8 +61,9 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 			return [];
 		}
 	});
-	const [previewSessionTabId, setPreviewSessionTabId] = useState<string | null>(null);
-	const [splitLayout, setSplitLayout] = useState<SessionSplitLayout | null>(null);
+	const projectChrome = useProjectSessionChrome(activeProjectId);
+	const { previewSessionTabId, setPreviewSessionTabId, setSplitLayout } = projectChrome;
+	const splitLayout = projectSplitLayout(projectChrome.splitLayout, sessionRecords, activeProjectId);
 	const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
 	/** 分屏组胶囊在 Tab 栏的收起状态（持久化） */
 	const [splitGroupCollapsed, setSplitGroupCollapsed] = useState<boolean>(() => {
@@ -104,7 +118,7 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 
 	// 会话记录消失时清理 Tab / pin / preview / 分屏
 	useEffect(() => {
-		setSessionTabIds((current) => {
+		setAllSessionTabIds((current) => {
 			const next = current.filter((id) => Boolean(sessionRecords[id]));
 			return next.length === current.length ? current : next;
 		});
@@ -120,7 +134,7 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 			const ids = splitLayoutSessionIds(layout);
 			return ids.every((id) => Boolean(sessionRecords[id])) ? layout : null;
 		});
-	}, [sessionRecords, setSessionTabIds]);
+	}, [sessionRecords, setAllSessionTabIds, setPreviewSessionTabId, setSplitLayout]);
 
 	// 主进程「跳转目标」推送（系统通知点击 / 桌面宠物点击 / 文件夹右键打开项目）：
 	// - sessionId：解析 record 后交给 App 注入的 focus handler 切换焦点。冷启动点击通知时
@@ -175,13 +189,19 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 	/** 在 App / 侧栏边界登记 Tab（preview / permanent）；与 selectSession 解耦 */
 	const registerOpenSession = useCallback(
 		(sessionId: string, mode: SessionTabOpenMode = "permanent") => {
-			const { tabs, pinned, previewId } = tabsSnapshotRef.current;
+			const records = store.get(sessionRecordsAtom);
+			const projectId = records[sessionId]?.projectId;
+			if (!projectId) return;
+			const all = store.get(sessionTabIdsAtom);
+			const tabs = projectSessionTabs(all, records, projectId);
+			const pinned = tabsSnapshotRef.current.pinned;
+			const previewId = projectChrome.byProject[projectId]?.preview ?? null;
 			const result = mode === "preview" ? openPreviewSessionTab(tabs, pinned, previewId, sessionId) : openPermanentSessionTab(tabs, pinned, previewId, sessionId);
 			// 已打开的常驻 Tab 复用原数组：相同引用写 jotai 会被 Object.is 跳过。
-			setSessionTabIds(result.tabs);
-			setPreviewSessionTabId((current) => (current === result.previewId ? current : result.previewId));
+			setAllSessionTabIds(mergeProjectSessionTabs(all, result.tabs, records, projectId));
+			projectChrome.updatePreview(projectId, result.previewId);
 		},
-		[setSessionTabIds],
+		[setAllSessionTabIds, store, projectChrome.byProject, projectChrome.updatePreview],
 	);
 
 	const promotePreview = useCallback(
@@ -348,7 +368,8 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 	const cycleTabsOnShortcut = useCallback(
 		(id: string) => {
 			if (id !== "cycleSessionTabs" && id !== "cycleSessionTabsReverse") return;
-			const target = cycleSessionTab(store.get(sessionTabIdsAtom), store.get(currentSessionIdAtom), id === "cycleSessionTabs" ? 1 : -1);
+			const tabs = projectSessionTabs(store.get(sessionTabIdsAtom), store.get(sessionRecordsAtom), tabsSnapshotRef.current.activeProjectId);
+			const target = cycleSessionTab(tabs, store.get(currentSessionIdAtom), id === "cycleSessionTabs" ? 1 : -1);
 			if (target) selectTab(target);
 		},
 		[store, selectTab],
@@ -360,6 +381,7 @@ export function useSessionWorkspaceChrome(options: { currentSessionId: string | 
 		(draggedSessionId: string, target: SessionSplitDropTarget) => {
 			setDraggingSessionId(null);
 			const snap = tabsSnapshotRef.current;
+			if (store.get(sessionRecordByIdAtomFamily(draggedSessionId))?.projectId !== snap.activeProjectId) return;
 
 			// 分屏拖入 → 常驻（用 snapshot，避免 stale tabs）；侧栏拖入尚未在 Tab 栏的会话也要先登记
 			const permanent = openPermanentSessionTab(snap.tabs, snap.pinned, snap.previewId, draggedSessionId);

@@ -88,12 +88,14 @@ export const SessionRuntimeInjector = React.memo(function SessionRuntimeInjector
 	const paneTerminalState = paneOwnerKey ? services.terminalStatesByOwner[paneOwnerKey] : undefined;
 	const paneTerminalOpen = Boolean(paneTerminalState?.open) && Boolean(paneTerminal);
 	const paneTerminalCollapsed = Boolean(paneTerminalState?.collapsed);
-	const paneTerminalDockVisible = shouldMountPaneTerminalDock({
-		ownerKey: paneOwnerKey,
-		activeOwnerKey: services.activeTerminalOwnerKey,
-		focused,
-		open: paneTerminalOpen,
-	});
+	const paneTerminalDockVisible =
+		services.layoutRefs.terminalInSession !== false &&
+		shouldMountPaneTerminalDock({
+			ownerKey: paneOwnerKey,
+			activeOwnerKey: services.activeTerminalOwnerKey,
+			focused,
+			open: paneTerminalOpen,
+		});
 	// 本栏 dock 的开关回调绑定本栏自己的 owner key：非聚焦栏也能关自己的终端，
 	// 不会写到当前聚焦会话的桶里（分屏双栏状态互不串台）。
 	const setPaneTerminalOpen = React.useCallback(

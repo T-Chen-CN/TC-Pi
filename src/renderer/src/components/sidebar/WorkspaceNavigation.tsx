@@ -1,77 +1,61 @@
-import { useEffect } from "react";
-import { ChevronDown, ChevronRight, FolderOpen, Home, MessageSquare, FolderPlus, MessageCircle, MoreHorizontal } from "lucide-react";
-import type { WorktreeEntry } from "../../../../shared/types";
+import { MessageSquare } from "lucide-react";
 import type { SidebarController } from "../../hooks/useSidebarController";
 import type { useWorkspaceNavigation } from "../../hooks/useWorkspaceNavigation";
-import { isChatProject, displayProjectDirectoryName } from "../../rendererUtils";
-import { showNotice } from "../../utils/notice";
+import { useWorkspaceSessionPicker } from "../../hooks/useWorkspaceSessionPicker";
+import { displayProjectDirectoryName } from "../../rendererUtils";
 import { t } from "../../i18n";
 import { Button } from "../ui-shadcn/button";
-import { cn } from "../../lib/utils";
-import { WorkspaceProjectList } from "./WorkspaceProjectList";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui-shadcn/popover";
 import { WorkspaceSessionList } from "./WorkspaceSessionList";
 
 export type WorkspaceNavigationPort = ReturnType<typeof useWorkspaceNavigation>;
 
-/** 固定导航与独立聊天入口；列表在文档流中展开，限高滚动保留文件树空间。 */
-export function WorkspaceNavigation(props: {
-	controller: SidebarController;
-	navigation: WorkspaceNavigationPort;
-	projectId?: string;
-	sessionId?: string;
-	worktreesByProject: Readonly<Record<string, readonly WorktreeEntry[]>>;
-	branchByProject?: Readonly<Record<string, string | null | undefined>>;
-	removingWorktreePaths?: ReadonlySet<string>;
-}) {
+/** 标签栏里的会话选择浮层；controller 和菜单仍由原侧栏单实例管理。 */
+export function WorkspaceNavigation(props: { controller: SidebarController; navigation: WorkspaceNavigationPort; projectId?: string; sessionId?: string }) {
 	const { controller, navigation, projectId, sessionId } = props;
-	const { actions, lists } = navigation;
-	const projects = controller.catalog.projects.filter((project) => !isChatProject(project));
-	const chat = controller.catalog.projects.find(isChatProject);
 	const project = controller.catalog.projects.find((item) => item.id === projectId);
-	const session = controller.catalog.sessionsByProject[projectId ?? ""]?.find((item) => item.id === sessionId);
-	useEffect(() => {
-		if (lists.sessions && projectId) actions.sessions.ensureCatalogsLoaded([projectId]);
-	}, [lists.sessions, projectId, actions.sessions.ensureCatalogsLoaded]);
-	const fail = () => showNotice(t("workspace.navigationFailed"));
-	const add = () => {
-		void actions.projects.add().catch(fail);
-	};
-	const rowClass = "h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-body";
+	const picker = useWorkspaceSessionPicker(projectId, navigation.actions.sessions);
 	return (
-		<nav className="flex max-h-[60vh] min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto border-b border-border/40 pb-2 [&>button]:shrink-0" aria-label={t("workspace.navigation")}>
-			<Button variant="ghost" className={cn(rowClass, navigation.page === "home" && "bg-accent text-accent-foreground")} onClick={navigation.home} aria-current={navigation.page === "home" ? "page" : undefined}>
-				<Home className="size-4 shrink-0" />
-				<span>{t("workspace.home")}</span>
-			</Button>
-			<Button variant="ghost" className={rowClass} onClick={add}>
-				<FolderPlus className="size-4 shrink-0" />
-				<span>{t("workspace.add")}</span>
-			</Button>
-			<Button variant="ghost" className={rowClass} aria-label={t("workspace.select")} aria-expanded={lists.projects} aria-controls="workspace-inline-list" onClick={() => (projects.length ? navigation.setLists((value) => ({ ...value, projects: !value.projects })) : add())}>
-				<FolderOpen className="size-4 shrink-0" />
-				<span className="shrink-0">{t("workspace.select")}</span>
-				<span className="min-w-0 flex-1 truncate text-right text-caption text-muted-foreground">{project && !isChatProject(project) ? displayProjectDirectoryName(project) : ""}</span>
-				{lists.projects ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
-			</Button>
-			{lists.projects && <WorkspaceProjectList controller={controller} actions={actions} projectId={projectId} worktreesByProject={props.worktreesByProject} branchByProject={props.branchByProject} removingWorktreePaths={props.removingWorktreePaths} />}
-			<Button variant="ghost" className={rowClass} aria-label={t("workspace.sessions")} aria-expanded={lists.sessions} aria-controls="workspace-session-list" onClick={() => navigation.setLists((value) => ({ ...value, sessions: !value.sessions }))}>
-				<MessageSquare className="size-4 shrink-0" />
-				<span className="shrink-0">{t("workspace.sessions")}</span>
-				<span className="min-w-0 flex-1 truncate text-right text-caption text-muted-foreground">{session?.title}</span>
-				{lists.sessions ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
-			</Button>
-			{lists.sessions && <WorkspaceSessionList project={project} sessionId={sessionId} controller={controller} actions={actions} />}
-			{chat && (
-				<div className="flex shrink-0 items-center">
-					<Button variant="ghost" className={cn(rowClass, "flex-1", projectId === chat.id && navigation.page === "workspace" && "bg-accent text-accent-foreground")} onClick={() => navigation.chat(chat.id)}>
-						<MessageCircle className="size-4 shrink-0" />
-						<span>{t("workspace.independentChat")}</span>
-					</Button>
-					<Button variant="ghost" size="icon-sm" className="size-6 shrink-0 text-muted-foreground" aria-label={t("workspace.chatMenu")} onClick={(event) => void controller.openMenu({ kind: "project", projectId: chat.id, x: event.clientX, y: event.clientY }).catch(fail)}>
-						<MoreHorizontal className="size-3.5" />
-					</Button>
+		<Popover open={picker.open} onOpenChange={picker.setOpen}>
+			<PopoverTrigger asChild>
+				<Button type="button" variant="ghost" size="icon-sm" className="size-7 shrink-0 [-webkit-app-region:no-drag]" title={t("workspace.sessions")} aria-label={t("workspace.sessions")} disabled={!projectId}>
+					<MessageSquare className="size-3.5" aria-hidden="true" />
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent
+				align="end"
+				side="bottom"
+				sideOffset={8}
+				collisionPadding={8}
+				className="flex max-h-[min(60vh,var(--radix-popover-content-available-height))] w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-1 [-webkit-app-region:no-drag]"
+				data-testid="workspace-session-picker"
+				aria-label={t("workspace.sessions")}
+				onInteractOutside={(event) => {
+					// 原菜单 portal 到 body；菜单抢焦点不是用户点击浮层之外，不能误关列表。
+					if (controller.menu || (event.target instanceof Element && event.target.closest('[data-slot="dropdown-menu-content"]'))) event.preventDefault();
+				}}
+				onEscapeKeyDown={(event) => {
+					if (controller.menu) event.preventDefault();
+				}}
+			>
+				<div className="flex shrink-0 items-center gap-2 border-b border-border/40 px-2 py-2 text-caption">
+					<span className="shrink-0 font-medium">{t("workspace.sessions")}</span>
+					<span className="min-w-0 flex-1 truncate text-right text-muted-foreground">{project ? displayProjectDirectoryName(project) : ""}</span>
 				</div>
-			)}
-		</nav>
+				<WorkspaceSessionList project={project} sessionId={sessionId} controller={controller} actions={navigation.actions} onSelect={picker.select} />
+				{project && (
+					<Button
+						variant="ghost"
+						className="mt-1 h-8 shrink-0 justify-start border-t border-border/40 px-2 text-caption text-muted-foreground"
+						onClick={() => {
+							controller.openSessionManager(project.id);
+							picker.setOpen(false);
+						}}
+					>
+						{t("workspace.manageSessions")}
+					</Button>
+				)}
+			</PopoverContent>
+		</Popover>
 	);
 }

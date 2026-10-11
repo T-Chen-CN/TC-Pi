@@ -86,11 +86,11 @@ test("equal sizes are ignored to keep resize effects idle", () => {
 	);
 });
 
-test("AppShell opens a collapsed drawer by resizing to the saved width", () => {
+test("AppShell delegates opening panels to one atomic layout owner", () => {
 	const shell = readFileSync("src/renderer/src/components/app/AppShell.tsx", "utf8");
-	assert.match(shell, /shouldCommitPanelPixels/);
-	// expand() 无历史会落到 minSize，打开抽屉必须用保存宽度 resize。
-	assert.match(shell, /panel\.resize\(drawerWidthRef\.current\)/);
-	assert.match(shell, /panel\.resize\(listWidthRef\.current\)/);
-	assert.doesNotMatch(shell, /panel\.expand\(\)/);
+	const layoutHook = readFileSync("src/renderer/src/hooks/useWorkbenchPanelLayout.ts", "utf8");
+	assert.match(shell, /useWorkbenchPanelResize\(/);
+	assert.match(shell, /useWorkbenchPanelLayout\(/);
+	assert.match(layoutHook, /group\.setLayout\(applyWorkbenchPanelWidths\(/);
+	assert.doesNotMatch(shell, /panel\.(?:resize|collapse|expand)\(/);
 });

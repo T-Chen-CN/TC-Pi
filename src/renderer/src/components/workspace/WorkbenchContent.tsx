@@ -29,11 +29,13 @@ export type WorkbenchContentProps = {
 	/** Git Diff 优先；无 Diff 时渲染编辑器 tab */
 	gitDiff: GitDiffLike | null;
 	gitDiffDisplayMode: WorkspaceContentOpenMode;
-	onToggleGitDiffMode: () => void;
+	onToggleGitDiffMode?: () => void;
 	onCloseGitDiff: () => void;
 	editorTabs: readonly EditorTabLike[];
 	activeTab: EditorTabLike | null;
 	onDirty: (id: string) => void;
+	onSaved?: (id: string) => void;
+	registerCloseGuard?: (id: string, guard: () => Promise<boolean>) => () => void;
 	editorMode: WorkspaceContentOpenMode;
 	onToggleEditorMode?: () => void;
 	onCloseEditor: () => void;
@@ -45,7 +47,7 @@ export type WorkbenchContentProps = {
 /**
  * 中间栏阅读面：Git Diff / 文件编辑共用 FileDiffViewer。
  *
- * 文件标签分别由标签模式顶栏与简洁模式右侧承载。已打开文件保持实例，切换仅隐藏，保留撤销历史。
+ * 文件标签由中央工作台顶栏承载。跨工作区的已打开文件保持实例，切换仅隐藏，保留撤销历史。
  * 非当前文件关闭全局保存快捷键；关闭标签时才释放实例。
  * 不用 React.lazy：Vite/Electron 下动态 import 偶发
  * 「Failed to fetch dynamically imported module」，且 lazy 会缓存 rejected
@@ -59,6 +61,8 @@ export function WorkbenchContent(props: WorkbenchContentProps) {
 					<FileDiffViewer
 						active={props.activeTab?.id === tab.id && !props.gitDiff}
 						onDirty={() => props.onDirty(tab.id)}
+						onSaved={() => props.onSaved?.(tab.id)}
+						registerCloseGuard={props.registerCloseGuard}
 						displayMode={props.editorMode}
 						filePath={tab.filePath}
 						activeTabId={tab.id}

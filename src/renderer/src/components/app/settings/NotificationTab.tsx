@@ -166,7 +166,6 @@ export const NotificationTab = memo(function NotificationTab(props: Notification
 				<SettingSwitchRow anchor="notification-enable" title={t("settings.enableNotifications")} checked={draft.enableNotifications} onChange={(checked) => updateDraft({ enableNotifications: checked })} />
 				<SettingSwitchRow anchor="notification-ask" title={t("settings.askNotification")} description={t("settings.askNotificationDesc")} checked={draft.askNotificationEnabled} onChange={(checked) => updateDraft({ askNotificationEnabled: checked })} />
 				<SettingSwitchRow anchor="notification-agent-count" title={t("settings.agentCountReminder")} description={t("settings.agentCountReminderDesc")} checked={draft.agentCountReminderEnabled} onChange={(checked) => updateDraft({ agentCountReminderEnabled: checked })} />
-				<SettingSwitchRow anchor="notification-announcement" title={t("settings.announcementNotification")} description={t("settings.announcementNotificationDesc")} checked={draft.announcementNotificationEnabled} onChange={(checked) => updateDraft({ announcementNotificationEnabled: checked })} />
 			</SettingsSection>
 
 			{/* 应用内通知（toast）：展示时长全局可配 + 历史回看 */}

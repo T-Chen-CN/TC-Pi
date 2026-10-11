@@ -112,8 +112,10 @@ test("App supplies one durable settings fallback for both panel widths", () => {
 });
 
 test("AppShell shares the drawer width bounds with the persistence clamp", () => {
-	assert.match(appShell, /DRAWER_WIDTH_MIN,/);
-	assert.match(appShell, /DRAWER_WIDTH_MIN_PINNED,/);
+	const layoutHook = readFileSync("src/renderer/src/hooks/useWorkbenchPanelLayout.ts", "utf8");
+	assert.match(layoutHook, /DRAWER_WIDTH_MIN,/);
+	assert.match(layoutHook, /DRAWER_WIDTH_MIN_PINNED/);
+	assert.match(appShell, /minSize=\{panelLayout\.drawerMinSize\}/);
 	assert.match(appShell, /DRAWER_WIDTH_MAX,/);
 	// 常量不再在 AppShell 本地定义，防止与 hook 的 clamp 范围漂移
 	assert.doesNotMatch(appShell, /const DRAWER_MIN = 180;/);

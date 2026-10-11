@@ -58,4 +58,17 @@ const ResizableHandle = ({
 	</ResizablePrimitive.Separator>
 );
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+/** 自定义分配策略的分隔线：Group 禁用库手势，保留同一套视觉与键盘焦点。 */
+const ControlledResizableHandle = ({ active, disabled, className, ...props }: React.HTMLAttributes<HTMLDivElement> & { active?: boolean; disabled?: boolean }) => (
+	<div
+		{...props}
+		role="separator"
+		aria-orientation="vertical"
+		aria-disabled={disabled || undefined}
+		tabIndex={disabled ? -1 : 0}
+		data-separator={active ? "active" : "inactive"}
+		className={cn("relative flex h-full w-px shrink-0 touch-none select-none items-center justify-center bg-transparent outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset", className)}
+	/>
+);
+
+export { ResizablePanelGroup, ResizablePanel, ResizableHandle, ControlledResizableHandle };
