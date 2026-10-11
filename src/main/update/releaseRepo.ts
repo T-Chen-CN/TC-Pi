@@ -1,7 +1,7 @@
 import { UPDATE_REPO, UPDATE_REPO_OWNER } from "../../shared/updateSources";
 
 /**
- * PiDeck 更新所指向的 GitHub 仓库坐标。
+ * TC-Pi 更新所指向的 GitHub 仓库坐标。
  *
  * 坐标的唯一事实来源收敛到 shared/updateSources.ts：这里直接复用，不再手抄字面量
  * （此前两处各写一份、靠人工同步，迟早漂移）。对外仍导出同名常量，消费方无需改动。

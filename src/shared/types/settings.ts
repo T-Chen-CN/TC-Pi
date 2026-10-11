@@ -51,7 +51,7 @@ export type WorkspaceContentOpenMode = "split" | "maximize";
 export type SessionTabOpenMode = "preview" | "permanent";
 export type AppFontSizeMode = "compact" | "medium" | "large" | "xlarge";
 
-/** 更新源：atomgit = 国内 AtomGit 源（默认首选）；github = 官方 GitHub Release。 */
+/** 当前使用 TC-Pi GitHub Releases；atomgit 仅为读取旧持久化设置保留，运行时统一迁移。 */
 export type UpdateSourceId = "atomgit" | "github";
 
 /** 内置镜像体检状态：ok=检测+下载预检全通；slow=通但实测速度低于阈值；broken=失败/超时/响应异常。 */
@@ -477,20 +477,11 @@ export type AppSettings = {
 	 * 默认 true；关闭后仅提示有更新，手动点「立即下载」。
 	 */
 	autoDownloadUpdates: boolean;
-	/**
-	 * 更新源："github" 走 GitHub Release 官方源（app-update.yml 原生链路）；
-	 * 其余为国内镜像前缀代理（generic provider 拼 releases/latest/download）；
-	 * "custom" 用 customUpdateSourceUrl 的镜像前缀。
-	 * 默认 "atomgit"（v0.7.5 起，国内加速源为第一首选）。
-	 */
+	/** TC-Pi 的 GitHub Releases；历史镜像值在读取和保存边界归一化为 github。 */
 	updateSource: UpdateSourceId;
-	/** updateSource="custom" 时的镜像前缀（如 https://mirror.example.com），拼接规则见 updateSources.ts。 */
+	/** 旧版镜像前缀，仅保留数据读取兼容；当前更新链路不使用。 */
 	customUpdateSourceUrl: string;
-	/**
-	 * updateSource 一次性迁移标记：v0.7.5 将默认源从 github 切为 atomgit 时，
-	 * 对已持久化过 "github" 的旧用户补一次迁移到 atomgit；置 true 后永不重复迁移，
-	 * 用户后续显式改回 github 会被尊重。缺省 = 未迁移（仅旧 settings.json 会出现）。
-	 */
+	/** 原项目迁移标记：读取时删除，不能阻止更新来源切到 TC-Pi。 */
 	updateSourceAtomgitMigrated?: boolean;
 	/** 上次后台检查完成时间（毫秒时间戳）；缺省 = 从未检查。 */
 	updateLastCheckAt?: number;

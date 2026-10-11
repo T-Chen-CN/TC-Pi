@@ -427,7 +427,7 @@ export type ChangelogPayload = {
 	/** markdown 正文；失败为 null。 */
 	markdown: string | null;
 	/** 实际取到内容的源；失败为 null。 */
-	source: "atomgit" | "github" | null;
+	source: "github-api" | "github" | null;
 	/** 正文解析出的版本条目数（诊断用）。 */
 	versionCount: number;
 	/** CHANGELOG 网页地址，供降级「在浏览器打开」。 */

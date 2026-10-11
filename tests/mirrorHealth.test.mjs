@@ -132,24 +132,14 @@ test("fetch 网络错误 → broken，原因「连接失败」（不向外抛）
 	assert.equal(result.error, "连接失败");
 });
 
-test("probeAllMirrors：并行探测全部内置更新源，失败互不影响", async () => {
-	// 真实延迟 + 默认 Date.now：同步 fake fetch 会让测速在 0/1ms 间随机
-	// （dlMs=0 → speed=0 → slow），偶发 flaky（2026-09 CI 实测）；
-	// 注入共享 fake clock 也会被 Promise.all 并行交错污染，同样不可靠。
-	const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-	const fetchImpl = async (url, _opts) => {
-		if (url.endsWith("/latest.yml")) {
-			await sleep(10);
-			return new Response("version: 0.7.4\n", { status: 200 });
-		}
-		await sleep(200); // 256KB/200ms = 1310KB/s，稳定高于 300 阈值
-		return new Response(new Uint8Array(PROBE_RANGE_BYTES), { status: 206 });
-	};
-	const results = await probeAllMirrors(fetchImpl);
-	const byId = {};
-	for (const r of results) byId[r.id] = r;
-	assert.equal(Object.keys(byId).length, 1, "应涵盖内置 AtomGit 更新源");
-	assert.equal(byId.atomgit.status, "ok");
+test("probeAllMirrors：TC-Pi 没有配置镜像时不请求原作者的源", async () => {
+	let calls = 0;
+	const results = await probeAllMirrors(async () => {
+		calls += 1;
+		throw new Error("Unexpected mirror request");
+	});
+	assert.equal(results.length, 0);
+	assert.equal(calls, 0);
 });
 
 test("探测加超时保护：单请求最坏耗时不超过 PROBE_TIMEOUT_MS", () => {

@@ -318,7 +318,6 @@ import { TerminalSessionManager } from "./terminal/TerminalSessionManager";
 import { buildTrayMenuTemplate, TRAY_RECENT_PROJECTS_LIMIT } from "./tray/trayMenuTemplate";
 import { startTrayRegistrationVerify, type TrayRegistrationVerify } from "./tray/trayRegistrationVerify";
 import { UpdateService } from "./update/UpdateService";
-import { installAtomgitNoCacheBypass, UPDATER_PARTITION_NAME } from "./update/atomgitNoCacheBypass";
 import { createRealAutoUpdater } from "./update/createAutoUpdater";
 import { createMacManualUpdateChecker } from "./update/macManualUpdate";
 import { UsageStatsService } from "./usageStats/UsageStatsService";
@@ -1108,7 +1107,7 @@ function printStartupInfo() {
 		console.log("%c  Persistent installationType: %c${persistentInstallationType}", "color: #6b7280;", "color: #8b5cf6; font-weight: bold;");
 		console.log("");
 		console.log("%c🐛 Found a bug? Report at:", "color: #6b7280;");
-		console.log("%c  https://github.com/ayuayue/PiDeck/issues", "color: #3b82f6; text-decoration: underline;");
+		console.log("%c  https://github.com/T-Chen-CN/TC-Pi/issues", "color: #3b82f6; text-decoration: underline;");
 		console.log("");
 		console.log("%c🎉 Easter egg: You found it! Thanks for exploring.", "color: #ec4899; font-weight: bold;");
 		console.log("");
@@ -1997,7 +1996,7 @@ function registerIpc() {
 	const catalogUpdater = new PiAiCatalogUpdater({
 		userDataDir: app.getPath("userData"),
 		// 目录更新/检测复用应用更新的源偏好（settings.updateSource）：
-		// github → raw 直连优先；atomgit 等 → AtomGit OpenAPI 优先，两者互为兜底。
+		// GitHub raw 与 contents API 都只读取 TC-Pi。
 		source: () => settingsStore.get().updateSource,
 	});
 	// 内置扩展热更新：版本号不跟 PiDeck 应用版本走（见 resources/extensions/extensions-manifest.json），
@@ -2007,19 +2006,13 @@ function registerIpc() {
 		userDataDir: app.getPath("userData"),
 		builtinExtensionsDir: resolveBuiltInExtensionsDir(builtInExtensionRoots),
 
-		// 与模型目录/应用更新共用 settings.updateSource：默认 AtomGit，切 GitHub 后 raw 直连优先。
+		// 与模型目录/应用更新共用 TC-Pi GitHub 来源。
 		source: () => settingsStore.get().updateSource,
 	});
 
 	// 后台更新检查：Windows / 支持自动升级的发行物走 electron-updater；
 	// macOS 当前未签 Developer ID，不能承诺稳定的替换/重启，因此只检测 Release 并交给用户手动安装。
 	// 两条路径都由同一个 UpdateService 快照推送渲染层，设置页能明确表达能力边界。
-	// AtomGit 镜像源对 query string 返回 404，而 electron-updater 检查必带 noCache 参数：
-	// 在 updater 首次发起请求前注册 webRequest 剥除器（幂等）。注意必须挂在
-	// electron-updater 的独立 partition session（"electron-updater"）上，而不是 defaultSession
-	// —— updater 的 ElectronHttpExecutor 用 session.fromPartition("electron-updater") 发请求，
-	// 挂在 defaultSession 会拦不到（0.7.5 曾因此漏修）。
-	installAtomgitNoCacheBypass(() => session.fromPartition(UPDATER_PARTITION_NAME, { cache: false }));
 	const updateServiceBase = {
 		settingsStore,
 		// 更新通道（dev/stable，启动时已判定）：dev 强制 GitHub 源 + allowPrerelease（见 UpdateService.applyUpdateSource）。

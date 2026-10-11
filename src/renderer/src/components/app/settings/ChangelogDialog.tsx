@@ -127,7 +127,7 @@ export function ChangelogDialog(props: {
 							    stale（网络失败退回旧缓存）时额外提示可刷新取最新。 */}
 							<span className="text-caption text-muted-foreground/70">
 								{t("changelog.sourceLabel", {
-									source: state.payload.source === "github" ? "GitHub" : state.payload.source === "atomgit" ? "AtomGit" : "—",
+									source: state.payload.source === "github" || state.payload.source === "github-api" ? t("settings.updateSourceGithub") : "—",
 								})}
 								{state.payload.fetchedAt
 									? ` · ${t("changelog.updatedAt", {
@@ -159,4 +159,4 @@ export function ChangelogDialog(props: {
  * 与主进程 ChangelogService.changelogPageUrl 同源（同样指向 AtomGit blob 页）；
  * 主进程返回的 pageUrl 始终可用，此常量只用于 IPC 本身抛错的极端场景。
  */
-const DEFAULT_PAGE_URL = "https://atomgit.com/ayuayue/PiDeck/blob/main/CHANGELOG.zh-CN.md";
+const DEFAULT_PAGE_URL = "https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md";

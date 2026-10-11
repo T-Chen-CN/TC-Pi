@@ -32,7 +32,7 @@ test("pre-push ref list is parsed per git's documented contract", () => {
 });
 
 test("mirror pushes exactly the incoming refs (branches and tags)", () => {
-	const plan = planAtomgitMirror({ remoteName: "origin", remoteUrl: "git@github.com:ayuayue/PiDeck.git", stdin: `${BRANCH_LINE}\n${TAG_LINE}`, env: {} });
+	const plan = planAtomgitMirror({ remoteName: "origin", remoteUrl: "git@github.com:ayuayue/PiDeck.git", stdin: `${BRANCH_LINE}\n${TAG_LINE}`, env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } });
 	assert.equal(plan.action, "push");
 	assert.deepEqual(plan.refspecs, ["refs/heads/dev:refs/heads/dev", "refs/tags/v0.7.7-beta:refs/tags/v0.7.7-beta"]);
 	assert.equal(plan.remote, DEFAULT_ATOMGIT_REMOTE);
@@ -41,33 +41,33 @@ test("mirror pushes exactly the incoming refs (branches and tags)", () => {
 
 test("mirror refuses to mirror itself (no recursion)", () => {
 	// 镜像 push 自己也是一次 push，会再次触发 pre-push：远端名命中要放行
-	assert.equal(planAtomgitMirror({ remoteName: "atomgit", remoteUrl: "https://atomgit.com/ayuayue/PiDeck.git", stdin: BRANCH_LINE, env: {} }).reason, "target-is-atomgit");
+	assert.equal(planAtomgitMirror({ remoteName: "atomgit", remoteUrl: "https://atomgit.com/ayuayue/PiDeck.git", stdin: BRANCH_LINE, env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } }).reason, "target-is-atomgit");
 	// 远端名不叫 atomgit 但 URL 指向 atomgit 也要放行
-	assert.equal(planAtomgitMirror({ remoteName: "mirror", remoteUrl: "https://atomgit.com/ayuayue/PiDeck.git", stdin: BRANCH_LINE, env: {} }).reason, "target-is-atomgit");
+	assert.equal(planAtomgitMirror({ remoteName: "mirror", remoteUrl: "https://atomgit.com/ayuayue/PiDeck.git", stdin: BRANCH_LINE, env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } }).reason, "target-is-atomgit");
 });
 
 test("mirror never propagates ref deletions", () => {
 	// 本地清理分支是高频动作，跟着删会把镜像上的分支一起删掉：只跳过并记录
-	const mixed = planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: `${BRANCH_LINE}\n${DELETE_LINE}`, env: {} });
+	const mixed = planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: `${BRANCH_LINE}\n${DELETE_LINE}`, env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } });
 	assert.equal(mixed.action, "push");
 	assert.deepEqual(mixed.refspecs, ["refs/heads/dev:refs/heads/dev"]);
 	assert.deepEqual(mixed.droppedDeletes, ["refs/heads/gone"]);
 
-	const onlyDelete = planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: DELETE_LINE, env: {} });
+	const onlyDelete = planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: DELETE_LINE, env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } });
 	assert.equal(onlyDelete.action, "skip");
 	assert.equal(onlyDelete.reason, "only-deletions");
 	assert.deepEqual(onlyDelete.droppedDeletes, ["refs/heads/gone"]);
 
-	assert.equal(planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: "", env: {} }).reason, "nothing-to-mirror");
+	assert.equal(planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: "", env: { PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } }).reason, "nothing-to-mirror");
 });
 
 test("mirror respects its switches", () => {
 	assert.equal(planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: BRANCH_LINE, env: { PI_DECK_SKIP_ATOMGIT: "1" } }).reason, "skip-env");
 	// 自定义远端名同样要参与递归防护
-	const custom = planAtomgitMirror({ remoteName: "ag", remoteUrl: "", stdin: BRANCH_LINE, env: { PI_DECK_ATOMGIT_REMOTE: "ag" } });
+	const custom = planAtomgitMirror({ remoteName: "ag", remoteUrl: "", stdin: BRANCH_LINE, env: { PI_DECK_ATOMGIT_REMOTE: "ag", PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } });
 	assert.equal(custom.action, "skip");
 	assert.equal(custom.reason, "target-is-atomgit");
-	assert.equal(planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: BRANCH_LINE, env: { PI_DECK_ATOMGIT_REMOTE: "ag" } }).remote, "ag");
+	assert.equal(planAtomgitMirror({ remoteName: "origin", remoteUrl: "", stdin: BRANCH_LINE, env: { PI_DECK_ATOMGIT_REMOTE: "ag", PI_DECK_ENABLE_ATOMGIT: "1", PI_DECK_ATOMGIT_URL: "https://atomgit.com/example/mirror.git" } }).remote, "ag");
 });
 
 test("failure is non-blocking by default, strict only when asked", () => {
@@ -97,8 +97,8 @@ test("installer wires the hook for other devices", () => {
 	assert.match(installer, /git\(\[\s*"config",\s*"--local",\s*"core\.hooksPath"/);
 	assert.match(installer, /HOOKS_PATH = "\.githooks"/);
 	// 新设备常见缺 atomgit 远端：安装时补齐，地址与镜像脚本同源
-	assert.match(installer, /import \{ DEFAULT_ATOMGIT_REMOTE, DEFAULT_ATOMGIT_URL \} from "\.\/atomgit-mirror\.mjs"/);
-	assert.match(installer, /git\(\[\s*"remote",\s*"add",\s*DEFAULT_ATOMGIT_REMOTE,\s*DEFAULT_ATOMGIT_URL\s*\]/);
+	assert.match(installer, /PI_DECK_ENABLE_ATOMGIT/);
+	assert.match(installer, /git\(\[\s*"remote",\s*"add",\s*DEFAULT_ATOMGIT_REMOTE,\s*mirrorUrl\s*\]/);
 	// 已有别人（husky）接管 hooks 时不硬抢，除非 --force
 	assert.match(installer, /--force/);
 	assert.match(installer, /core\.hooksPath 已被设置为/);
@@ -115,7 +115,7 @@ test("npm install installs the hook automatically", () => {
 });
 
 test("atomgit URL has a single source of truth", () => {
-	assert.equal(DEFAULT_ATOMGIT_URL, "https://atomgit.com/ayuayue/PiDeck.git");
+	assert.equal(DEFAULT_ATOMGIT_URL, "");
 	// 二次开发说明保留上游 GitHub 归属；镜像默认值仍由脚本契约验证
 	assert.match(readme, /https:\/\/github\.com\/ayuayue\/PiDeck/);
 });

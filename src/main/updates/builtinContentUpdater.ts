@@ -24,7 +24,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { decodeAtomGitContentsBuffer, repoFileSourceEntries, type RepoFileSourceEntry } from "../update/atomGitContents";
+import { decodeGitHubContentsBuffer, repoFileSourceEntries, type RepoFileSourceEntry } from "../update/repoContents";
 import type { UpdateSourceId } from "../../shared/types/settings";
 import type { BuiltinContentCheckResult, BuiltinContentUpdateResult, BuiltinContentUpdateStatus } from "../../shared/types/contentUpdate";
 
@@ -57,7 +57,7 @@ export function sha256Of(content: Buffer | string): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
-/** 源候选（atomgit OpenAPI / github raw）；形态与 update/atomGitContents 共用。 */
+/** 源候选（GitHub contents API / github raw）；形态与 update/repoContents 共用。 */
 type SourceEntry = RepoFileSourceEntry;
 
 export type BuiltinContentUpdaterOptions = {
@@ -84,7 +84,7 @@ export type BuiltinContentUpdaterOptions = {
 	maxFileBytes?: number;
 	/** 默认分支，默认 main。 */
 	branch?: string;
-	/** 更新源：github 时 GitHub raw 直连优先，否则 AtomGit OpenAPI 优先。 */
+	/** 更新源：github 时 GitHub raw 直连优先，否则 GitHub API OpenAPI 优先。 */
 	source?: () => UpdateSourceId;
 	/** 覆盖层写盘成功后回调（如失效查询侧缓存）。 */
 	onOverlayWritten?: () => void;
@@ -121,7 +121,7 @@ export class BuiltinContentUpdater {
 		this.maxManifestBytes = options.maxManifestBytes ?? 256 * 1024;
 		this.maxFileBytes = options.maxFileBytes ?? 2 * 1024 * 1024;
 		this.branch = options.branch ?? BUILTIN_CONTENT_UPDATE_DEFAULT_BRANCH;
-		this.source = options.source ?? (() => "atomgit");
+		this.source = options.source ?? (() => "github");
 		this.onOverlayWritten = options.onOverlayWritten;
 	}
 
@@ -478,8 +478,8 @@ export class BuiltinContentUpdater {
 	}
 
 	/**
-	 * 源顺序：GitHub 源时 raw 直连优先，否则 AtomGit OpenAPI 优先（国内直连更稳）。
-	 * URL 构造与 base64 解码统一在 update/atomGitContents.ts——AtomGit 不能走
+	 * 源顺序：GitHub 源时 raw 直连优先，否则 GitHub API OpenAPI 优先（国内直连更稳）。
+	 * URL 构造与 base64 解码统一在 update/repoContents.ts——GitHub API 不能走
 	 * `/<owner>/<repo>/raw/<ref>/<path>`（已被 GitCode 前端接管，返回 SPA HTML）。
 	 */
 	private sourceEntries(relPath: string, branch: string): SourceEntry[] {
@@ -506,8 +506,8 @@ export class BuiltinContentUpdater {
 		for (const entry of this.sourceEntries(`${this.repoDir}/${name}`, branch)) {
 			try {
 				const buffer = await this.downloadBinary(entry.url, this.maxFileBytes);
-				if (entry.id === "atomgit") {
-					const decoded = decodeAtomGitContentsBuffer(buffer.toString("utf8"));
+				if (entry.id === "github-api") {
+					const decoded = decodeGitHubContentsBuffer(buffer.toString("utf8"));
 					if (!decoded) throw new Error("atomgit contents response has an unexpected shape");
 					return decoded;
 				}
@@ -521,8 +521,8 @@ export class BuiltinContentUpdater {
 
 	private async downloadText(entry: SourceEntry, maxBytes: number): Promise<string> {
 		const buffer = await this.downloadBinary(entry.url, maxBytes);
-		if (entry.id === "atomgit") {
-			const decoded = decodeAtomGitContentsBuffer(buffer.toString("utf8"));
+		if (entry.id === "github-api") {
+			const decoded = decodeGitHubContentsBuffer(buffer.toString("utf8"));
 			if (!decoded) throw new Error("atomgit contents response has an unexpected shape");
 			return decoded.toString("utf8");
 		}

@@ -94,7 +94,7 @@ function externalLinkBlock(permissions: HostPluginPermission[]): string {
 	return `/** 打开开发指南：这条能力只开浏览器，页面本身仍然没有网络。 */
 async function openGuide() {
   try {
-    await pideck.workbench.openExternal("https://github.com/ayuayue/PiDeck/blob/main/docs/host-plugin-dev-guide.md");
+    await pideck.workbench.openExternal("https://github.com/T-Chen-CN/TC-Pi/blob/main/docs/host-plugin-dev-guide.md");
   } catch (error) {
     report(error);
   }

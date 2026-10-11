@@ -18,7 +18,8 @@ const script = readFileSync("scripts/sync-main.mjs", "utf8");
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
 test("sync args default to dev → main on origin and can be overridden", () => {
-	assert.deepEqual(parseSyncArgs([]), { source: "dev", target: "main", remote: "origin", message: "", dryRun: false, pushAtomgit: true });
+	assert.deepEqual(parseSyncArgs([]), { source: "dev", target: "main", remote: "origin", message: "", dryRun: false, pushAtomgit: false });
+	assert.equal(parseSyncArgs(["--atomgit"]).pushAtomgit, true, "mirror sync requires an explicit flag");
 	const custom = parseSyncArgs(["--source", "feature", "--target", "release", "--remote", "upstream", "--message", "自定义", "--no-atomgit", "--dry-run"]);
 	assert.equal(custom.source, "feature");
 	assert.equal(custom.target, "release");

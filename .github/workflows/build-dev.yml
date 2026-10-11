@@ -152,7 +152,7 @@ jobs:
         with:
           # 用 PAT 而非默认 GITHUB_TOKEN：GITHUB_TOKEN 创建的 Release 不广播
           # release: published 事件，后续接入的监听 workflow 无法触发（与 release.yml 同因）。
-          token: ${{ secrets.RELEASE_PAT }}
+          token: ${{ secrets.RELEASE_PAT || github.token }}
           tag_name: ${{ needs.resolve-version.outputs.tag }}
           # tag 不存在时指到本次构建 commit；tag 已存在时本字段被忽略
           target_commitish: ${{ github.sha }}

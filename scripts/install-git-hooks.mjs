@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * 安装 / 校验 PiDeck 的仓库级 git 钩子：每次 `git push` 自动把引用镜像到 AtomGit。
+ * 安装 / 校验 PiDeck 的仓库级 git 钩子：默认只推指定远端，镜像需要显式启用。
  *
  * 为什么需要「安装」这一步：git 不跟踪 `.git/hooks`，钩子必须放在仓库里（`.githooks/`）
  * 并把 `core.hooksPath` 指过去，**其他设备** clone 或拉取后才能有同样行为。本脚本幂等，
  * 反复执行安全：
  *   1. `git config --local core.hooksPath .githooks`（只写本仓库，不动全局配置）；
  *   2. POSIX 上给钩子补执行位（Windows 不需要，git 直接调用 sh）；
- *   3. 确保 `atomgit` 远端存在（新设备常见缺失），地址取自 scripts/atomgit-mirror.mjs；
+ *   3. 只有显式启用并指定镜像地址时才配置镜像远端；
  *   4. 打印可自检的命令。
  *
  * 用法：
@@ -23,7 +23,7 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_ATOMGIT_REMOTE, DEFAULT_ATOMGIT_URL } from "./atomgit-mirror.mjs";
+import { DEFAULT_ATOMGIT_REMOTE } from "./atomgit-mirror.mjs";
 
 const HOOKS_PATH = ".githooks";
 const HOOK_FILE = join(HOOKS_PATH, "pre-push");
@@ -67,7 +67,7 @@ function main() {
 	const current = git(["config", "--local", "--get", "core.hooksPath"]);
 	const installed = current.ok && current.output === HOOKS_PATH;
 	if (installed && checkOnly) {
-		log(`✅ core.hooksPath = ${HOOKS_PATH}（pre-push → AtomGit 镜像已启用）`);
+		log(`✅ core.hooksPath = ${HOOKS_PATH}（镜像默认关闭）`);
 	}
 
 	if (!installed) {
@@ -93,20 +93,21 @@ function main() {
 		// 忽略：权限模型的差异不该让安装失败
 	}
 
-	// 新设备自愈：没有 atomgit 远端就补一个
-	if (!git(["remote", "get-url", DEFAULT_ATOMGIT_REMOTE]).ok) {
+	// 不给 fork 自动添加上游镜像；只有明确启用并配置自己的地址时才安装镜像远端。
+	const mirrorUrl = process.env.PI_DECK_ENABLE_ATOMGIT === "1" ? process.env.PI_DECK_ATOMGIT_URL : "";
+	if (mirrorUrl && !git(["remote", "get-url", DEFAULT_ATOMGIT_REMOTE]).ok) {
 		if (checkOnly) {
-			warn(`未配置远端 ${DEFAULT_ATOMGIT_REMOTE}：首次 push 时钩子会自动添加，或现在执行 git remote add ${DEFAULT_ATOMGIT_REMOTE} ${DEFAULT_ATOMGIT_URL}`);
-		} else if (git(["remote", "add", DEFAULT_ATOMGIT_REMOTE, DEFAULT_ATOMGIT_URL]).ok) {
-			log(`✅ 已添加远端 ${DEFAULT_ATOMGIT_REMOTE} → ${DEFAULT_ATOMGIT_URL}`);
+			warn(`未配置远端 ${DEFAULT_ATOMGIT_REMOTE}，镜像需要显式配置自己的目标地址`);
+		} else if (git(["remote", "add", DEFAULT_ATOMGIT_REMOTE, mirrorUrl]).ok) {
+			log(`✅ 已添加远端 ${DEFAULT_ATOMGIT_REMOTE}`);
 		} else {
-			warn(`添加远端 ${DEFAULT_ATOMGIT_REMOTE} 失败，可手动执行：git remote add ${DEFAULT_ATOMGIT_REMOTE} ${DEFAULT_ATOMGIT_URL}`);
+			warn(`添加远端 ${DEFAULT_ATOMGIT_REMOTE} 失败`);
 		}
 	}
 
 	if (!checkOnly) {
 		log("");
-		log("每次 git push 会把本次推送的引用同步到 AtomGit（失败只提示，不阻断 push）。");
+		log("默认只推指定远端；AtomGit 镜像须显式配置 PI_DECK_ENABLE_ATOMGIT=1 与 PI_DECK_ATOMGIT_URL。");
 		log("自检：PI_DECK_ATOMGIT_DRY_RUN=1 git push <remote> <branch>   # 只打印将执行的镜像命令");
 		log("开关：PI_DECK_SKIP_ATOMGIT=1 跳过；PI_DECK_ATOMGIT_STRICT=1 镜像失败即失败");
 	}

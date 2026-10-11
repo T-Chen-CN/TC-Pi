@@ -2,6 +2,13 @@
 
 > 本文档承接 AGENTS.md 移出的发版细节。发版前通读一遍，按清单执行。
 
+## TC-Pi 发布来源
+
+- 发布仓库：`T-Chen-CN/TC-Pi`；应用更新、更新日志和内置内容均读取此仓库，原作者仓库仅作为 upstream。
+- 仓库保持公开，客户端无需携带 GitHub 凭据。首次发布需上传安装包及 electron-builder 生成的 `latest.yml`（macOS 为 `latest-mac.yml`，Linux 为 `latest-linux.yml`），只有源码提交不会产生可下载更新。
+- Release 工作流默认使用当前仓库的 `GITHUB_TOKEN`，可选 `RELEASE_PAT`；stable 与 dev 分别跟随正式版与预发布。
+- AtomGit 镜像默认关闭。本地只有同时设置 `PI_DECK_ENABLE_ATOMGIT=1` 和自己的 `PI_DECK_ATOMGIT_URL` 才镜像；CI 也必须显式设置 `ATOMGIT_MIRROR_ENABLED=true` 与 `ATOMGIT_REPO`。不自动向原作者镜像推送。
+
 ## 发版前检查
 
 1. 核对 `README.md` / `README.en.md` 功能与安装说明仍准确。
@@ -11,7 +18,7 @@
 
 发版前机器能判的门禁全部收口在 `scripts/release-preflight.mjs`，泳道并行、不首错即停、失败只打尾部输出、完整 JSON 报告落盘 `release-preflight/`（gitignored）兼存 `latest.json`：
 
-- `npm run preflight` —— typecheck + 全量单测 + biome 格式 + 发布一致性（版本号/CHANGELOG/README 一致、全部 `--check` 型生成器同步、提示词库可检索、DSH wire payload 形状）四泳道并行；
+- `npm run preflight` —— typecheck + 全量单测 + biome 格式 + 发布一致性（版本号/CHANGELOG/README 一致、全部 `--check` 型生成器同步、当前 pi 与会话契约）四泳道并行；
 - `npm run preflight -- --e2e` —— 追加 Playwright E2E 泳道（慢，含完整构建）；
 - `npm run preflight -- --skip unit-tests` —— 日常快速通道；`--only <ids>` 只跑指定泳道；`--list` 列泳道；`--test-concurrency N` 调单测并发。
 - 门禁红灯时按提示先跑对应 `--apply`（如 `node scripts/sync-release-notes.js --apply`）再重试；发版期 `CHANGELOG` 仍是 `(Unreleased)` 只提醒不拦截。

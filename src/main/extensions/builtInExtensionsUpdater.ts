@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { decodeAtomGitContentsBuffer, repoFileSourceEntries, type RepoFileSourceEntry } from "../update/atomGitContents";
+import { decodeGitHubContentsBuffer, repoFileSourceEntries, type RepoFileSourceEntry } from "../update/repoContents";
 import type { UpdateSourceId } from "../../shared/types/settings";
 import type { BuiltInExtensionsCheckResult, BuiltInExtensionsUpdateResult, BuiltInExtensionsUpdateStatus } from "../../shared/types/extensionsUpdate";
 import { BUILT_IN_EXTENSIONS_OVERLAY_BACKUP_DIR_NAME, BUILT_IN_EXTENSIONS_OVERLAY_DIR_NAME, EXTENSIONS_MANIFEST_FILE_NAME, listExtensionFileNames, readManifestFromDir, readVerifiedArtifact, sha256Of, parseBuiltInExtensionsManifest, type BuiltInExtensionsManifest } from "./builtInExtensionsManifest";
@@ -16,7 +16,7 @@ export const BUILT_IN_EXTENSIONS_UPDATE_ALLOWED_BRANCHES = ["main", "dev"] as co
 /** 扩展目录在仓库中的相对路径（与 resources/extensions 一致）。 */
 const EXTENSIONS_REPO_DIR = "resources/extensions";
 
-/** 源候选（atomgit OpenAPI / github raw）；形态与 update/atomGitContents 共用，避免两处各定义一份。 */
+/** 源候选（GitHub contents API / github raw）；形态与 update/repoContents 共用，避免两处各定义一份。 */
 type SourceEntry = RepoFileSourceEntry;
 
 /** 最小响应形状：支持流式 body（undici/Node fetch 必有）或整体 arrayBuffer（测试替身）。 */
@@ -43,7 +43,7 @@ export type BuiltInExtensionsUpdaterOptions = {
 	maxFileBytes?: number;
 	/** 默认分支，默认 main。 */
 	branch?: string;
-	/** 更新源：github 时 GitHub raw 直连优先，否则 AtomGit OpenAPI 优先。 */
+	/** 更新源：github 时 GitHub raw 直连优先，否则 GitHub API OpenAPI 优先。 */
 	source?: () => UpdateSourceId;
 };
 
@@ -65,7 +65,7 @@ export class BuiltInExtensionsUpdater {
 		this.maxManifestBytes = options.maxManifestBytes ?? 256 * 1024;
 		this.maxFileBytes = options.maxFileBytes ?? 2 * 1024 * 1024;
 		this.branch = options.branch ?? BUILT_IN_EXTENSIONS_UPDATE_DEFAULT_BRANCH;
-		this.source = options.source ?? (() => "atomgit");
+		this.source = options.source ?? (() => "github");
 	}
 
 	/** 覆盖层目录绝对路径（无论是否存在）。 */
@@ -329,8 +329,8 @@ export class BuiltInExtensionsUpdater {
 	}
 
 	/**
-	 * 源顺序：GitHub 源时 raw 直连优先，否则 AtomGit OpenAPI 优先（国内直连更稳）。
-	 * URL 构造与 base64 解码统一在 update/atomGitContents.ts——AtomGit 不能走
+	 * 源顺序：GitHub 源时 raw 直连优先，否则 GitHub API OpenAPI 优先（国内直连更稳）。
+	 * URL 构造与 base64 解码统一在 update/repoContents.ts——GitHub API 不能走
 	 * `/<owner>/<repo>/raw/<ref>/<path>`（已被 GitCode 前端接管，返回 SPA HTML）。
 	 */
 	private sourceEntries(relPath: string, branch: string): SourceEntry[] {
@@ -357,8 +357,8 @@ export class BuiltInExtensionsUpdater {
 		for (const entry of this.sourceEntries(`${EXTENSIONS_REPO_DIR}/${name}`, branch)) {
 			try {
 				const buffer = await this.downloadBinary(entry.url, this.maxFileBytes);
-				if (entry.id === "atomgit") {
-					const decoded = decodeAtomGitContentsBuffer(buffer.toString("utf8"));
+				if (entry.id === "github-api") {
+					const decoded = decodeGitHubContentsBuffer(buffer.toString("utf8"));
 					if (!decoded) throw new Error("atomgit contents response has an unexpected shape");
 					return decoded;
 				}
@@ -372,8 +372,8 @@ export class BuiltInExtensionsUpdater {
 
 	private async downloadText(entry: SourceEntry, maxBytes: number): Promise<string> {
 		const buffer = await this.downloadBinary(entry.url, maxBytes);
-		if (entry.id === "atomgit") {
-			const decoded = decodeAtomGitContentsBuffer(buffer.toString("utf8"));
+		if (entry.id === "github-api") {
+			const decoded = decodeGitHubContentsBuffer(buffer.toString("utf8"));
 			if (!decoded) throw new Error("atomgit contents response has an unexpected shape");
 			return decoded.toString("utf8");
 		}

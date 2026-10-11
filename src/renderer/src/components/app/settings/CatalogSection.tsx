@@ -7,7 +7,6 @@ import { Button } from "../../ui-shadcn/button";
 import { SettingsSection } from "./SettingsStorageTab";
 import type { CatalogCheckResult, CatalogUpdateFailCode, CatalogUpdateResult, CatalogUpdateStatus } from "../../../../../shared/types/catalog";
 import type { UpdateSourceId } from "../../../../../shared/types/settings";
-import { UPDATE_SOURCE_MIRRORS } from "../../../../../shared/updateSources";
 
 type BusyKind = "check" | "update" | "restore" | "restore-prev" | null;
 
@@ -60,14 +59,7 @@ export function CatalogSection(props: { updateSource?: UpdateSourceId; customUpd
 				: null,
 		[catalogSnapshot],
 	);
-	// 当前目录更新源的展示名：与应用更新同源，直接复用同一份清单与 label。
-	const catalogSourceLabel = useMemo(() => {
-		const source = props.updateSource ?? "atomgit";
-		if (source === "github") return t("settings.updateSourceGithub");
-		if (source === "atomgit") return t("settings.updateSourceAtomGit");
-		const mirror = UPDATE_SOURCE_MIRRORS.find((m) => m.id === source);
-		return mirror ? mirror.host : t("settings.updateSourceAtomGit");
-	}, [props.updateSource]);
+	const catalogSourceLabel = t("settings.updateSourceGithub");
 
 	const refresh = useCallback(() => {
 		desktopApi.catalog

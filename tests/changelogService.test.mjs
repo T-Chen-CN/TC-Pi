@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
-const { ChangelogService, buildChangelogUrls, countChangelogVersions, decodeAtomGitContentsResponse, looksLikeChangelog } = loadTsCommonJs("src/main/update/ChangelogService.ts");
+const { ChangelogService, buildChangelogUrls, countChangelogVersions, decodeGitHubContentsResponse, looksLikeChangelog } = loadTsCommonJs("src/main/update/ChangelogService.ts");
 
 /** 一份形态真实的 changelog 片段（本仓库实际格式：`## vX.Y.Z - 日期`）。 */
 const REAL_CHANGELOG = `## v0.7.5-beta - 2026-09-09
@@ -37,8 +37,8 @@ function jsonResponse(body, { status = 200 } = {}) {
 	};
 }
 
-/** AtomGit OpenAPI contents 响应替身：markdown 按 base64 编码装进 JSON。 */
-function atomgitContentsResponse(markdown, { status = 200 } = {}) {
+/** GitHub contents API contents 响应替身：markdown 按 base64 编码装进 JSON。 */
+function githubContentsResponse(markdown, { status = 200 } = {}) {
 	return jsonResponse(
 		JSON.stringify({
 			type: "file",
@@ -50,8 +50,8 @@ function atomgitContentsResponse(markdown, { status = 200 } = {}) {
 }
 
 /** OpenAPI contents 接口的匿名 URL（与 buildChangelogUrls 的拼法保持一致）。 */
-const ATOMGIT_API_URL = "https://api.atomgit.com/api/v5/repos/ayuayue/PiDeck/contents/CHANGELOG.zh-CN.md?ref=main";
-const GITHUB_RAW_URL = "https://raw.githubusercontent.com/ayuayue/PiDeck/main/CHANGELOG.zh-CN.md";
+const GITHUB_API_URL = "https://api.github.com/repos/T-Chen-CN/TC-Pi/contents/CHANGELOG.zh-CN.md?ref=main";
+const GITHUB_RAW_URL = "https://raw.githubusercontent.com/T-Chen-CN/TC-Pi/main/CHANGELOG.zh-CN.md";
 
 /** 按 URL 分派响应的 fetch 替身；未列出的 URL 抛网络错。 */
 function fetchByUrl(map, calls = []) {
@@ -83,14 +83,14 @@ test("countChangelogVersions counts ## vX.Y.Z headings", () => {
 test("buildChangelogUrls prefers AtomGit by default and GitHub when source is github", () => {
 	const zh = buildChangelogUrls({ source: "atomgit", branch: "main", language: "zh" });
 	assert.equal(zh.length, 2);
-	assert.equal(zh[0].id, "atomgit");
+	assert.equal(zh[0].id, "github-api");
 	assert.equal(zh[1].id, "github");
 	// atomgit 必须走 OpenAPI contents 接口（匿名 raw 已被 GitCode SPA 接管拿不到文件），
 	// 且带 ref 参数；GitHub 保持 raw 直链。
-	assert.match(zh[0].url, /^https:\/\/api\.atomgit\.com\/api\/v5\/repos\/ayuayue\/PiDeck\/contents\//);
+	assert.match(zh[0].url, /^https:\/\/api\.github\.com\/repos\/T-Chen-CN\/TC-Pi\/contents\//);
 	assert.match(zh[0].url, /CHANGELOG\.zh-CN\.md\?ref=main$/);
 	assert.doesNotMatch(zh[0].url, /\/raw\//);
-	assert.match(zh[1].url, /^https:\/\/raw\.githubusercontent\.com\/ayuayue\/PiDeck\/main\/CHANGELOG\.zh-CN\.md$/);
+	assert.match(zh[1].url, /^https:\/\/raw\.githubusercontent\.com\/T-Chen-CN\/TC-Pi\/main\/CHANGELOG\.zh-CN\.md$/);
 
 	// 用户显式选官方源：GitHub 提前
 	const gh = buildChangelogUrls({ source: "github", branch: "main", language: "zh" });
@@ -102,9 +102,9 @@ test("buildChangelogUrls prefers AtomGit by default and GitHub when source is gi
 	assert.doesNotMatch(en[0].url, /zh-CN/);
 });
 
-test("decodeAtomGitContentsResponse decodes base64 content and rejects bad shapes", () => {
+test("decodeGitHubContentsResponse decodes base64 content and rejects bad shapes", () => {
 	// 中文 + emoji 的 base64 往返
-	const decoded = decodeAtomGitContentsResponse(
+	const decoded = decodeGitHubContentsResponse(
 		JSON.stringify({
 			type: "file",
 			encoding: "base64",
@@ -114,7 +114,7 @@ test("decodeAtomGitContentsResponse decodes base64 content and rejects bad shape
 	assert.equal(decoded, "## v1.0.0 🚀 新功能");
 	// base64 序列里带换行（部分实现会分行）也能解
 	assert.equal(
-		decodeAtomGitContentsResponse(
+		decodeGitHubContentsResponse(
 			JSON.stringify({
 				type: "file",
 				encoding: "base64",
@@ -126,26 +126,26 @@ test("decodeAtomGitContentsResponse decodes base64 content and rejects bad shape
 		REAL_CHANGELOG,
 	);
 	// 非法 JSON → 抛错（由逐源 try/catch 吞掉并回退）
-	assert.throws(() => decodeAtomGitContentsResponse(ATOMGIT_CAPTCHA_HTML));
+	assert.throws(() => decodeGitHubContentsResponse(ATOMGIT_CAPTCHA_HTML));
 	// 形态不对（不是 file / 缺 content）→ 抛错
-	assert.throws(() => decodeAtomGitContentsResponse(JSON.stringify({ type: "dir", content: "" })));
-	assert.throws(() => decodeAtomGitContentsResponse(JSON.stringify({ message: "Not Found" })));
+	assert.throws(() => decodeGitHubContentsResponse(JSON.stringify({ type: "dir", content: "" })));
+	assert.throws(() => decodeGitHubContentsResponse(JSON.stringify({ message: "Not Found" })));
 });
 
 /**
- * 主路径：AtomGit OpenAPI 返回真实内容时直接成功（base64 正确解码为 UTF-8），
+ * 主路径：GitHub contents API 返回真实内容时直接成功（base64 正确解码为 UTF-8），
  * 不再回退 GitHub。
  */
-test("ChangelogService decodes the AtomGit OpenAPI response without falling back", async () => {
+test("ChangelogService decodes the GitHub contents API response without falling back", async () => {
 	const calls = [];
 	const service = new ChangelogService({
 		source: () => "atomgit",
-		fetchImpl: fetchByUrl({ [ATOMGIT_API_URL]: atomgitContentsResponse(REAL_CHANGELOG) }, calls),
+		fetchImpl: fetchByUrl({ [GITHUB_API_URL]: githubContentsResponse(REAL_CHANGELOG) }, calls),
 	});
 
 	const result = await service.getChangelog("zh");
 	assert.ok(result, "atomgit OpenAPI 应直接命中");
-	assert.equal(result.source, "atomgit");
+	assert.equal(result.source, "github-api");
 	assert.equal(result.versionCount, 2);
 	assert.match(result.markdown, /v0\.7\.5-beta/);
 	assert.match(result.markdown, /🚀|新功能/);
@@ -162,14 +162,14 @@ test("ChangelogService falls back to GitHub when AtomGit returns unusable conten
 		// 形态一：/raw/ 时代的老问题——SPA HTML 壳（对 API 而言是 JSON 解析失败）
 		jsonResponse(ATOMGIT_CAPTCHA_HTML),
 		// 形态二：JSON 合法但解码后是拦截页（内容校验拒绝）
-		atomgitContentsResponse(ATOMGIT_CAPTCHA_HTML),
+		githubContentsResponse(ATOMGIT_CAPTCHA_HTML),
 	]) {
 		const calls = [];
 		const service = new ChangelogService({
 			source: () => "atomgit",
 			fetchImpl: fetchByUrl(
 				{
-					[ATOMGIT_API_URL]: atomgitResponse,
+					[GITHUB_API_URL]: atomgitResponse,
 					[GITHUB_RAW_URL]: jsonResponse(REAL_CHANGELOG),
 				},
 				calls,
@@ -182,7 +182,7 @@ test("ChangelogService falls back to GitHub when AtomGit returns unusable conten
 		assert.equal(result.versionCount, 2);
 		assert.match(result.markdown, /v0\.7\.5-beta/);
 		assert.equal(calls.length, 2);
-		assert.match(calls[0], /api\.atomgit\.com/);
+		assert.match(calls[0], /api\.github\.com/);
 		assert.match(calls[1], /raw\.githubusercontent\.com/);
 	}
 });
@@ -191,7 +191,7 @@ test("ChangelogService returns null when every source fails", async () => {
 	const service = new ChangelogService({
 		source: () => "atomgit",
 		fetchImpl: fetchByUrl({
-			[ATOMGIT_API_URL]: () => {
+			[GITHUB_API_URL]: () => {
 				throw new Error("network down");
 			},
 			[GITHUB_RAW_URL]: jsonResponse("", { status: 404 }),
@@ -207,7 +207,7 @@ test("ChangelogService rejects oversized responses instead of buffering them", a
 		source: () => "atomgit",
 		maxBytes: 1_000,
 		fetchImpl: fetchByUrl({
-			[ATOMGIT_API_URL]: atomgitContentsResponse(huge),
+			[GITHUB_API_URL]: githubContentsResponse(huge),
 			[GITHUB_RAW_URL]: jsonResponse(REAL_CHANGELOG),
 		}),
 	});
@@ -233,8 +233,8 @@ test("ChangelogService aborts a hung request via the timeout instead of hanging"
 	assert.equal(await service.getChangelog("zh"), null);
 });
 
-test("changelogPageUrl points at the AtomGit blob page for the fallback link", () => {
+test("changelogPageUrl points at the GitHub blob page for the fallback link", () => {
 	const service = new ChangelogService({ branch: "main" });
-	assert.equal(service.changelogPageUrl("zh"), "https://atomgit.com/ayuayue/PiDeck/blob/main/CHANGELOG.zh-CN.md");
-	assert.equal(service.changelogPageUrl("en"), "https://atomgit.com/ayuayue/PiDeck/blob/main/CHANGELOG.md");
+	assert.equal(service.changelogPageUrl("zh"), "https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md");
+	assert.equal(service.changelogPageUrl("en"), "https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md");
 });

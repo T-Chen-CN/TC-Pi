@@ -10,7 +10,7 @@
  * 华为云 → nodejs.org 官方；哈希直接固化在代码里，不需要再维护一份索引清单。
  */
 
-import { atomGitFeedUrl, gitHubLatestDownloadBase } from "../updateSources";
+import { gitHubLatestDownloadBase } from "../updateSources";
 
 /** 引导安装的 Node 版本。与项目 CI 对齐的 Node 24 LTS 线。 */
 export const PI_RUNTIME_NODE_VERSION = "24.13.0";
@@ -47,17 +47,17 @@ export function officialPiRuntimeNodeUrl(platform: PiRuntimePlatform, arch: PiRu
 export const PI_RUNTIME_NODE_MIRRORS = ["https://npmmirror.com/mirrors/node", "https://mirrors.huaweicloud.com/nodejs"] as const;
 
 /**
- * PiDeck Release 资产（AtomGit/GitHub latest）作为可选兜底。
+ * TC-Pi GitHub Release 资产作为可选兜底。
  * 只尝试 Windows 官方完整 zip；资产缺席时安装器继续使用后续镜像/官方源。
  */
 export function piRuntimeNodeReleaseAssetUrls(arch: PiRuntimeArch): string[] {
 	const file = piRuntimeNodeArchiveName("win32", arch);
-	return [`${atomGitFeedUrl()}/${encodeURIComponent(file)}`, `${gitHubLatestDownloadBase()}/${encodeURIComponent(file)}`];
+	return [`${gitHubLatestDownloadBase()}/${encodeURIComponent(file)}`];
 }
 
 /**
  * 按回退顺序返回全部候选下载 URL。
- * win32：npmmirror → AtomGit（自有兜底）→ GitHub（自有兜底）→ 华为云 → 官方；
+ * win32：npmmirror → TC-Pi GitHub（自有兜底）→ 华为云 → 官方；
  * 其他平台：npmmirror → 华为云 → 官方（Release 上无对应资产）。
  */
 export function piRuntimeNodeDownloadUrls(platform: PiRuntimePlatform, arch: PiRuntimeArch): string[] {

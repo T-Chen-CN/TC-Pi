@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * 把开发分支合并进发布分支（默认 `dev` → `main`）并推送 origin + AtomGit。
+ * 把开发分支合并进发布分支（默认 `dev` → `main`）并推送 origin；镜像需显式 --atomgit。
  *
  * 为什么用临时 worktree：合并需要切到 main，而工作区里经常有别的任务正在编辑的文件——
  * 直接 `git switch main` 会被拒绝或互相打断。worktree 让整个合并发生在系统临时目录里，
  * 当前分支与工作区完全不受影响（合并完自动清理）。
  *
  * 流程：fetch → 建临时 worktree(target) → `merge --no-ff source` → 推 origin target
- *       → 若存在 atomgit 远端再显式推一次（pre-push 钩子已镜像时是幂等兜底）→ 删 worktree。
+ *       → 显式 --atomgit 且存在对应远端时再推一次（pre-push 钩子已镜像时是幂等兜底）→ 删 worktree。
  *
  * 安全约定：
  * - 合并冲突一律 `merge --abort` 后退出 1，**绝不** `-X ours/theirs` 私自选边；
@@ -18,11 +18,11 @@
  *   单测 import 就会真的 fetch + 合并 + 推送（2026-09-20 CI 红灯与本机误推 main 的根因）。
  *
  * 用法：
- *   npm run sync:main                        # dev → main，推 origin + atomgit
+ *   npm run sync:main                        # dev → main，只推 origin
  *   npm run sync:main -- --dry-run           # 只预览会并入/推送什么
  *   npm run sync:main -- --source dev --target main
  *   npm run sync:main -- --message "自定义合并说明"
- *   npm run sync:main -- --no-atomgit        # 只推 origin
+ *   npm run sync:main -- --atomgit           # 显式同步自己的镜像
  */
 
 import { spawnSync } from "node:child_process";
@@ -49,12 +49,13 @@ export function parseSyncArgs(argv) {
 		remote: DEFAULT_REMOTE,
 		message: "",
 		dryRun: false,
-		pushAtomgit: true,
+		pushAtomgit: false,
 	};
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
 		if (arg === "--dry-run") options.dryRun = true;
 		else if (arg === "--no-atomgit") options.pushAtomgit = false;
+		else if (arg === "--atomgit") options.pushAtomgit = true;
 		else if (arg === "--source") options.source = argv[++index] ?? options.source;
 		else if (arg === "--target") options.target = argv[++index] ?? options.target;
 		else if (arg === "--remote") options.remote = argv[++index] ?? options.remote;

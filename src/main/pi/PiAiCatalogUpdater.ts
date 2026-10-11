@@ -19,9 +19,8 @@ import { PI_AI_CATALOG_FILE_NAME, PI_AI_CATALOG_MANIFEST_FILE_NAME, invalidatePi
 import { compareSemver, generatePiAiCatalogFromFiles, type CatalogSourceFile } from "./piAiCatalogGenerate";
 import type { CatalogArtifactSourceStatus, CatalogCheckResult, CatalogUpdateResult, CatalogUpdateStatus } from "../../shared/types/catalog";
 import type { UpdateSourceId } from "../../shared/types/settings";
-// AtomGit 只有 OpenAPI contents 可取文件（`/<owner>/<repo>/raw/...` 已被 GitCode 前端接管，
-// 返回 SPA HTML），URL 构造与解码与内置扩展/内容、changelog 共用一套实现。
-import { atomGitContentsApiUrl, decodeAtomGitContentsResponse, gitHubRawFileUrl, type RepoFileSourceEntry } from "../update/atomGitContents";
+// 仓库回退仅使用 TC-Pi 的 raw/contents API，npm 目录更新保持 pi 的官方来源。
+import { gitHubContentsApiUrl, decodeGitHubContentsResponse, gitHubRawFileUrl, type RepoFileSourceEntry } from "../update/repoContents";
 
 /** 默认回退分支：main（发行分支，模型目录与正式发行版对齐） */
 export const CATALOG_UPDATE_DEFAULT_BRANCH = "main";
@@ -45,11 +44,11 @@ function nonEmptyString(value: unknown): string | undefined {
 	return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-/** 仓库文件源 id（atomgit OpenAPI / github raw）。 */
+/** 仓库文件源 id（GitHub contents API / github raw）。 */
 type CatalogSourceId = RepoFileSourceEntry["id"];
 
 /**
- * 下载源（按顺序尝试）：GitHub 源时 raw 直连优先，否则 AtomGit OpenAPI 优先。
+ * 下载源（按顺序尝试）：GitHub 源时 raw 直连优先，否则 GitHub contents API 优先。
  *
  * manifest 与 catalog 必须配对同源：跨源取会让 manifest 声明的 sha256/entryCount
  * 与实际内容错配，写入前校验必失败。任一源失败只影响本次尝试，由 downloadFromAnySource
@@ -58,8 +57,8 @@ type CatalogSourceId = RepoFileSourceEntry["id"];
 function sourceBaseUrls(branch: string, source: CatalogSourceId): { id: CatalogSourceId; catalog: string; manifest: string }[] {
 	const catalogFile = `resources/${PI_AI_CATALOG_FILE_NAME}`;
 	const manifestFile = `resources/${PI_AI_CATALOG_MANIFEST_FILE_NAME}`;
-	const build = (file: string, id: CatalogSourceId) => (id === "atomgit" ? atomGitContentsApiUrl(file, branch) : gitHubRawFileUrl(file, branch));
-	const order: CatalogSourceId[] = source === "github" ? ["github", "atomgit"] : ["atomgit", "github"];
+	const build = (file: string, id: CatalogSourceId) => (id === "github-api" ? gitHubContentsApiUrl(file, branch) : gitHubRawFileUrl(file, branch));
+	const order: CatalogSourceId[] = source === "github" ? ["github", "github-api"] : ["github-api", "github"];
 	return order.map((id) => ({ id, catalog: build(catalogFile, id), manifest: build(manifestFile, id) }));
 }
 
@@ -115,7 +114,7 @@ export type PiAiCatalogUpdaterOptions = {
 	branch?: string;
 	/**
 	 * 更新源：复用应用更新的镜像偏好（shared/updateSources.ts）。
-	 * github → GitHub raw 直连优先；其余（atomgit 等）→ AtomGit OpenAPI 优先；
+	 * github → GitHub raw 直连优先；其余（历史镜像设置）→ GitHub contents API 优先；
 	 * 两个源始终互为兜底，所以任何源配置下目录更新都可用。
 	 * 用函数而非快照：设置可在运行时更改，每次检查/下载读最新值。
 	 */
@@ -143,10 +142,10 @@ export class PiAiCatalogUpdater {
 
 	/**
 	 * 当前生效源归一化为仓库文件源 id：github 官方源走 raw 直连，其余（atomgit/自定义镜像）
-	 * 都走 AtomGit OpenAPI——两者都是匿名可读的公开源，任一失败会自动换另一个。
+	 * 都走 GitHub contents API——两者都是匿名可读的公开源，任一失败会自动换另一个。
 	 */
 	private currentSource(): CatalogSourceId {
-		return this.source() === "github" ? "github" : "atomgit";
+		return this.source() === "github" ? "github" : "github-api";
 	}
 
 	private catalogPath(): string {
@@ -401,12 +400,12 @@ export class PiAiCatalogUpdater {
 	}
 
 	/**
-	 * 单源取文本：AtomGit OpenAPI 回的是 base64 信封，必须先解码（形态异常会抛错 →
+	 * 单源取文本：GitHub contents API 回的是 base64 信封，必须先解码（形态异常会抛错 →
 	 * 外层 try/catch 换下一个源）；GitHub raw 响应体即原文。
 	 */
 	private async downloadRepoFile(id: CatalogSourceId, url: string, maxBytes: number): Promise<string> {
 		const body = await this.downloadText(url, maxBytes);
-		return id === "atomgit" ? decodeAtomGitContentsResponse(body) : body;
+		return id === "github-api" ? decodeGitHubContentsResponse(body) : body;
 	}
 
 	/**

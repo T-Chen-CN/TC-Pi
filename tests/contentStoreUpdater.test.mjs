@@ -60,7 +60,7 @@ function makeNetwork(repoFiles) {
 				},
 			};
 		}
-		const isAtomGit = url.includes("api.atomgit.com");
+		const isAtomGit = url.includes("api.github.com");
 		const payload = isAtomGit
 			? JSON.stringify({
 					type: "file",

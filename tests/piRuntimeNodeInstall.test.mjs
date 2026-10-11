@@ -54,13 +54,12 @@ test("契约：版本、哈希表、镜像回退链与 URL 拼接", () => {
 	// 回退链：npmmirror → 自有 Release（win32 才有）→ 华为云 → 官方（国内网络优先）。
 	// 逐元素断言：vm 沙箱跨 realm 下 deepEqual 比较原型会误报。
 	const urls = piRuntimeNodeDownloadUrls("win32", "x64");
-	assert.equal(urls.length, 5);
+	assert.equal(urls.length, 4);
 	assert.equal(urls[0], "https://npmmirror.com/mirrors/node/v24.13.0/node-v24.13.0-win-x64.zip");
-	// 自有 Release 资产：与 DSH runner node 共用同一份官方完整 zip（sha256 与官方一致）
-	assert.equal(urls[1], "https://atomgit.com/ayuayue/PiDeck/releases/download/latest/node-v24.13.0-win-x64.zip");
-	assert.equal(urls[2], "https://github.com/ayuayue/PiDeck/releases/latest/download/node-v24.13.0-win-x64.zip");
-	assert.equal(urls[3], "https://mirrors.huaweicloud.com/nodejs/v24.13.0/node-v24.13.0-win-x64.zip");
-	assert.equal(urls[4], officialPiRuntimeNodeUrl("win32", "x64"));
+	// 自有 Release 资产：使用同一份官方完整 zip（sha256 与官方一致）
+	assert.equal(urls[1], "https://github.com/T-Chen-CN/TC-Pi/releases/latest/download/node-v24.13.0-win-x64.zip");
+	assert.equal(urls[2], "https://mirrors.huaweicloud.com/nodejs/v24.13.0/node-v24.13.0-win-x64.zip");
+	assert.equal(urls[3], officialPiRuntimeNodeUrl("win32", "x64"));
 	// 非 Windows：Release 上没有对应资产，回退链不含自有源
 	const darwinUrls = piRuntimeNodeDownloadUrls("darwin", "arm64");
 	assert.equal(darwinUrls.length, 3);
@@ -102,8 +101,8 @@ test("installPiRuntimeNode：镜像失败自动回退下一个源，最终成功
 		const originalDownload = deps.download;
 		deps.download = async (url, destPath) => {
 			attempted.push(url);
-			// 前 4 个源（npmmirror/AtomGit/GitHub/华为云）都模拟网络不可达，官方源成功
-			if (attempted.length < 5) throw new Error("network unreachable");
+			// 前 3 个源（npmmirror/GitHub/华为云）都模拟网络不可达，官方源成功
+			if (attempted.length < 4) throw new Error("network unreachable");
 			await originalDownload(url, destPath);
 		};
 		const result = await installPiRuntimeNode(
@@ -118,12 +117,11 @@ test("installPiRuntimeNode：镜像失败自动回退下一个源，最终成功
 			deps,
 		);
 		assert.equal(result.ok, true, result.error);
-		assert.equal(attempted.length, 5, "should try all 5 mirrors");
+		assert.equal(attempted.length, 4, "should try all 4 sources");
 		assert.match(attempted[0], /npmmirror\.com/);
-		assert.match(attempted[1], /atomgit\.com/);
-		assert.match(attempted[2], /github\.com/);
-		assert.match(attempted[3], /huaweicloud\.com/);
-		assert.match(attempted[4], /nodejs\.org/);
+		assert.match(attempted[1], /github\.com/);
+		assert.match(attempted[2], /huaweicloud\.com/);
+		assert.match(attempted[3], /nodejs\.org/);
 		assert.equal(result.path, piRuntimeNodeExePath(root, "win32"));
 		assert.equal(result.version, EXPECTED_VERSION);
 		assert.equal(result.source, "download");
@@ -162,7 +160,7 @@ test("installPiRuntimeNode：sha256 不匹配时拒绝解压并换下一个源",
 		assert.equal(result.ok, false);
 		assert.match(result.error ?? "", /sha256 mismatch/);
 		assert.equal(extractCalled, 0, "tampered archives must never be extracted");
-		assert.equal(downloads, 5, "all mirrors must be tried before giving up");
+		assert.equal(downloads, 4, "all configured sources must be tried before giving up");
 		// 失败后不得在 userData 留下半截安装
 		assert.equal(existsSync(piRuntimeNodeExePath(root, "win32")), false);
 	} finally {

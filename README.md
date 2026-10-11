@@ -3,6 +3,8 @@
 [English](README.en.md)
 
 基于 [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck) 的本地二次开发版本。PiDeck 是 Electron 桌面工作台，通过 stdio JSON-RPC 管理 pi Agent，提供工作区、会话、文件与开发工具管理。
+当前维护仓库：[T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi)。应用更新从本仓库的 [Releases](https://github.com/T-Chen-CN/TC-Pi/releases) 获取。
+
 
 ## 当前功能
 

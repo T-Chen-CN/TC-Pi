@@ -18,13 +18,13 @@
       "url": "https://github.com/1900EasonJin"
     }
   ],
-  "homepage": "https://github.com/ayuayue/PiDeck#readme",
+  "homepage": "https://github.com/T-Chen-CN/TC-Pi#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ayuayue/PiDeck.git"
+    "url": "git+https://github.com/T-Chen-CN/TC-Pi.git"
   },
   "bugs": {
-    "url": "https://github.com/ayuayue/PiDeck/issues"
+    "url": "https://github.com/T-Chen-CN/TC-Pi/issues"
   },
   "keywords": [
     "pi",
@@ -246,8 +246,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "ayuayue",
-      "repo": "PiDeck"
+      "owner": "T-Chen-CN",
+      "repo": "TC-Pi"
     }
   },
   "devDependencies": {

@@ -145,7 +145,7 @@ export function HostPluginsTab() {
 					variant="ghost"
 					size="sm"
 					onClick={() => {
-						void desktopApi.app.openExternal("https://github.com/ayuayue/PiDeck/blob/main/docs/host-plugin-dev-guide.md", true).catch(() => fail("plugin-host-unavailable"));
+						void desktopApi.app.openExternal("https://github.com/T-Chen-CN/TC-Pi/blob/main/docs/host-plugin-dev-guide.md", true).catch(() => fail("plugin-host-unavailable"));
 					}}
 				>
 					<BookOpen data-icon="inline-start" />

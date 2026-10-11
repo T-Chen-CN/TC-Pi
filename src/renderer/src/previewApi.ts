@@ -958,7 +958,7 @@ export function createPreviewApi(): PiDesktopApi {
 
 			info: async () => ({
 				version: "preview",
-				releasesUrl: "https://github.com/ayuayue/PiDeck/releases",
+				releasesUrl: "https://github.com/T-Chen-CN/TC-Pi/releases",
 				platform: "win32" as NodeJS.Platform,
 				homeDir: "C:/Users/preview",
 				userDataDir: "C:/Users/preview/AppData/Roaming/pi-desktop",
@@ -984,7 +984,7 @@ export function createPreviewApi(): PiDesktopApi {
 				markdown: null,
 				source: null,
 				versionCount: 0,
-				pageUrl: "https://atomgit.com/ayuayue/PiDeck/blob/main/CHANGELOG.zh-CN.md",
+				pageUrl: "https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md",
 				fetchedAt: null,
 				fromCache: false,
 				stale: false,

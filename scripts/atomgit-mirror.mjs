@@ -11,7 +11,7 @@
  * - **递归防护**：镜像本身也是一次 push，会再次触发本钩子；命中 AtomGit 远端名或 URL 时直接放行，
  *   并且镜像 push 额外带 `--no-verify` 双保险。
  * - **远端自愈**：新设备 / 新 clone 往往没有 atomgit 远端，这里自动 `git remote add`
- *   （地址常量见 DEFAULT_ATOMGIT_URL，可用 PI_DECK_ATOMGIT_URL 覆盖）。
+ *   （仅在 PI_DECK_ENABLE_ATOMGIT=1 且指定 PI_DECK_ATOMGIT_URL 后启用）。
  * - **默认非阻塞**：镜像失败只打印可操作提示，退出码 0，绝不阻断主 push；
  *   设 `PI_DECK_ATOMGIT_STRICT=1` 才把镜像失败升级为「push 失败」。
  * - **低速放弃**：镜像源不可达时按 git 的 lowSpeedLimit/lowSpeedTime 在 ~20s 内放弃，
@@ -31,8 +31,8 @@ export const ZERO_SHA = "0".repeat(40);
 
 export const DEFAULT_ATOMGIT_REMOTE = "atomgit";
 
-/** clone 到新设备后没有 atomgit 远端时自动写入的地址。 */
-export const DEFAULT_ATOMGIT_URL = "https://atomgit.com/ayuayue/PiDeck.git";
+/** 不预设第三方镜像目标，必须显式配置自己的 URL。 */
+export const DEFAULT_ATOMGIT_URL = "";
 
 /**
  * 解析 pre-push 的 stdin 契约：每行 `<local ref> <local sha> <remote ref> <remote sha>`。
@@ -64,6 +64,8 @@ export function planAtomgitMirror(options) {
 	if (env.PI_DECK_SKIP_ATOMGIT === "1") return { action: "skip", reason: "skip-env", ...empty };
 	// 目标就是 AtomGit：本次 push 本身就是镜像动作，再镜像一次会无限递归
 	if (remoteName === remote || remoteUrl.includes("atomgit.com")) return { action: "skip", reason: "target-is-atomgit", ...empty };
+	// Fork 默认只推自己的 GitHub；镜像必须同时显式启用并指定自己的目标地址。
+	if (env.PI_DECK_ENABLE_ATOMGIT !== "1" || !env.PI_DECK_ATOMGIT_URL) return { action: "skip", reason: "mirror-not-configured", ...empty };
 
 	const refspecs = [];
 	const droppedDeletes = [];
@@ -110,8 +112,15 @@ function runGit(args, env) {
  * 失败只提示（除非 strict），因为「缺远端」不该让开发者的 push 直接失败。
  */
 function ensureRemote(remote, env) {
-	if (runGit(["remote", "get-url", remote], env).ok) return true;
 	const url = env.PI_DECK_ATOMGIT_URL || DEFAULT_ATOMGIT_URL;
+	if (!url) return false;
+	const existing = runGit(["remote", "get-url", remote], env);
+	if (existing.ok) {
+		// 旧 checkout 的同名远端可能仍指向原作者，不允许它覆盖显式指定的新目标。
+		if (existing.output === url) return true;
+		warn(`⚠️  ${remote} 远端与已配置的镜像目标不同，跳过镜像；请先核对远端配置`);
+		return false;
+	}
 	if (runGit(["remote", "add", remote, url], env).ok) {
 		log(`ℹ️  已自动添加远端 ${remote} → ${url}`);
 		return true;

@@ -15,6 +15,9 @@
 #   原生模块按 arm64 编译；x64 用 ubuntu-latest。ref 留空时用 tag 指向的提交构建。
 name: Linux 手动补发产物
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -93,7 +96,7 @@ jobs:
         with:
           # 与 release.yml 保持一致用 PAT：权限足、事件语义统一；
           # 追加资产是 edited 事件，不会误触发 sync-atomgit。
-          token: ${{ secrets.RELEASE_PAT }}
+          token: ${{ secrets.RELEASE_PAT || github.token }}
           tag_name: ${{ inputs.tag_custom || inputs.tag }}
           # 只追加安装包与增量块，不动已存在的 latest*.yml（原因见文件头注释）
           files: |

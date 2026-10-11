@@ -76,8 +76,8 @@ const targetTags = (getArg("--tags", "") || getArg("--tag", ""))
 	.split(",")
 	.map((t) => t.trim())
 	.filter(Boolean);
-const ghRepo = getArg("--gh-repo", "ayuayue/PiDeck");
-const atomgitRepo = getArg("--atomgit-repo", "ayuayue/PiDeck");
+const ghRepo = getArg("--gh-repo", process.env.GITHUB_REPOSITORY || "T-Chen-CN/TC-Pi");
+const atomgitRepo = getArg("--atomgit-repo", process.env.ATOMGIT_REPO || "");
 const atomgitApiBase = getArg("--api-base", "https://api.atomgit.com/api/v5");
 const token = process.env.ATOMGIT_TOKEN || getArg("--token", "");
 // 强制重建开关：同名 Release 在 AtomGit 已存在时先删除再全量重传（同版本号重建产物重发版场景）
@@ -187,6 +187,7 @@ export function planAssetActions(githubAssets, remoteAssets) {
 const isCliMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 async function main() {
+	if (!atomgitRepo) throw new Error("Mirror repository must be explicitly configured with --atomgit-repo or ATOMGIT_REPO");
 	if (targetTags.length === 0) {
 		console.error("❌ 错误: 必须指定同步的 Release Tag！例如: --tag v0.7.4 或 --tag v0.7.2,v0.7.3,v0.7.4");
 		process.exit(1);

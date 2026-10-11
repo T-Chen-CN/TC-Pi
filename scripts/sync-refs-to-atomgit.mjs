@@ -44,7 +44,8 @@ function getArg(flag, defaultValue = "") {
 const hasFlag = (flag) => args.includes(flag);
 
 const ghRemote = getArg("--gh-remote", "origin");
-const atomgitUrlPlain = getArg("--atomgit-url", "https://atomgit.com/ayuayue/PiDeck.git");
+const atomgitUrlPlain = getArg("--atomgit-url", process.env.ATOMGIT_URL || "");
+if (!atomgitUrlPlain) throw new Error("Mirror URL must be explicitly configured with --atomgit-url or ATOMGIT_URL");
 const atomgitUser = getArg("--atomgit-user", "oauth2");
 const token = process.env.ATOMGIT_TOKEN || getArg("--token", "");
 const batchSize = Math.max(1, Number(getArg("--batch-size", "10")) || 10);

@@ -18,6 +18,7 @@ concurrency:
 jobs:
   trigger-atomgit-sync:
     name: Trigger sync-atomgit
+    if: ${{ vars.ATOMGIT_MIRROR_ENABLED == 'true' && vars.ATOMGIT_REPO != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
