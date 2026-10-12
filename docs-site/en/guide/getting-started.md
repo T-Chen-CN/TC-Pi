@@ -1,21 +1,21 @@
 ---
-title: Quick Start | Install PiDeck pi desktop
-description: "Get started with PiDeck (pi desktop): download installers for Windows/macOS/Linux, first-launch environment check, one-click Node and pi CLI install, and create your first agent session."
+title: Quick Start | Install TC-Pi pi desktop
+description: "Get started with TC-Pi (pi desktop): download installers for Windows/macOS/Linux, first-launch environment check, one-click Node and pi CLI install, and create your first agent session."
 ---
 
 # Quick Start
 
-There are two ways to use PiDeck: download a pre-built installer or run from source.
+There are two ways to use TC-Pi: download a pre-built installer or run from source.
 
 ## Download & Install
 
-1. Go to the [GitHub Releases](https://github.com/ayuayue/PiDeck/releases) page.
+1. Go to the [GitHub Releases](https://github.com/T-Chen-CN/TC-Pi/releases) page.
 2. Download the latest installer for your platform:
    - **Windows**: `.exe` installer or `.zip` portable
    - **macOS**: `.dmg` (Apple Silicon / Intel)
    - **Linux**: `.AppImage` or `.deb`
 3. Run the installer and follow the setup wizard.
-4. Launch PiDeck — you'll see the project workspace and session panel.
+4. Launch TC-Pi — you'll see the project workspace and session panel.
 
 ## Run from Source
 
@@ -29,8 +29,8 @@ There are two ways to use PiDeck: download a pre-built installer or run from sou
 
 ```bash
 # Clone the repository
-git clone https://github.com/ayuayue/PiDeck.git
-cd PiDeck
+git clone https://github.com/T-Chen-CN/TC-Pi.git
+cd TC-Pi
 
 # Install dependencies
 npm install
@@ -54,4 +54,4 @@ Output files are placed in the `release/` directory.
 
 1. Click **"Add Project"** or drag a folder into the workspace panel.
 2. Select a project to open its session view.
-3. Type your prompt in the composer and press Enter — PiDeck will start a pi RPC agent for that project.
+3. Type your prompt in the composer and press Enter — TC-Pi will start a pi RPC agent for that project.

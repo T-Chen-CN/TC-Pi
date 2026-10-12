@@ -124,7 +124,7 @@ export function createMacManualUpdateChecker(options?: {
 		options?.fetchReleases ??
 		(async (url: string): Promise<ReleasesListResponse> => {
 			// GitHub API 要求显式 User-Agent；Accept 指明可接受的 JSON 表示。
-			const response = await net.fetch(url, { headers: { "User-Agent": "PiDeck-UpdateService", Accept: "application/vnd.github+json" } });
+			const response = await net.fetch(url, { headers: { "User-Agent": "TC-Pi-UpdateService", Accept: "application/vnd.github+json" } });
 			return { ok: response.ok, status: response.status, body: await response.text() };
 		});
 

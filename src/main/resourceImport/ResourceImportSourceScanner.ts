@@ -236,7 +236,7 @@ export class ResourceImportSourceScanner {
 				const blockers: string[] = [];
 				if (!isRecord(entry.value)) blockers.push("MCP server definition must be an object.");
 				const definition = convertMcpDefinition(sourceDef, sourcePath.toLowerCase().endsWith(".toml"), warnings, blockers);
-				if (!isMcpServerName(entry.name) || entry.name.trim() !== entry.name) blockers.push("MCP name is invalid for PiDeck.");
+				if (!isMcpServerName(entry.name) || entry.name.trim() !== entry.name) blockers.push("MCP name is invalid for TC-Pi.");
 				stored.push({
 					candidateId: randomUUID(),
 					kind: "mcp",

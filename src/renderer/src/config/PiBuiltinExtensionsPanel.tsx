@@ -25,7 +25,7 @@ type PiResourcesApi = {
 
 function api(): PiResourcesApi {
 	const desktop = (window as unknown as { piDesktop?: { config?: Partial<PiResourcesApi> } }).piDesktop;
-	if (!desktop?.config?.piResourcesSummary || !desktop.config.piResourcesSetBuiltin) throw new Error("PiDeck pi resources API is not available");
+	if (!desktop?.config?.piResourcesSummary || !desktop.config.piResourcesSetBuiltin) throw new Error("TC-Pi pi resources API is not available");
 	return desktop.config as PiResourcesApi;
 }
 

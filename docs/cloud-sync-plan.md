@@ -1,29 +1,29 @@
-# PiDeck 云同步计划（Cloud Sync Plan）
+# TC-Pi 云同步计划（Cloud Sync Plan）
 
 > 状态：调研/方案阶段，未开始实现。
 > 参考实现：`F:\Netcatty`（Netcatty 的端到端加密云同步）。
-> 目标：把 Netcatty 的云同步能力按 PiDeck 的架构规则搬到本仓库，并加入“用户选择同步哪些会话”的产品能力。
+> 目标：把 Netcatty 的云同步能力按 TC-Pi 的架构规则搬到本仓库，并加入“用户选择同步哪些会话”的产品能力。
 
 ---
 
 ## 1. 结论摘要
 
-PiDeck 的云同步采用与 Netcatty 相同的核心理念：
+TC-Pi 的云同步采用与 Netcatty 相同的核心理念：
 
 1. **零知识加密**：用户设置主密码，PBKDF2 派生 AES-256-GCM 密钥；云端只保存密文。
 2. **统一云服务适配层**：GitHub Gist、Google Drive、OneDrive、WebDAV、S3 兼容存储都走同一个加密对象存储接口。
 3. **三路合并 + 缩水保护**：以“上次成功同步的 base”做合并，防止本地数据异常清空后反向覆盖云端。
 4. **自动同步 + 手动冲突处理**：设置页可连接多个 provider，支持自动同步、手动同步、冲突选择。
-5. **用户可批量或逐个选择同步内容/会话**：这是 PiDeck 新增的产品能力。Netcatty 本身没有“会话级选择”，因为它的同步对象是小型 Vault（主机/密钥/片段）。PiDeck 的会话 JSONL 很大，所以学 Netcatty 的 **EncryptedObjectStorage 多对象存储抽象**，把“小索引 + 大会话对象”分开存。全局会话和项目级 `.pi/sessions` 会话都支持用户选择；提供“一键全选/全不选”和“逐个勾选”两种方式；未选择的不同步，选定后按项目身份和相对路径恢复到目标机器正确位置。
+5. **用户可批量或逐个选择同步内容/会话**：这是 TC-Pi 新增的产品能力。Netcatty 本身没有“会话级选择”，因为它的同步对象是小型 Vault（主机/密钥/片段）。TC-Pi 的会话 JSONL 很大，所以学 Netcatty 的 **EncryptedObjectStorage 多对象存储抽象**，把“小索引 + 大会话对象”分开存。全局会话和项目级 `.pi/sessions` 会话都支持用户选择；提供“一键全选/全不选”和“逐个勾选”两种方式；未选择的不同步，选定后按项目身份和相对路径恢复到目标机器正确位置。
 6. **密钥默认同步**：pi auth、DSH credentials、imagegen apiKey 等模型密钥一并进入加密 payload；是否同步由用户按分类开关控制，默认开启。因为不同步密钥的话，模型配置跨设备没有意义。
 
 ---
 
-## 2. PiDeck 同步范围总表
+## 2. TC-Pi 同步范围总表
 
 | 数据域 | 本地位置 | 是否默认同步 | 用户可选择 | 说明 |
 |---|---|---|---|---|
-| PiDeck 桌面设置 | `userData/settings.json` | 是 | 可按分类开关 | 只同步用户偏好，排除设备相关字段 |
+| TC-Pi 桌面设置 | `userData/settings.json` | 是 | 可按分类开关 | 只同步用户偏好，排除设备相关字段 |
 | pi 基础配置 | `~/.pi/agent/models.json`、`settings.json` | 是 | 是 | provider/baseUrl/models/agent 偏好 |
 | pi 认证 | `~/.pi/agent/auth.json` | **是（加密同步，可关闭）** | 是 | 模型密钥进入加密 payload，默认同步 |
 | pi trust | `~/.pi/agent/trust.json` | 否 | 是 | 目录信任跨设备不一定有效，默认不同步 |
@@ -105,7 +105,7 @@ PiDeck 的云同步采用与 Netcatty 相同的核心理念：
 
 ---
 
-## 3. PiDeck 版 SyncPayload（索引载荷）
+## 3. TC-Pi 版 SyncPayload（索引载荷）
 
 建议把同步数据分成两层：
 
@@ -327,7 +327,7 @@ Netcatty 的最佳实践是：
 - 用三路合并按 entity id 合并；
 - 用 `EncryptedObjectStorage` 抽象支持多对象。
 
-PiDeck 学过来后的调整：
+TC-Pi 学过来后的调整：
 
 - “项目/会话/catalog/设置”放 index payload；
 - “用户选中的会话正文”放 session objects；
@@ -390,9 +390,9 @@ PiDeck 学过来后的调整：
 
 Pi 扩展分三类，处理方式完全不同：
 
-1. **PiDeck 内置扩展**
+1. **TC-Pi 内置扩展**
    - 例如 `pi-deck-todo.ts`、`pi-deck-goal-mode.ts`；
-   - 由 PiDeck 应用自带，**不需要跨设备安装**；
+   - 由 TC-Pi 应用自带，**不需要跨设备安装**；
    - 只同步启用/禁用状态（removedBuiltInExtensions / disabledExtensions）。
 
 2. **本地文件扩展**
@@ -434,14 +434,14 @@ Pi 扩展分三类，处理方式完全不同：
 4. **Netcatty 可借鉴的模式：插件 sidecar**
    - Netcatty 对第三方插件不同步插件安装包，而是同步插件“非敏感设置/基线数据”；
    - 插件不存在时不丢数据、不报错，等插件装回来后恢复；
-   - PiDeck 项目扩展也采用类似思路：
+   - TC-Pi 项目扩展也采用类似思路：
      - 扩展的启用/禁用/配置声明同步；
      - 扩展代码没有装到目标机时，项目资源仍保留；
      - 用户安装扩展后自动接管。
 
 5. **完整 node_modules 同步：本期不做（已确认）**
    - 不提供“打包 node_modules”高级同步；
-   - 离线/内网场景由用户自行通过其他方式准备扩展安装目录，PiDeck 只负责声明 + 自动安装。
+   - 离线/内网场景由用户自行通过其他方式准备扩展安装目录，TC-Pi 只负责声明 + 自动安装。
 
 ---
 
@@ -526,7 +526,7 @@ interface PiDeckCloudObjectStorage {
 
 ---
 
-## 9. PiDeck 架构落点
+## 9. TC-Pi 架构落点
 
 | 层 | 落点 |
 |---|---|
@@ -544,7 +544,7 @@ interface PiDeckCloudObjectStorage {
 从 Netcatty 搬运并改造：
 
 - `domain/cloudProviderIds.ts`
-- `domain/sync.ts`（裁剪成 PiDeck payload）
+- `domain/sync.ts`（裁剪成 TC-Pi payload）
 - `domain/syncMerge.ts`
 - `domain/syncGuards.ts`
 - `domain/syncStrategy.ts`
@@ -555,7 +555,7 @@ interface PiDeckCloudObjectStorage {
 - `infrastructure/services/cloudSync/*`
 - `application/syncPayload.ts` → `src/main/cloudSync/payload.ts`
 - `application/state/useCloudSync.ts` / `useAutoSync.ts` → 主进程 service + renderer hook
-- `components/cloud-sync/*` → PiDeck 设置页 UI
+- `components/cloud-sync/*` → TC-Pi 设置页 UI
 
 ---
 
@@ -573,7 +573,7 @@ interface PiDeckCloudObjectStorage {
    - 补 OAuth bridge / 客户端 ID 配置。
 
 3. **M3 Index payload**
-   - `payload.ts`：收集 PiDeck settings、pi/DSH 配置、统一 project 树。
+   - `payload.ts`：收集 TC-Pi settings、pi/DSH 配置、统一 project 树。
    - 每个 project 包含：metadata + resources + sessions + catalogEntries。
    - 本地应用/恢复逻辑。
    - 路径重映射与安全过滤。

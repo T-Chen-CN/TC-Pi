@@ -60,9 +60,9 @@ test("主进程词典：normalizeMainProcessLocale 认繁体，mainProcessT 取�
 	assert.equal(normalizeMainProcessLocale(undefined), "zh-CN");
 	assert.equal(normalizeMainProcessLocale(42), "zh-CN");
 
-	assert.equal(mainProcessT("zh-TW", "shellMenu.quickTask"), "使用 PiDeck 發起任務");
-	assert.equal(mainProcessT("zh-CN", "shellMenu.quickTask"), "使用 PiDeck 发起任务");
-	assert.equal(mainProcessT("en-US", "shellMenu.quickTask"), "Start a task with PiDeck");
+	assert.equal(mainProcessT("zh-TW", "shellMenu.quickTask"), "使用 TC-Pi 發起任務");
+	assert.equal(mainProcessT("zh-CN", "shellMenu.quickTask"), "使用 TC-Pi 发起任务");
+	assert.equal(mainProcessT("en-US", "shellMenu.quickTask"), "Start a task with TC-Pi");
 });
 
 test("Web 客户端：词典含 zh-TW，注入脚本按浏览器语言分流", () => {

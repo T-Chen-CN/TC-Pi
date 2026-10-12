@@ -1,23 +1,23 @@
-# 中间过程展示调研：PiDeck vs 新版 DSH vs beui `agent-activity`
+# 中间过程展示调研：TC-Pi vs 新版 DSH vs beui `agent-activity`
 
 - **状态**：调研中（只读调研 + 本报告；**尚未改动任何产品代码**）
 - **分支**：`research/dsh-process-display`（基线 `dev` @ `988c74d46`，package version `0.7.7`）
 - **对照对象**：
   - 新版 DSH：`F:\deepseek-harness-master\deepseek-harness-master`（`packages/client/ui-chat`）
   - beui 组件库：`https://beui.dev/r/agent-activity.json`（本地已有部分依赖）
-- **调研问题**：能不能把 PiDeck 的「中间思考 / 中间工具调用 / 中间回复」展示，改成 DSH 那样「合并 + 点开才显示」的更清楚的形态？
+- **调研问题**：能不能把 TC-Pi 的「中间思考 / 中间工具调用 / 中间回复」展示，改成 DSH 那样「合并 + 点开才显示」的更清楚的形态？
 
 ---
 
 ## 0. 结论速览
 
-1. **PiDeck 已经有一层 run 级折叠**（不是"全部一级平铺"）：一轮只有一个「执行过程: N个工具 N次思考 N段中间回复」折叠条，思考/工具/重试/错误/中间回复统一收在里面，最终回答在外常驻。
+1. **TC-Pi 已经有一层 run 级折叠**（不是"全部一级平铺"）：一轮只有一个「执行过程: N个工具 N次思考 N段中间回复」折叠条，思考/工具/重试/错误/中间回复统一收在里面，最终回答在外常驻。
    证据：`src/renderer/src/components/session/turn/TurnRow.tsx:271-350`、`.../timeline/segmentSummary.ts:19-39`。
-   另外**每个步骤卡片自带折叠**（`ThinkingBlock` 单行预览↔全文、`ToolCard` trigger↔详情、`RetryStep` / `ErrorStep` 同）——所以 DSH 的第 3 层（单条思考/工具正文可再展开）PiDeck **已经有了**。
+   另外**每个步骤卡片自带折叠**（`ThinkingBlock` 单行预览↔全文、`ToolCard` trigger↔详情、`RetryStep` / `ErrorStep` 同）——所以 DSH 的第 3 层（单条思考/工具正文可再展开）TC-Pi **已经有了**。
    → **真正缺的是中间层：DSH 的「过程组」（把连续思考+工具调用合并成一组，组头给类别摘要）**。
 2. **"看起来乱"的真正原因不是缺折叠，而是折叠后没有任何高度上限**：`.execution-summary-details` 只有 `display:flex`，**没有 `max-height` / `overflow`**（`src/renderer/src/styles/timeline.css:191-200`），而 `expandInterimDuringStream` 默认 `true`（`src/main/settings/SettingsStore.ts:158`、`App.tsx:665-667`）——**长任务流式期间整轮过程是全程无限长平铺的**，这才是用户看到的画面。
 3. **"只挂 120 条"是对上面这个症状的补偿**：`TIMELINE_MOUNTED_STEP_LIMIT = 120`（`.../timeline/turnMountBudget.ts:21`）限制的是一轮内步骤的 **DOM 挂载条数**，超出部分藏在「显示更早 N 条步骤」按钮后；它不是折叠，是性能兜底。
-4. **DSH 的做法确实是三层结构**，比 PiDeck 多两层信息组织：
+4. **DSH 的做法确实是三层结构**，比 TC-Pi 多两层信息组织：
    - 第 1 层：整轮过程折叠条（时长/状态 + 不可折叠的运行中轮次）；
    - 第 2 层：**过程组**（连续思考+工具调用合并成一组，组头是"类别摘要"如「已读取文件并搜索代码」，组体默认收起、限高滚动）；
    - 第 3 层：单条思考/工具行（可再展开看正文）。
@@ -33,7 +33,7 @@
 
 ---
 
-## 1. 现状：PiDeck 现在到底怎么显示
+## 1. 现状：TC-Pi 现在到底怎么显示
 
 ### 1.1 过程组织只有两级（缺的是中间那层「过程组」）
 
@@ -90,7 +90,7 @@ article.turn-row                       ← 一轮 agent-run
 - 正在流式的那一条 → 通过 `resolveLiveInterimId` 提升到**容器外**渲染（`TurnRow.tsx:139-158, 353`），避免 Radix Collapsible 卸载/收起导致 DOM 消失。
 - 折叠条会统计「N段中间回复」（`segmentSummary.ts:31-36`，只数有文本的）。
 
-也就是说：**PiDeck 的中间回复默认是被折叠隐藏的**（历史轮里完全看不到），这与 DSH"中间回复是一级显示"相反——但**DHS 整轮收起时也隐藏阶段回复**，两者只在"整轮展开时"的层级不同（DSH 提升为一级行，PiDeck 是扁平列表里的一行）。
+也就是说：**TC-Pi 的中间回复默认是被折叠隐藏的**（历史轮里完全看不到），这与 DSH"中间回复是一级显示"相反——但**DHS 整轮收起时也隐藏阶段回复**，两者只在"整轮展开时"的层级不同（DSH 提升为一级行，TC-Pi 是扁平列表里的一行）。
 
 ### 1.5 每步行本身的重量
 
@@ -139,7 +139,7 @@ Turn（轮次）
 - 中文业务规则全文：`conversation-nodes/README.zh.md`（300 行，权威口径）。
 
 **架构差异（值得注意）**：DSH **没有"包裹整轮"的组件**。`ChatView` 是一个扁平列表（`chat/ChatView.tsx:65-76`），Turn 只是节点上的元数据（`node.location.turn`）+ 一层可见性开关；"整轮折叠"是靠一个**合成节点** `turn-process` 实现的（`conversation-nodes/turn-process.ts:294-299`）。
-→ 对比 PiDeck：`TurnRow` 是真正的整轮容器。这对移植是**有利**的——PiDeck 不需要引入合成节点机制，直接在 `TurnRow` 里加分组层即可。
+→ 对比 TC-Pi：`TurnRow` 是真正的整轮容器。这对移植是**有利**的——TC-Pi 不需要引入合成节点机制，直接在 `TurnRow` 里加分组层即可。
 
 ### 2.2 分组边界（哪些进同一组）
 
@@ -170,7 +170,7 @@ Turn（轮次）
 
 证据：`contract/process-groups.ts:1-19`、`conversation-nodes/README.zh.md:206-299`。
 
-### 2.4 展示模式（4 档，PiDeck 目前没有）
+### 2.4 展示模式（4 档，TC-Pi 目前没有）
 
 `设置 → 通用设置 → 工作步骤展示`：`compact` / `standard`（默认）/ `detailed` / `verbose`（`chat-settings.ts:12,32`）。
 
@@ -185,7 +185,7 @@ Turn（轮次）
 
 证据：`packages/client/ui-chat/src/client/presentation-policy.ts`、`chat-settings.ts:12,32`、业务口径 `conversation-nodes/README.zh.md:108-164`。
 
-> 这个"**模式 → 能力表 → 各渲染器各取一个字段**"的写法值得 PiDeck 借鉴：新增模式只改表，不散落 `if (mode === ...)`。
+> 这个"**模式 → 能力表 → 各渲染器各取一个字段**"的写法值得 TC-Pi 借鉴：新增模式只改表，不散落 `if (mode === ...)`。
 
 ### 2.5 条目多了怎么办：不限条数，限高 + 分页
 
@@ -195,20 +195,20 @@ Turn（轮次）
 - 历史回溯靠**宿主分页 + 「加载更早」**：分页参数 `PAGE_MESSAGES = 50`、`HISTORY_PAGE_OPTIONS = {maxMessages: 500, turnWindow: {minMessages: 50, minTurns: 2}}`、跳转页 `JUMP_PAGE_MESSAGES = 200`（`api/session-controller/src/client/sessions/session.ts:51-62`），裁切自尾部往前数、`minTurns` 保证不切半轮（`api/session-controller/src/history.ts:392-427`）；`hasMore` → 「加载更早」（`chat/ChatView.tsx:241-247`，文案 `chat.loadOlder`）。
 - 另有局部行数上限：工具卡展开体 diff 9 行 / read 8 行 / search 8 行，实时明细截断 160 字素，工具调用树 `MAX_DEPTH = 256`。只有**轮次导航轨**与 **Trajectory 表格**用了虚拟化。
 
-> 这解释了 DSH 为什么不需要 120 这样的数字：**视觉高度被限高组吃掉了，DOM 量用分页 + 限高受控**。PiDeck 的 120 是"整轮过程平铺"这一形态下的必要兜底。
+> 这解释了 DSH 为什么不需要 120 这样的数字：**视觉高度被限高组吃掉了，DOM 量用分页 + 限高受控**。TC-Pi 的 120 是"整轮过程平铺"这一形态下的必要兜底。
 
 ### 2.6 两个容易看漏的实现细节（第二轮审计补充）
 
 **(1) Turn 级按钮只显示"时长 / 状态"，不显示计数。**
 `TurnProcessNodeView.tsx:35-44` 的 label 只有四种：运行中「深度求索中，用时 X 秒」、已停止、处理失败、已结束「用时 X 秒」；`worked` 兜底「已完成工作」。
 计数**存在但只作为 DOM 属性**（`:52-55`：`data-turn-process-messages` / `-tool-calls` / `-subagents`），供给测试与埋点，不呈现给用户。
-→ 对比 PiDeck：折叠条显示「执行过程: N个工具 N次思考 N段中间回复」。**要不要改成"时长 + 状态"是一个独立的产品决策**（见 §9.9 第 6 条）。
+→ 对比 TC-Pi：折叠条显示「执行过程: N个工具 N次思考 N段中间回复」。**要不要改成"时长 + 状态"是一个独立的产品决策**（见 §9.9 第 6 条）。
 （另注：`.agents/notes/archived/feature/2026-08-14-web-turn-process-folding.md:20` 描述的是老版"折叠显示计数"设计稿，与当前代码不符，已过期。）
 
 **(2) 折起的成员用 `hidden="until-found"` 保持挂载，而不是卸载。**
 `chat/searchable-hidden.ts:14-29`：折叠成员保留在 DOM 里但标记为可搜索隐藏；浏览器 Ctrl+F 命中时 `beforematch` 触发并自动展开对应披露。同时还有**焦点守卫**：若折叠会把焦点吞掉，则改为保持展开；手动折叠前先把焦点移到控制按钮（`TurnProcessNodeView.tsx:58-61`）。
 理由（设计注记）：保留有状态工具视图 + 支持浏览器查找。
-→ 这是一个明确的**取舍**：DSH 用 DOM 量换「可搜索 + 状态不丢」；PiDeck 用 Radix 卸载换 DOM 量。两者都自洽，但 PiDeck 若不改成 `until-found`，**折叠态下的过程内容无法被 Ctrl+F 搜到**——这是新结构会放大的一处体验缺口（现在过程内容本来就默认折叠，问题不显著；改成"中间回复也在一级"后会更明显）。
+→ 这是一个明确的**取舍**：DSH 用 DOM 量换「可搜索 + 状态不丢」；TC-Pi 用 Radix 卸载换 DOM 量。两者都自洽，但 TC-Pi 若不改成 `until-found`，**折叠态下的过程内容无法被 Ctrl+F 搜到**——这是新结构会放大的一处体验缺口（现在过程内容本来就默认折叠，问题不显著；改成"中间回复也在一级"后会更明显）。
 
 **(3) 中间回复与最终回复的区分方式（三件套）。** 这是 §9.5 冲突 4 的现成答案：
 1. 中间回复行带 `data-turn-process-member`，整轮折起时 `hidden="until-found"`；最终答案行不带。
@@ -257,7 +257,7 @@ maxHeight?: number                       // 默认 208
 
 ### 3.2 本地依赖已经就绪（重要）
 
-`agent-activity` 的 registry 依赖里，**PiDeck 本地已存在**：
+`agent-activity` 的 registry 依赖里，**TC-Pi 本地已存在**：
 
 | 依赖 | 本地状态 |
 |---|---|
@@ -285,7 +285,7 @@ maxHeight?: number                       // 默认 208
 
 ## 4. 三方对照表
 
-| 维度 | PiDeck 现状 | 新版 DSH | beui `agent-activity` |
+| 维度 | TC-Pi 现状 | 新版 DSH | beui `agent-activity` |
 |---|---|---|---|
 | 层级 | 2 层过程组织（整轮折叠 → 扁平步骤行）+ 卡片内折叠 | **3 层**（整轮 → 过程组 → 单步） | 2 层（折叠条 → 紧凑行流） |
 | 思考+工具是否合并 | ❌ 同层兄弟行 | ✅ 合并成过程组 | ✅ 合并进同一条流 |
@@ -304,11 +304,11 @@ maxHeight?: number                       // 默认 208
 
 ## 5. 为什么不能直接照抄 DSH
 
-| 差异 | PiDeck | DSH | 影响 |
+| 差异 | TC-Pi | DSH | 影响 |
 |---|---|---|---|
 | 过程的分组时机 | `groupToolMessages` 在 AppUtils 里把消息**预先**归成 `thinking-group` / `tool-group` / `retry-group` / `error-group`（`AppUtils.ts:306+`） | 分组是**展示层**独立一遍（`process-groups.ts`），源节点不动 | 可行的做法：在 `buildTurnDisplay()` 之上再加**一个纯函数** `groupTurnProcess()`，不动既有消息归组 |
 | 工具类别 | 没有 | 13 类，按工具名匹配 | 需新增纯函数 `toolCategory.ts`（可单测） |
-| 阶段回复边界 | 已由 `stopReason` 判定 `interim-answer` / `final-answer`（`buildTurnDisplay.ts:132-144`） | 同样有，且"回复截断二级组" | PiDeck **已有**，直接把 `interim-answer` 当组边界即可 |
+| 阶段回复边界 | 已由 `stopReason` 判定 `interim-answer` / `final-answer`（`buildTurnDisplay.ts:132-144`） | 同样有，且"回复截断二级组" | TC-Pi **已有**，直接把 `interim-answer` 当组边界即可 |
 | 整轮折叠语义 | `stepsVisible`（含中间回复） | 整轮折叠**不含**最终答案，但含阶段回复 | 语义已一致，可复用 |
 | 运行中不可折叠 | ❌ 运行中也允许用户收起 | ✅ 运行/中止/失败轮**禁止**整轮折叠 | 是否对齐需要产品决策 |
 | 数据来源 | pi RPC 消息流（`run.items`） | DSH host 的 Node/Step/Turn 投影 | 工具调用缺 `callId` 父子树信息，子调用归类做不到 100% |
@@ -344,7 +344,7 @@ maxHeight?: number                       // 默认 208
 ### 方案 B：DSH 式二级过程组（**用户已确认的目标**，见 §9）
 
 - 新增纯函数 `timeline/groupTurnProcess.ts`：按 §2.2 边界规则把扁平序列切成「过程组 + 一级引用」，**用 `interim-answer` / `retry` / `error` / 新一轮作为组边界，工具类别变化不拆组**。
-- 新增纯函数 `timeline/toolCategory.ts`：工具名 → 类别（对照 DSH 13 类，按 PiDeck 实际工具名裁剪）。
+- 新增纯函数 `timeline/toolCategory.ts`：工具名 → 类别（对照 DSH 13 类，按 TC-Pi 实际工具名裁剪）。
 - 新增 `turn/ProcessGroupStep.tsx`：组头（图标 + 类别摘要 + chevron）、组体默认收起、限高 `min(400px, 50vh)` + 滚动 + 渐隐。
 - 组头文案 i18n：运行中「正在读取文件 · src/app.ts」/ 已结束「已读取文件并搜索代码」。
 - 保留 A 的限高 + 贴底跟随作为组体的实现手段（两者可共用一套滚动基建）。
@@ -464,7 +464,7 @@ TurnRow（一轮 agent-run）
 | 输入 | DSH 规则 | 本设计建议 | 理由 |
 |---|---|---|---|
 | Assistant 阶段回复 | 截断组 + 独立一级 | 同 DSH | 用户明确要求 |
-| 模型重试 `model-retry`（PiDeck：`retry-entry`） | 截断组 + 独立节点 | **作组成员，不拆组** | PiDeck 把重试/错误"收进过程行"是刻意的用户反馈改动（`AppUtils.ts:148-171` 注释），拆出来是倒退 |
+| 模型重试 `model-retry`（TC-Pi：`retry-entry`） | 截断组 + 独立节点 | **作组成员，不拆组** | TC-Pi 把重试/错误"收进过程行"是刻意的用户反馈改动（`AppUtils.ts:148-171` 注释），拆出来是倒退 |
 | 轮次错误 `turn-error`（`error-entry`） | 截断组 + 独立节点 | 同上，作组成员 | 同上 |
 | 用户 steering | 截断组 + 独立节点 | 天然已对齐 | steering 是时间线一级用户气泡，不在 `run.items` 内 |
 | 工具类别变化 | 不拆组 | 同 DSH | — |
@@ -541,7 +541,7 @@ TurnRow（一轮 agent-run）
 4. **组数上界**：单轮最多挂多少个组头？（建议 40）
 5. **大折叠栏展开时是否自动展开第一个组**？（DSH：否，全部组默认收起）
 6. **大折叠栏折叠态的标题文案**：保留现在的纯计数（「N个工具 N次思考 N段中间回复」），还是像 DSH 那样**只显示「用时 X 秒」+ 状态**（DSH 的计数只作 DOM 属性、不呈现，见 §2.6）？
-7. **折叠态是否改成「可搜索隐藏」**：DSH 折起成员用 `hidden="until-found"` 保持挂载（Ctrl+F 能搜到过程内容、有状态工具视图不丢），PiDeck 现在是 Radix 卸载。改成 `until-found` 会牺牲折叠态的 DOM 收益，但补上"过程内容搜不到"的缺口（§2.6）。
+7. **折叠态是否改成「可搜索隐藏」**：DSH 折起成员用 `hidden="until-found"` 保持挂载（Ctrl+F 能搜到过程内容、有状态工具视图不丢），TC-Pi 现在是 Radix 卸载。改成 `until-found` 会牺牲折叠态的 DOM 收益，但补上"过程内容搜不到"的缺口（§2.6）。
 
 ### 9.10 过程组外壳：自建 vs beui `agent-activity`（追评）
 
@@ -550,7 +550,7 @@ TurnRow（一轮 agent-run）
 | 方案 | 结论 | 理由 |
 |---|---|---|
 | **A. 自建 `ProcessGroupStep.tsx`**（Radix `Collapsible` + 组头 + 组体） | ✅ **推荐** | 与现有 `.execution-summary` 同一观感与 token；组头文案可自由做成类别摘要；组体直接塞现有 `ThinkingStep` / `ToolStep` **零改动复用**；不引新依赖；Tailwind utility 合规 |
-| B. `AgentActivity` 作为**组壳** | ⚠️ 可做但要打架 | `AgentActivityTool` 行只能承载 `action` + `target` 文本，**装不下 `ToolCard` 的 diff / 工具结果 / 完整输出视图**。要用就得把每一步塞进它的 `text` 行（`text.content: ReactNode`，技术上可行），但外层行自带的 `text-muted-foreground` / `min-h-7` / `px-1.5 py-1` 会污染 PiDeck 现有观感——正是 AGENTS.md 警告的「半吊子 utility 比没写更糟」。另外 `status="working"` 会**强制展开**，与"组体默认收起"冲突（需按组区分 working/complete 规避） |
+| B. `AgentActivity` 作为**组壳** | ⚠️ 可做但要打架 | `AgentActivityTool` 行只能承载 `action` + `target` 文本，**装不下 `ToolCard` 的 diff / 工具结果 / 完整输出视图**。要用就得把每一步塞进它的 `text` 行（`text.content: ReactNode`，技术上可行），但外层行自带的 `text-muted-foreground` / `min-h-7` / `px-1.5 py-1` 会污染 TC-Pi 现有观感——正是 AGENTS.md 警告的「半吊子 utility 比没写更糟」。另外 `status="working"` 会**强制展开**，与"组体默认收起"冲突（需按组区分 working/complete 规避） |
 | C. `AgentActivity` 作为**大折叠栏** | ❌ 不建议 | 同样装不下 `ToolCard` 的完整内容 |
 | D. beui 只做**局部增强** | ✅ 可选项 | `thinking-shimmer` 做组头运行中动效、`agent-progress` 做「深度思考中… 12s」抬头（对应 DSH 的 `TurnProcessNodeView` label）；这两个组件自带 utility、无历史包袱，可安全引入 |
 
@@ -612,14 +612,14 @@ wheel/touch/key/滚动条 ──► useStickToBottom（唯一跟随状态机）
 
 | 主题 | 位置 |
 |---|---|
-| PiDeck 折叠渲染 | `src/renderer/src/components/session/turn/TurnRow.tsx:260-422` |
-| PiDeck 展示序列纯函数 | `src/renderer/src/components/session/timeline/buildTurnDisplay.ts:45-158` |
-| PiDeck 折叠态决策 | `src/renderer/src/components/session/turn/useTurnExecution.ts:56-144` |
-| PiDeck 摘要统计 / 文案 | `.../timeline/segmentSummary.ts:19-39`、`.../turn/ProcessSummaryToggle.tsx`、`src/renderer/src/i18n/rendererCopy.zh-CN.ts:4016-4019` |
-| PiDeck 120 挂载预算 | `.../timeline/turnMountBudget.ts:21,37-45`（契约 `tests/turnMountBudget.test.mjs`） |
-| PiDeck 3 轮窗口 | `.../timeline/turnRenderWindow.ts:12-16` |
-| PiDeck 折叠区无高度上限 | `src/renderer/src/styles/timeline.css:191-200` |
-| PiDeck 流式默认展开 | `src/main/settings/SettingsStore.ts:158`、`src/renderer/src/App.tsx:665-667` |
+| TC-Pi 折叠渲染 | `src/renderer/src/components/session/turn/TurnRow.tsx:260-422` |
+| TC-Pi 展示序列纯函数 | `src/renderer/src/components/session/timeline/buildTurnDisplay.ts:45-158` |
+| TC-Pi 折叠态决策 | `src/renderer/src/components/session/turn/useTurnExecution.ts:56-144` |
+| TC-Pi 摘要统计 / 文案 | `.../timeline/segmentSummary.ts:19-39`、`.../turn/ProcessSummaryToggle.tsx`、`src/renderer/src/i18n/rendererCopy.zh-CN.ts:4016-4019` |
+| TC-Pi 120 挂载预算 | `.../timeline/turnMountBudget.ts:21,37-45`（契约 `tests/turnMountBudget.test.mjs`） |
+| TC-Pi 3 轮窗口 | `.../timeline/turnRenderWindow.ts:12-16` |
+| TC-Pi 折叠区无高度上限 | `src/renderer/src/styles/timeline.css:191-200` |
+| TC-Pi 流式默认展开 | `src/main/settings/SettingsStore.ts:158`、`src/renderer/src/App.tsx:665-667` |
 | DSH 整轮折叠条 | `packages/client/ui-chat/src/client/chat/TurnProcessNodeView.tsx:27-65` |
 | DSH 过程组容器 | `.../chat/ChatGroupSeat.tsx:128-189`（组头 `:91-126`） |
 | DSH 节点模型 | `.../contract/chat-nodes.ts:98-109`、`.../contract/turn-process.ts:20-74`、`.../contract/process-groups.ts` |
@@ -628,8 +628,8 @@ wheel/touch/key/滚动条 ──► useStickToBottom（唯一跟随状态机）
 | DSH 展示模式能力表 | `packages/client/ui-chat/src/client/presentation-policy.ts:11-52`、`chat-settings.ts:12,32` |
 | Radix 折叠关闭即卸载 | `node_modules/@radix-ui/react-collapsible/dist/index.mjs:137`（`children: isOpen && children`） |
 | E2E / DOM 锚点 | `e2e/timeline-gobottom-lock.spec.ts`、`e2e/settle-reposition.spec.ts:86`、`e2e/typewriter.spec.ts:27-62` |
-| PiDeck 滚动跟随 / 锚定 | `src/renderer/src/lib/stick-to-bottom/{useStickToBottom,followState,resizeScrollGuard}.ts`、`src/renderer/src/hooks/useSessionTimelineController.ts:107-136,941-962,971-1057,1560-1572` |
-| PiDeck 划选策略 | `src/renderer/src/components/session/timeline/selectionToolbarPolicy.ts:7`（`QUOTE_EXCLUDED_SELECTOR`） |
+| TC-Pi 滚动跟随 / 锚定 | `src/renderer/src/lib/stick-to-bottom/{useStickToBottom,followState,resizeScrollGuard}.ts`、`src/renderer/src/hooks/useSessionTimelineController.ts:107-136,941-962,971-1057,1560-1572` |
+| TC-Pi 划选策略 | `src/renderer/src/components/session/timeline/selectionToolbarPolicy.ts:7`（`QUOTE_EXCLUDED_SELECTOR`） |
 | DSH 分组算法（代码级） | `packages/client/ui-chat/src/client/conversation-nodes/process-groups.ts:13,146-164` |
 | DSH 可搜索隐藏 / 焦点守卫 | `packages/client/ui-chat/src/client/chat/searchable-hidden.ts:14-29` |
 | DSH 状态存续 | `packages/client/ui-chat/src/client/stores.ts:31-46`、`chat/use-disclosure.ts:11-21` |

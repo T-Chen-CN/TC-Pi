@@ -32,9 +32,9 @@ export const SLOW_THRESHOLD_KBPS = 300;
 /** latest.yml `url:` 里允许作为探测文件名的字符（basename，禁止路径穿越）。 */
 const PROBE_FILE_NAME_RE = /^[A-Za-z0-9._+-]+$/;
 /** 写死版本会在发版后立刻 404；yml 解析失败时仍按 NSIS 命名约定回退。 */
-const PROBE_FILE_FALLBACK_PREFIX = "PiDeck-";
+const PROBE_FILE_FALLBACK_PREFIX = "TC-Pi-";
 const PROBE_FILE_FALLBACK_SUFFIX = "-setup.exe";
-const PROBE_FILE_LAST_RESORT = "PiDeck-setup.exe";
+const PROBE_FILE_LAST_RESORT = "TC-Pi-setup.exe";
 
 /**
  * 从 generic provider 的 latest.yml 取出探测用的安装包文件名。
@@ -47,7 +47,8 @@ export function resolveProbeFileName(ymlText: string): string {
 	const fallback = rawVersion ? `${PROBE_FILE_FALLBACK_PREFIX}${rawVersion}${PROBE_FILE_FALLBACK_SUFFIX}` : PROBE_FILE_LAST_RESORT;
 
 	const urls: string[] = [];
-	const urlRe = /^\s+url:\s*(\S+)/gm;
+	// electron-builder 的标准 YAML 列表以「- url:」开头；忽略列表标记会把真实文件名错当缺失。
+	const urlRe = /^[\t ]+(?:-[\t ]+)?url:\s*(\S+)/gm;
 	let urlMatch: RegExpExecArray | null;
 	while ((urlMatch = urlRe.exec(ymlText)) !== null) {
 		urls.push(urlMatch[1] ?? "");
@@ -58,7 +59,8 @@ export function resolveProbeFileName(ymlText: string): string {
 	const withoutQuery = preferred.split("?")[0] ?? preferred;
 	const slash = Math.max(withoutQuery.lastIndexOf("/"), withoutQuery.lastIndexOf("\\"));
 	const basename = (slash >= 0 ? withoutQuery.slice(slash + 1) : withoutQuery).trim();
-	return PROBE_FILE_NAME_RE.test(basename) ? basename : fallback;
+	// 只预检 NSIS 安装包，任意其他文件名（如路径穿越后剩下的 passwd）都走安全回退。
+	return PROBE_FILE_NAME_RE.test(basename) && /-setup\.exe$/i.test(basename) ? basename : fallback;
 }
 
 /** 单个镜像探测；fetchImpl 注入便于测试。超时/非预期响应一律收成 broken，不向外抛。 */

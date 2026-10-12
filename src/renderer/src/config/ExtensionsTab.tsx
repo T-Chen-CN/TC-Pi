@@ -27,7 +27,7 @@ type ExtensionsApi = {
 
 function getExtensionsApi(): ExtensionsApi {
 	const api = (window as unknown as { piDesktop?: { extensions?: ExtensionsApi } }).piDesktop?.extensions;
-	if (!api) throw new Error("PiDeck extensions API is not available");
+	if (!api) throw new Error("TC-Pi extensions API is not available");
 	return api;
 }
 

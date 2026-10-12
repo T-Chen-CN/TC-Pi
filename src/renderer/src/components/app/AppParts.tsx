@@ -8,6 +8,7 @@
 // ============================================================
 
 import { useEffect, useState } from "react";
+import { t } from "../../i18n";
 import { ConfirmDialog as ShadcnConfirmDialog } from "../ui-shadcn/ConfirmDialog";
 
 // Re-exports from other modules
@@ -154,7 +155,7 @@ export function BrandLockup() {
 			reduceMq.removeEventListener("change", onReduceChange);
 		};
 	}, []);
-	const brandTitle = branch ? `PiDeck · ${branch}` : "PiDeck";
+	const brandTitle = branch ? `${t("app.brandName")} · ${branch}` : t("app.brandName");
 	const logoStyle = useLogoStyle();
 	// macOS 窗口左上角已有原生交通灯，π logo + 字标挤在同一行视觉过重；
 	// darwin 平台只保留字标（品牌语义仍由 aria-label 承载），其余平台维持原样。
@@ -164,8 +165,8 @@ export function BrandLockup() {
 			{/* 默认静态定格；点击 logo 才播落位动画（classic=四块拼图 / pi-tui=三块落位），不随会话启动自动播。 */}
 			{showLogo && (logoStyle === "pi-tui" ? <PiTuiLogoCanvas size={18} playOnClick /> : <PiLogoCanvas size={18} playOnClick />)}
 			<span className="flex min-w-0 flex-col justify-center gap-1">
-				<TextShimmer as="span" enabled={shimmerOn} className="brand-wordmark truncate text-[18px] font-[PiDeckDepartureMono] font-bold uppercase leading-none">
-					PiDeck
+				<TextShimmer as="span" enabled={shimmerOn} className="brand-wordmark truncate text-[18px] font-[PiDeckDepartureMono] font-bold leading-none">
+					{t("app.brandName")}
 				</TextShimmer>
 				{branch && <span className="truncate text-control font-medium leading-none text-muted-foreground">{branch}</span>}
 			</span>

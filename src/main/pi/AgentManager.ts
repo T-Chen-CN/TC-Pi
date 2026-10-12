@@ -890,8 +890,8 @@ export class AgentManager {
 				role: "system",
 				i18nKey: hasEnabledServer ? "diagnostic.mcpThirdParty.takeoverActive" : "diagnostic.mcpThirdParty.takeoverIdle",
 				fallbackText: hasEnabledServer
-					? `已安装 ${hit.source}，会话中的 MCP 由它接管，PiDeck MCP 页配置的服务器不会被当前会话加载。${command ? `建议卸载：${command}` : ""}`
-					: `已安装 ${hit.source}，它会接管 MCP 会话（当前未配置 MCP 服务器，暂无影响）；之后在 PiDeck 配置的 MCP 不会生效。${command ? `建议卸载：${command}` : ""}`,
+					? `已安装 ${hit.source}，会话中的 MCP 由它接管，TC-Pi MCP 页配置的服务器不会被当前会话加载。${command ? `建议卸载：${command}` : ""}`
+					: `已安装 ${hit.source}，它会接管 MCP 会话（当前未配置 MCP 服务器，暂无影响）；之后在 TC-Pi 配置的 MCP 不会生效。${command ? `建议卸载：${command}` : ""}`,
 				options: { params: { source: hit.source, ...(command ? { command } : {}) } },
 			});
 			// 全局 toast：本次运行每个扩展只弹一次（连续新建会话/进程重连不刷屏）。
@@ -899,7 +899,7 @@ export class AgentManager {
 			this.mcpThirdPartyNoticesSent.add(hit.source);
 			this.emit(ipcChannels.agentsNotice, {
 				agentId,
-				message: hasEnabledServer ? `你的 MCP 由 ${hit.source} 接管，PiDeck 里配置的服务器不会被本会话加载。` : `${hit.source} 会接管 MCP（当前未配置服务器，暂无影响）；之后在 PiDeck 配的 MCP 不会生效。`,
+				message: hasEnabledServer ? `你的 MCP 由 ${hit.source} 接管，TC-Pi 里配置的服务器不会被本会话加载。` : `${hit.source} 会接管 MCP（当前未配置服务器，暂无影响）；之后在 TC-Pi 配的 MCP 不会生效。`,
 				i18nKey: hasEnabledServer ? "notice.mcpThirdParty.takeoverActive" : "notice.mcpThirdParty.takeoverIdle",
 				i18nParams: { source: hit.source, ...(command ? { command } : {}) },
 				kind: hasEnabledServer ? "warning" : "info",
@@ -4297,7 +4297,7 @@ export class AgentManager {
 		if (diag.cwdMissing) {
 			lines.push("1. 确认上面的工作目录是否真的存在（被移动/重命名/删除，或所在磁盘/网络盘未挂载）");
 			lines.push("2. 目录不存在时 pi 无法以该目录为工作目录启动，与 pi 是否安装无关");
-			lines.push("3. 在 PiDeck 中重新指定该项目的目录后重启会话");
+			lines.push("3. 在 TC-Pi 中重新指定该项目的目录后重启会话");
 		} else if (versionCheckFailed) {
 			lines.push("1. 在终端执行 pi --version，确认 pi 是否已安装且路径正确");
 			lines.push("2. 如未安装，执行 npm install -g @earendil-works/pi-coding-agent");

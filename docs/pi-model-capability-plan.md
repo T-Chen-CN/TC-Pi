@@ -1,8 +1,8 @@
-# Pi / PiDeck 模型能力与思考级别链路方案
+# Pi / TC-Pi 模型能力与思考级别链路方案
 
 > 本文回答四个问题：模型配置中的 `reasoning` / `thinkingLevelMap` 是否需要手配；草稿态和正式 Agent 态分别显示什么；“关闭”是否会写入配置；以及 `input: ["text", "image"]` 多模态能力到底怎样生效。
 >
-> 核对基线：Pi `0.85.0`（2026-09 跟进）、PiDeck 当前工作区代码。Pi 上游源码以本机安装包 `@earendil-works/pi-coding-agent` / `@earendil-works/pi-ai` 为准。文中标注「已用真实 Pi 0.84.3 RPC 验证」的实测结论为当时记录，行为语义未在本版变更。
+> 核对基线：Pi `0.85.0`（2026-09 跟进）、TC-Pi 当前工作区代码。Pi 上游源码以本机安装包 `@earendil-works/pi-coding-agent` / `@earendil-works/pi-ai` 为准。文中标注「已用真实 Pi 0.84.3 RPC 验证」的实测结论为当时记录，行为语义未在本版变更。
 
 ## 结论先行
 
@@ -12,7 +12,7 @@
 3. 欢迎页和草稿会话优先读取启动 capability cache；运行 Agent 读取自身 runtime cache。旧 Pi 或 probe 失败时才回退静态兼容档位。
 4. 配置页里显示的“关闭”只表示当前 `xhigh` / `max` 映射为空，不等于 `reasoning: false`，也不一定会写入 `thinkingLevelMap`。
 5. 手动新增 Pi 模型先保持能力字段为空，再按端点元数据、Pi 当前目录和内置目录的唯一模型本体匹配补全；不再写入乐观的 1M / 128K / reasoning / image 猜测值。
-6. `input` 是 Pi 真正的多模态能力字段。没有 `image` 时，Pi/pi-ai 会把用户图片和工具图片替换为占位文本；PiDeck 目前仍允许附件并把图片发给 Pi，再由 Pi/视觉桥决定结果。
+6. `input` 是 Pi 真正的多模态能力字段。没有 `image` 时，Pi/pi-ai 会把用户图片和工具图片替换为占位文本；TC-Pi 目前仍允许附件并把图片发给 Pi，再由 Pi/视觉桥决定结果。
 
 ## 0. 本次实施技术汇总
 
@@ -26,7 +26,7 @@
 
 ### 0.2 权威数据源与边界
 
-| 数据 | 权威来源 | PiDeck 用途 |
+| 数据 | 权威来源 | TC-Pi 用途 |
 |---|---|---|
 | 全局可用模型、容量、输入模态、reasoning/map | 用户安装的 `pi --mode rpc --no-session` 的 `get_available_models` | 欢迎页模型列表和只读能力展示 |
 | 每个模型实际可选 levels | 同一临时 Pi 进程的 `set_model → get_available_thinking_levels` | 欢迎页/草稿 thinking picker 精确过滤（运行态也统一读此 snapshot） |
@@ -110,11 +110,11 @@ type AvailableModel = {
 
 watcher 使用目录级、按文件名过滤、短 debounce 的策略；创建与 `dispose()` 必须在同一模块，`app` quit 时统一释放。写入路径触发显式 invalidation，不依赖 watcher 时序。首次 hydration 未完成或失败时，UI 继续用现有 fallback，不阻塞主窗口。
 
-本轮只做**进程内**缓存。每次 PiDeck 启动重新 hydration（快速档，本机实测 ≈0.4s）降低于维护跨重启 cache 的 Pi 命令、版本、模型/auth 文件指纹和安全边界的复杂度；扩展贡献的模型不在这份快照里，需要用户用刷新按钮显式补回。
+本轮只做**进程内**缓存。每次 TC-Pi 启动重新 hydration（快速档，本机实测 ≈0.4s）降低于维护跨重启 cache 的 Pi 命令、版本、模型/auth 文件指纹和安全边界的复杂度；扩展贡献的模型不在这份快照里，需要用户用刷新按钮显式补回。
 
 ### 0.6 兼容与错误策略
 
-- Pi `>=0.81.0` 支持精确 levels RPC；结果可用时它始终压过 PiDeck 静态列表和本地 catalog 推导。
+- Pi `>=0.81.0` 支持精确 levels RPC；结果可用时它始终压过 TC-Pi 静态列表和本地 catalog 推导。
 - 旧 Pi、unknown command、错误结构、process start 失败：保留原 `pi --list-models → models.json` 兼容链路，thinking picker 使用现有 fallback，但 UI/数据状态不得把它标为“已确认”。
 - 模型或 auth 配置在 hydration 中途更新：旧 generation 的任何结果均丢弃；新 generation 完成前不复用旧的精确 levels。
 - DSH 不启动 Pi probe，也不读取 `thinkingLevels`；它继续从 `reasoningEfforts` 生成选项。
@@ -139,7 +139,7 @@ watcher 使用目录级、按文件名过滤、短 debounce 的策略；创建�
 | `settings.json.defaultThinkingLevel` | Pi 全局/项目设置 | 默认请求档位，不是能力声明 |
 | `settings.json.modelThinkingLevels` | Pi 全局/项目设置 | provider/model 的默认请求档位，不是能力声明 |
 
-Pi 的 `ModelDefinitionSchema` 支持 `off/minimal/low/medium/high/xhigh/max` 全部 map 键，但 PiDeck 当前可视化配置只提供 `xhigh` 和 `max` 两行。
+Pi 的 `ModelDefinitionSchema` 支持 `off/minimal/low/medium/high/xhigh/max` 全部 map 键，但 TC-Pi 当前可视化配置只提供 `xhigh` 和 `max` 两行。
 
 ### 1.2 Pi 0.84.3 的实际算法
 
@@ -177,15 +177,15 @@ return ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 例如配置 `defaultThinkingLevel: "max"`、模型没有 map 时，Pi 会把请求 clamp 到可用的 `high`，不是 `off`。
 
-## 2. PiDeck 配置页：用户不处理“思考级别”到底写不写
+## 2. TC-Pi 配置页：用户不处理“思考级别”到底写不写
 
 ### 2.1 手动新增 Pi 模型的能力模板
 
-`src/renderer/src/ConfigModal.tsx` 的“手动添加”现在只创建 `id/name` 空草稿，不再预写容量、推理或图片字段。用户填写模型 ID 或显示名后，以及保存整个配置前，PiDeck 按下列优先级补**空字段**：
+`src/renderer/src/ConfigModal.tsx` 的“手动添加”现在只创建 `id/name` 空草稿，不再预写容量、推理或图片字段。用户填写模型 ID 或显示名后，以及保存整个配置前，TC-Pi 按下列优先级补**空字段**：
 
 1. 中转站 `/models` 已报告的容量字段；
 2. 当前用户安装 Pi 的完整 `get_available_models` 目录；
-3. PiDeck 内置 `pi-ai` catalog。
+3. TC-Pi 内置 `pi-ai` catalog。
 
 匹配不是要求第三方 provider 名相同：先尝试 `provider + modelId` 精确匹配，再尝试跨 provider 的标准模型 ID；例如 `luna-relay/gpt-5.6` 可复用 `openai/gpt-5.6` 的模型级事实。`GPT-5.6 Luna` 一类重命名会做边界明确、唯一且最长的名称别名匹配；`gpt-5` 不会被拿来冒充 `gpt-5.6`，歧义或未知名称保持空字段供用户编辑。
 
@@ -222,11 +222,11 @@ Pi 原生允许配置所有七个 map 键，例如：
 }
 ```
 
-Pi 会据此只显示 `off/low/high/max`。PiDeck 可视化弹窗目前不能编辑基础五档，只能保留它们、不能管理它们。含有基础 map 的模型会被标记为 advanced preserved fields，但用户无法在普通弹窗内完整核对。
+Pi 会据此只显示 `off/low/high/max`。TC-Pi 可视化弹窗目前不能编辑基础五档，只能保留它们、不能管理它们。含有基础 map 的模型会被标记为 advanced preserved fields，但用户无法在普通弹窗内完整核对。
 
 ## 3. 草稿态/欢迎页链路
 
-当前 PiDeck 的草稿态没有 Pi runtime，因此不能调用 Pi RPC：
+当前 TC-Pi 的草稿态没有 Pi runtime，因此不能调用 Pi RPC：
 
 ```text
 欢迎页 localStorage（可选）
@@ -242,7 +242,7 @@ Pi 会据此只显示 `off/low/high/max`。PiDeck 可视化弹窗目前不能编
 当前表现：
 
 - 不管模型 `reasoning` 是 `false`、没有 map，还是只支持 `off/high`，草稿 picker 都可能显示 7 档；
-- 用户选择后，PiDeck 会把所选字符串写进 `SessionRecord.thinkingLevel`；
+- 用户选择后，TC-Pi 会把所选字符串写进 `SessionRecord.thinkingLevel`；
 - 欢迎页则先写 `localStorage`，发送时作为 `SessionLaunchPreferences` 带入 draft；
 - 草稿阶段没有 `thinkingLevelMap` 的运行时解析，也不会因为配置页的模型行而过滤。
 
@@ -265,7 +265,7 @@ ComposerPickerHost
                           └─ Pi/pi-ai getSupportedThinkingLevels(currentModel)
 ```
 
-因此正式运行且查询成功后，PiDeck 最终显示数量与真实 Pi 完全一致：
+因此正式运行且查询成功后，TC-Pi 最终显示数量与真实 Pi 完全一致：
 
 - map 有两个扩展映射：7 个；
 - 没有 map 且 reasoning true：5 个；
@@ -276,7 +276,7 @@ ComposerPickerHost
 ### 4.2 选择档位
 
 ```text
-PiDeck pickThinking(level)
+TC-Pi pickThinking(level)
   ├─ 有 runtime
   │   └─ sessions:setRuntimeThinking
   │       └─ AgentManager.setThinking
@@ -304,7 +304,7 @@ PiDeck pickThinking(level)
 - 不要为了“启用思考”手工复制模型行到 `models.json`；
 - 让 Pi 内置 catalog 提供 `reasoning`、`input`、`thinkingLevelMap`；
 - 只在确实需要覆盖 base URL、headers 或 provider 兼容参数时写配置；
-- 如果把内置模型重新写进 `models.json`，Pi 的 custom model definition 可能覆盖内置条目，缺失的 map 不会自动从 PiDeck 的 catalog 补回。
+- 如果把内置模型重新写进 `models.json`，Pi 的 custom model definition 可能覆盖内置条目，缺失的 map 不会自动从 TC-Pi 的 catalog 补回。
 
 ### 自定义 provider / 网关
 
@@ -327,15 +327,15 @@ PiDeck pickThinking(level)
 
 ### 6.1 Pi 原生行为
 
-PiDeck 将图片作为 RPC `prompt.images` 发送。Pi AgentSession 把它们放进 user content；Pi/pi-ai 的公共 `transformMessages()` 再根据当前模型的 `input` 处理：
+TC-Pi 将图片作为 RPC `prompt.images` 发送。Pi AgentSession 把它们放进 user content；Pi/pi-ai 的公共 `transformMessages()` 再根据当前模型的 `input` 处理：
 
 - `input` 包含 `image`：保留图片，provider API 收到 base64 image block；
 - 不包含 `image`：用户图片替换为 `(image omitted: model does not support images)`，工具图片替换为对应占位文本；
 - `input` 缺省的自定义模型在 Pi 内部默认为 `["text"]`。
 
-### 6.2 PiDeck 视觉桥
+### 6.2 TC-Pi 视觉桥
 
-PiDeck 内置 `resources/extensions/pi-deck-vision.ts`，正常 RPC 启动时会注入：
+TC-Pi 内置 `resources/extensions/pi-deck-vision.ts`，正常 RPC 启动时会注入：
 
 - 当前 Pi 模型声明支持图片：原图直通，不调用视觉桥；
 - 当前模型不支持图片，且视觉桥配置完整：调用视觉模型，把图片改写为文字后再发给聊天模型；
@@ -349,7 +349,7 @@ PiDeck 内置 `resources/extensions/pi-deck-vision.ts`，正常 RPC 启动时会
 - 错误地勾上图片：原图会发给可能不支持的上游，可能得到 400；
 - 错误地不勾图片：原生视觉能力被 Pi 当成非视觉，图片可能被视觉桥二次描述，或最终被省略。
 
-### 6.3 当前 PiDeck UI 缺口
+### 6.3 当前 TC-Pi UI 缺口
 
 - `AvailableModel.images` 已从 `pi --list-models` / `models.json` 得到，但普通模型选择器和附件入口没有据此做能力提示或发送前门禁；
 - 附件仍可对所有 Pi 模型添加，最后才由 Pi/视觉桥处理；
@@ -366,7 +366,7 @@ DSH 的图片链路与 Pi 不同：`DshAgentManager` 会把图片转成 host 的
 
 ### Phase A：构建期提取官方 catalog 的只读能力数据
 
-PiDeck 已有一份本地规格匹配库：早期的 `resources/model-specs.db` 先被官方 `@earendil-works/pi-ai/dist/providers/data/*.json` 替代；当前再由构建脚本裁剪为随应用分发的 `resources/pi-ai-catalog.json` artifact，运行时不加载完整 pi-ai SDK。
+TC-Pi 已有一份本地规格匹配库：早期的 `resources/model-specs.db` 先被官方 `@earendil-works/pi-ai/dist/providers/data/*.json` 替代；当前再由构建脚本裁剪为随应用分发的 `resources/pi-ai-catalog.json` artifact，运行时不加载完整 pi-ai SDK。
 
 这份原始 catalog 已包含：
 
@@ -398,7 +398,7 @@ Pi 上游从 **0.81.0** 开始提供 `get_available_thinking_levels`，但它只
 
 > 2026-09 更新：这段实测用的是 `--no-extensions`。实现最初按 #181 改成了「默认带扩展」，导致 418 模型下 hydration 变成 ~2.5s（扩展加载占 ~2.0s）。现已收敛回本文档的原始口径：默认 `--no-extensions`，带扩展只留给选择器刷新按钮，见文末「扩展加载分档」。
 
-这仍然只有 PiDeck ↔ Pi 的 stdio JSON-RPC 一条通信边界，不在 PiDeck 复制 Pi 的能力算法。现有 `pi --list-models` 可在旧 Pi 或 capability hydration 失败时继续担任兼容 fallback；长期可推动 Pi 提供一次返回所有模型已计算 levels 的 RPC，去掉批量 `set_model → get_available_thinking_levels` 循环。
+这仍然只有 TC-Pi ↔ Pi 的 stdio JSON-RPC 一条通信边界，不在 TC-Pi 复制 Pi 的能力算法。现有 `pi --list-models` 可在旧 Pi 或 capability hydration 失败时继续担任兼容 fallback；长期可推动 Pi 提供一次返回所有模型已计算 levels 的 RPC，去掉批量 `set_model → get_available_thinking_levels` 循环。
 
 ### Phase C：运行态与全局统一为 capability cache，runtime RPC 仅兑底
 
@@ -445,7 +445,7 @@ Pi 上游从 **0.81.0** 开始提供 `get_available_thinking_levels`，但它只
 
 ## 已落地实现（2026-08 收敛）
 
-> 经评审收敛为最小职责边界：**配置阶段只读 PiDeck 自带、由 pi-ai 构建期提取的 catalog artifact；capability cache 只服务输入框/思考强度；endpoint `/models` 实报字段参与自适应模板。** 外部 Pi 安装目录的 catalog、models-store.json、PiDeck 自身的 capability cache 都不再参与配置模板计算。
+> 经评审收敛为最小职责边界：**配置阶段只读 TC-Pi 自带、由 pi-ai 构建期提取的 catalog artifact；capability cache 只服务输入框/思考强度；endpoint `/models` 实报字段参与自适应模板。** 外部 Pi 安装目录的 catalog、models-store.json、TC-Pi 自身的 capability cache 都不再参与配置模板计算。
 
 ### 数据源边界（最终）
 

@@ -19,7 +19,7 @@ type Busy = "check" | "update" | "restore" | "restorePrevious" | null;
 
 function getBuiltInApi(): BuiltInExtensionsApi {
 	const api = (window as unknown as { piDesktop?: { extensions?: BuiltInExtensionsApi } }).piDesktop?.extensions;
-	if (!api?.builtInStatus) throw new Error("PiDeck built-in extensions API is not available");
+	if (!api?.builtInStatus) throw new Error("TC-Pi built-in extensions API is not available");
 	return api;
 }
 

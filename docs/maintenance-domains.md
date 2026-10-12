@@ -13,7 +13,7 @@
 ## 内置扩展热更新（resources/extensions + userData 覆盖层）
 
 - 内置扩展（`resources/extensions/*.ts`）随包分发，RPC 启动时经 `-e <绝对路径>` 注入 pi。打包态 `resources` 只读，扩展出 bug 原本只能等下次发版；**热更新**把这条例外路径补上：拉远端清单 → 写 `<userData>/builtin-extensions/` 覆盖层 → 路径解析覆盖层优先 → 重启会话即生效。
-- 清单 `resources/extensions/extensions-manifest.json`（schemaVersion / version / bundleSha256 / 每文件 name+sha256+bytes）由 `scripts/generate-extensions-manifest.mjs` 生成并**提交到仓库 main 分支**，`npm run generate:extensions-manifest` 生成、`npm run check:extensions-manifest` 校验，已挂进 `npm run build` / `build:fast`。版本号 `version` 是**包级**版本（`--set-version` bump），**不跟 PiDeck 应用版本走**。
+- 清单 `resources/extensions/extensions-manifest.json`（schemaVersion / version / bundleSha256 / 每文件 name+sha256+bytes）由 `scripts/generate-extensions-manifest.mjs` 生成并**提交到仓库 main 分支**，`npm run generate:extensions-manifest` 生成、`npm run check:extensions-manifest` 校验，已挂进 `npm run build` / `build:fast`。版本号 `version` 是**包级**版本（`--set-version` bump），**不跟 TC-Pi 应用版本走**。
 - **`package.json` 的 `extraResources` filter 必须同时包含 `*.ts` 与 `extensions-manifest.json`**，否则打包版没有清单，扩展页看不到内置版本（漏了就只剩目录扫描兜底）。
 - 更新/检测入口在扩展设置页的「内置扩展」面板（`BuiltInExtensionsUpdatePanel`）+ `extensions:builtin-update-*` 通道；默认源 AtomGit（`api.atomgit.com/api/v5/repos/.../contents/...` 返回 base64，匿名可读），`settings.updateSource=github` 时 GitHub raw 直连优先。分支只接受 main/dev 白名单。
 - **判据是逐文件 sha256，不是版本号**：改了扩展却忘记 bump 版本也必须能检出更新；远端清单里出现**本地不认识的新文件名一律忽略**（注入清单 `BUILT_IN_EXTENSIONS` 编译在应用代码里，热更新不该也无法凭空引入新代码）。
@@ -28,11 +28,11 @@
 - 编辑只改文本：`replaceTextInContent` 保留图片/工具块等其它内容后作为 `replacement.content`（直接把新文本当 content 会把附件整体替掉）。
 - **重发（resend）仍用 `deleted` 墓碑做分支截断**，不用 context_edit：重发是「回到这条消息重来」，必须真的截断后续分支，否则旧回答的 tool_call / toolResult 配对会被保留，重发后报工具调用不匹配。墓碑（`{type:"deleted", id, originalEntryId, parentId, ts, reason?}`）是自造格式，pi 1.0 实测兼容（墓碑不进模型上下文、不抢 leafId、墓碑后 append 正常）；**不要因为「pi 没这个类型」误判要迁移**，pi 升大版本后重跑探针。
 - **追加新条目的 parentId 必须是「当前 leaf」而不是「最后一条 message」**（`currentLeafId`：跳过 session 头、取最后一条带 id 的条目）。编辑/删除会追加 `context_edit` 并成为新 leaf，若新消息挂到更早的 message 上就会绕开它分叉，pi 沿新 leaf 回溯时收集不到该编辑——用户的修改静默失效（2026-10 实测：追加后投影回旧内容）。同理，墓碑也必须带 id+parentId，pi 索引把最后一条带 id 的记录当 leaf。
-- **编辑器写盘的 leaf 语义必须与 pi 一致**：pi `SessionManager._buildIndex` 跳过 `type:"session"`、其余条目（含 `context_edit`、`label`、墓碑）都进索引并更新 leafId；PiDeck 侧的 `activeBranchIds`/`currentLeafId` 必须同口径，否则编辑/删除/追加会落在不同分支上。
+- **编辑器写盘的 leaf 语义必须与 pi 一致**：pi `SessionManager._buildIndex` 跳过 `type:"session"`、其余条目（含 `context_edit`、`label`、墓碑）都进索引并更新 leafId；TC-Pi 侧的 `activeBranchIds`/`currentLeafId` 必须同口径，否则编辑/删除/追加会落在不同分支上。
 - 一次操作追加多条 `context_edit`（删除 assistant 回答时连带 thinking-only / toolResult 祖先）时必须**串成 parent 链**（后一条的 parentId = 前一条的 id）。都挂在同一个 parent 上时后者成侧分支，pi 只沿 leaf 父链收集编辑，前几条会静默失效。
 - 读取侧（`SessionHistoryReader`）把有效编辑汇总成内部 `SessionContextEditsDetail` 后直接作用于消息数组：被移出的条目整条丢弃、被改写的替入新 `text`；`replacement` 形态不认识时按「无编辑」处理（宁可显示原文也不凭空清空上下文）。页面契约不再下发编辑汇总（过滤已在读取侧完成，跨 IPC 再传一遍是重复数据）。按文本定位的回退必须同时匹配原文与有效文本（连续两次编辑时 UI 手里是改写后的文本）。
 - **pi 进程运行中禁止外部改会话文件**：pi 内存 fileEntries 是唯一权威，外部改行被忽略，一旦 pi 全量重写（版本迁移/fork 新文件）外部修改会被覆盖丢失。三道闸（coordinator `requireStoppedForFileMutation` 写前+写后、AgentManager 对 live runtime 二次防御、runtime 通道 `ensureAgentIdle`）不许放宽；写盘期间被重新激活时按「已生效」返回成功并记 warn 日志，不要报 BUSY 引导用户重试（文件已是新内容，重试=二次编辑，2026-10 修复）。
-- 改写入路径后**必须用真实 pi 验收**（本地 pi 的 `loadEntriesFromFile` + `buildSessionProjection`）：断言编辑后模型看到新文本、删除后不出现、原文仍在文件里、继续 append 后编辑仍生效。只跑 PiDeck 自己的读取端会漏掉「leaf 接错导致编辑掉出分支」这类只有 pi 才能发现的失效。
+- 改写入路径后**必须用真实 pi 验收**（本地 pi 的 `loadEntriesFromFile` + `buildSessionProjection`）：断言编辑后模型看到新文本、删除后不出现、原文仍在文件里、继续 append 后编辑仍生效。只跑 TC-Pi 自己的读取端会漏掉「leaf 接错导致编辑掉出分支」这类只有 pi 才能发现的失效。
 - rewind checkpoint：merge 冲突（unmerged index）时真实 index 的 `write-tree` 必败，必须降级为 HEAD 树（`indexTreeDegraded` 标志 + warn 日志）而不是放弃快照（2026-10 事故：冲突期间检查点 3 连败整体不可用）；conversation 回退找不到 fork 锚点必须先于文件回退抛错拒绝，静默跳过会 UI 假成功（2026-10 事故）。
 - 失败日志：`logSessionCommandFailure` 标题带错误码（`(SESSION_RUNTIME_BUSY)` 等），按关键词可搜；不要加「无 debugDetails 就不打日志」类早退。
 
@@ -60,19 +60,19 @@
 - `resources/plugin-dev` 必须在 `extraResources`（filter `*.ts`）里，漏了打包版「复制 demo」直接报错（源缺失显式抛错，不静默）；demo **不在** `BUILT_IN_EXTENSIONS` 白名单（不是 `-e` 注入的内置扩展，是拷给用户的起步文件）。
 - 架构/文件地图/更新步骤详见 `docs/plugin-dev-guide.md`；无热重载（改插件重启会话），这是文档化的有意取舍。
 
-## 宿主插件（userData/host-plugins：独立于 pi 进程的 PiDeck 原生插件）
+## 宿主插件（userData/host-plugins：独立于 pi 进程的 TC-Pi 原生插件）
 
-- **与 pi 扩展是两套系统**：pi 扩展（`resources/extensions/`，`-e` 注入）活在 pi 进程里管 Agent 行为；宿主插件是 PiDeck 自己的插件——面板是渲染层创建的页面内 `<webview>`（partition `host-plugin:<instanceId>`，与内置浏览器同层叠模型，可被弹层正常覆盖），由主进程 `HostPluginViewHost` 签发实例、经窗口 attach 策略（`hostPluginWebviewPolicy`）校验后加载 `userData/host-plugins/<id>/` 资产，不经 pi、不走 pi 的扩展点。代码全部在 `src/main/plugins/`（Broker/Manager/Service/Sessions/Storage/ViewHost + policy/manifest/files/archive/webviewPolicy）。IPC 通道集中在 `shared/ipc.ts` 的 `host-plugins:*` 一组。
+- **与 pi 扩展是两套系统**：pi 扩展（`resources/extensions/`，`-e` 注入）活在 pi 进程里管 Agent 行为；宿主插件是 TC-Pi 自己的插件——面板是渲染层创建的页面内 `<webview>`（partition `host-plugin:<instanceId>`，与内置浏览器同层叠模型，可被弹层正常覆盖），由主进程 `HostPluginViewHost` 签发实例、经窗口 attach 策略（`hostPluginWebviewPolicy`）校验后加载 `userData/host-plugins/<id>/` 资产，不经 pi、不走 pi 的扩展点。代码全部在 `src/main/plugins/`（Broker/Manager/Service/Sessions/Storage/ViewHost + policy/manifest/files/archive/webviewPolicy）。IPC 通道集中在 `shared/ipc.ts` 的 `host-plugins:*` 一组。
 - **授权看内容指纹不看版本**：manifest 权限白名单是注册表式的，插件目录内容 sha256 指纹变化 → 旧授权立即失效需重新授权——这是安全特性，**禁止放宽为版本号比较或沿用旧授权**。storage rename 等敏感操作在 `beforeAttempt` 每次尝试前复查授权。
 - **网络不解除页面沙箱**：`network.https` + `network.httpsOrigins` / `network.local` + `network.localPorts` 经 `HostPluginNetwork` 代发；CSP `connect-src 'none'` 与页面 webRequest 包内资产门禁保持不变。HTTPS 每跳检查精确 origin、DNS 全结果公网且 socket 固定已验证 IP；本地只收 `http://127.0.0.1:<已授权端口>`。授权 UI 必须显示具体目的地并提示「会话读取 + 联网」的数据外发风险。本阶段不执行 BAT/启动服务；Broker 的 binding 撤销必须同步 abort，在 guest 已销毁时 ViewHost 也要 unbind，不能只丢弃迟到结果。守卫：`tests/hostPluginNetwork{,Transport,Ui,Demo}.test.mjs`；可导入示例：`docs/examples/host-plugins/example.network/`。
 - **历史读取有硬预算**：`HostPluginSessions` 单次请求 64MiB/10 万条上限，超限抛 `history-too-large`，不退化为全量扫描；目录索引用 changeSince 签名对比做粒度推送（活跃会话追加报 `{ sessionId }`，目录级变化报 `{ catalogChanged: true }`），面板侧定向失效、epoch 不打断其他在途读取。
 - **`.pideck-plugin` 归档是 NDJSON**（header 行 + 每文件一行 base64+sha256+size）：上限归档 24MiB / 单文件 4MiB / 100 文件 / 展开 16MiB，逐文件 sha256 校验，超限抛稳定错误码。选 NDJSON 而非 zip 是因为 Node 运行时无内置 zip 解压。
-- **主题跟随是全局驱动 + 每实例补充**：`prefers-color-scheme` 由应用既有的 `nativeTheme.themeSource` 驱动（改 PiDeck 主题即生效）；ViewHost 按当前主题对每实例 `insertCSS` 注入 `color-scheme`（适配原生控件/滚动条）。Electron 43 没有 per-contents `setEmulatedMedia`，不要再尝试。
+- **主题跟随是全局驱动 + 每实例补充**：`prefers-color-scheme` 由应用既有的 `nativeTheme.themeSource` 驱动（改 TC-Pi 主题即生效）；ViewHost 按当前主题对每实例 `insertCSS` 注入 `color-scheme`（适配原生控件/滚动条）。Electron 43 没有 per-contents `setEmulatedMedia`，不要再尝试。
 - **参考实现 pi-context 是双向契约**：适配器 `resources/host-plugin-adapters/pi-context/`（bridge/data），转换器对 viewer 的 seam（DOM/字段名）有 fail-closed 契约测试——上游改字段名时测试必须红，红后同步适配器，不许放宽断言。
 - 面向插件作者的文档单一数据源是 `docs/host-plugin-dev-guide.md`（官网指南页从它同步）；`tests/docsSharedGuide.test.mjs` 守卫两处不漂移。改 API 面（新增权限/方法/事件）必须同步四处：`shared/types/hostPlugin.ts` 契约 + `src/preload/hostPlugin.ts` 注入面 + dev-guide 的 API/错误码表 + `tests/hostPlugins.test.mjs`。
 - **脚手架是权限真相的第一个消费者**：设置页「新建插件…」经 `host-plugins:scaffold` → `src/main/plugins/hostPluginScaffold.ts` 生成 `<id>/`（已存在则 `already-exists`，不覆盖作者代码）。生成物必须过与安装路径**同一套** `isHostPluginId`/`parseHostPluginManifest` 自检，且模板只生成已勾选权限对应的代码（manifest 的 `permissions` 与生成代码同一份真相）；改 API/权限面时漏同步它，作者拿到的示例一运行就 `permission-denied`。守卫：`tests/hostPluginScaffold.test.mjs`（含每种权限组合的 `new Function` 语法解析）、`tests/hostPluginDirectoryInstall.test.mjs`（「从文件夹安装…」）。
 - **面板呈现双模式**（manifest `panels[].presentation`，缺省 `modal`）：`modal` 走 `HostPluginPanelHost` 大弹框；`page` 走 `HostPluginPageOverlay`——在 App 会话列外包一层 relative 容器，以 `absolute inset-0` 非模态覆盖层呈现，会话树不卸载（滚动/草稿/终端内存态保留），侧栏 `HostPluginDockButtons` 对 page 面板做开关切换（再点即关）。两者共用 `hostPluginPanelAtom` 同一入口，命令面板/设置页自动兼容。共享的加载/错误面在 `HostPluginSurface.tsx`。侧栏入口/图标/呈现方式的源码契约由 `tests/hostPluginSidebarEntry.test.mjs` 守卫。
-- **主题令牌**：`context.tokens` 把 PiDeck 语义色注入为页面 CSS 变量，`context.changed` 实时更新；converter 适配层把 pi-context 自己的 `:root` 中性色（`--bg/--card/--fg/--muted/--blue` 等）重映射到这些 token（后写覆盖，不改上游文件），图表系列色保留上游色板。新插件页面样式应消费 token 变量带缺省值，硬编码暗色在亮色主题下会露馅。
+- **主题令牌**：`context.tokens` 把 TC-Pi 语义色注入为页面 CSS 变量，`context.changed` 实时更新；converter 适配层把 pi-context 自己的 `:root` 中性色（`--bg/--card/--fg/--muted/--blue` 等）重映射到这些 token（后写覆盖，不改上游文件），图表系列色保留上游色板。新插件页面样式应消费 token 变量带缺省值，硬编码暗色在亮色主题下会露馅。
 
 ## dev 态渲染层缓存（Vite 预构建 chunk 的 immutable 陷阱）
 

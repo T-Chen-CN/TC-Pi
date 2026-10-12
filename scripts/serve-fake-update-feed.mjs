@@ -4,7 +4,7 @@
  *
  * 场景：临时把 package.json 版本改小（如 0.0.1）→ npm run pack → 本脚本起本地 feed，
  * 提供比当前版本大一个 patch 的 latest.yml + 假 setup.exe（真实 sha512、支持 Range 下载），
- * 然后设 PIDEK_UPDATE_FEED_URL + PIDECK_E2E=1 启动 release/win-unpacked/PiDeck.exe 即可触发更新。
+ * 然后设 PIDEK_UPDATE_FEED_URL + PIDECK_E2E=1 启动 release/win-unpacked/TC-Pi.exe 即可触发更新。
  *
  * 用法：
  *   node scripts/serve-fake-update-feed.mjs [--port 18765] [--version 0.0.2] [--launch]
@@ -12,7 +12,7 @@
  * 参数：
  *   --port     监听端口（默认 18765，0 = 随机并打印实际端口）
  *   --version  覆盖 feed 里的"新版本号"；缺省取 package.json 版本的下一个 patch
- *   --launch   自动带环境变量启动 release/win-unpacked/PiDeck.exe（推荐）——
+ *   --launch   自动带环境变量启动 release/win-unpacked/TC-Pi.exe（推荐）——
  *              避免 PowerShell/cmd 里手设环境变量不生效的坑（PowerShell 的
  *              set 只是 Set-Variable 别名，不会传给子进程，导致 updater 报
  *              ENOENT app-update.yml）
@@ -40,12 +40,12 @@ function nextPatchVersion(version) {
 	return `${match[1]}.${match[2]}.${Number.parseInt(match[3], 10) + 1}`;
 }
 const UPDATE_VERSION = argValue("version", nextPatchVersion(packageVersion));
-const UPDATE_FILE = `PiDeck-${UPDATE_VERSION}-setup.exe`;
+const UPDATE_FILE = `TC-Pi-${UPDATE_VERSION}-setup.exe`;
 
 // ---- 假安装包：固定内容 + 真实 sha512 -------------------------------------
 // 内容不必是有效安装器——electron-updater 只校验 sha512 与 size；E2E 验证过
 // 下载到 ready 不需要真实安装器（真正点「重启并安装」才会执行它，冒烟测到 ready 即止）。
-const UPDATE_BYTES = Buffer.from(`PiDeck fake update payload for local smoke test\n${UPDATE_VERSION}\n` + "x".repeat(64 * 1024), "utf8");
+const UPDATE_BYTES = Buffer.from(`TC-Pi fake update payload for local smoke test\n${UPDATE_VERSION}\n` + "x".repeat(64 * 1024), "utf8");
 const UPDATE_SHA512 = createHash("sha512").update(UPDATE_BYTES).digest("base64");
 
 // ---- HTTP server（latest.yml + 带 Range 的安装包下载）---------------------
@@ -114,7 +114,7 @@ server.listen(port, "127.0.0.1", () => {
 	console.log("用法（另开一个终端）：");
 	console.log(`  set PIDEK_UPDATE_FEED_URL=http://127.0.0.1:${actualPort}`);
 	console.log("  set PIDECK_E2E=1");
-	console.log("  release/win-unpacked/PiDeck.exe   ← electron-builder 输出在 release/，不是 out/");
+	console.log("  release/win-unpacked/TC-Pi.exe   ← electron-builder 输出在 release/，不是 out/");
 	console.log("---------------------------------------------------------------");
 	console.log("然后设置页 → 开发设置 → 点「检测更新」，看到 v" + UPDATE_VERSION + " 已下载即可（不要点「重启并安装」，会真执行假安装器）。");
 	console.log("---------------------------------------------------------------");
@@ -126,7 +126,7 @@ server.listen(port, "127.0.0.1", () => {
 	// --launch：spawn 时显式注入 env，绕开 shell 环境变量传递差异（尤其 PowerShell）。
 	// exe 读到 PIDEK_UPDATE_FEED_URL 后走 setFeedURL(generic)，不会再碰 app-update.yml。
 	if (args.includes("--launch")) {
-		const exePath = join(process.cwd(), "release", "win-unpacked", "PiDeck.exe");
+		const exePath = join(process.cwd(), "release", "win-unpacked", "TC-Pi.exe");
 		if (!existsSync(exePath)) {
 			console.error(`[launch] 未找到 ${exePath}，请先 npm run pack`);
 			process.exit(1);

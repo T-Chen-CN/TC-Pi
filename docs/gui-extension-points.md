@@ -11,7 +11,7 @@
 - 42 节点 kind ← `resources/extensions/pi-deck-gui-bridge-types.ts` 的 `UINode` 联合类型
 - pi 原生 API/事件 ← pi 官方 `docs/extensions.md`（升级 pi 时人工核对节选是否有变化）
 
-**安全模型**：插件运行在 pi 的 Node 进程里，拥有用户本人权限；PiDeck 不做进程内沙箱，
+**安全模型**：插件运行在 pi 的 Node 进程里，拥有用户本人权限；TC-Pi 不做进程内沙箱，
 防护靠知情同意。UI 侧的声明式约束（tone 色、节点目录、上限）只保护界面。
 
 ## pi 原生扩展 API（任何宿主可用）

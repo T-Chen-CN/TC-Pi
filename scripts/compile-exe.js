@@ -1,6 +1,6 @@
 /**
  * 本地快速编译为单 exe 文件（便携版）。
- * 跳过 tsc 类型检查，ASAR 不压缩，输出 PiDeck-*-x64.exe 便携单文件。
+ * 跳过 tsc 类型检查，ASAR 不压缩，输出 TC-Pi-*-x64.exe 便携单文件。
  * 用于日常自测，发版请用 npm run dist:win（完整压缩 + 全格式）。
  */
 const { execSync } = require("node:child_process");

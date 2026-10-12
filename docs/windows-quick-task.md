@@ -1,6 +1,6 @@
 # Windows 右键小任务 / Explorer quick tasks
 
-在设置的常用设置中启用「右键发起小任务」。这会为当前 Windows 用户注册独立菜单，不需要管理员权限。原有「用 PiDeck 打开」开关继续控制打开完整项目的菜单。
+在设置的常用设置中启用「右键发起小任务」。这会为当前 Windows 用户注册独立菜单，不需要管理员权限。原有「用 TC-Pi 打开」开关继续控制打开完整项目的菜单。
 
 1. 在桌面空白处、资源管理器空白处或文件夹图标上右键，选择小任务菜单。Windows 11 可能需要先点「显示更多选项」。
 2. 确认小窗口顶部显示的工作目录。未添加过的目录会先询问是否添加为项目。
@@ -33,7 +33,7 @@ npx electron . --quick-task-desktop
 便携版示例（替换应用和项目路径）：
 
 ```powershell
-& 'C:\Apps\PiDeck\PiDeck.exe' --quick-task 'C:\Projects\My Project'
+& 'C:\Apps\PiDeck\TC-Pi.exe' --quick-task 'C:\Projects\My Project'
 ```
 
 在设置中关闭小任务开关可移除三个菜单入口。移动/删除便携版前先关闭入口；在新位置启动后重新启用，更新菜单指向的可执行文件。开发版与打包版共用当前用户菜单键，最后启用的一方拥有菜单入口；不要同时把它们当成两个独立菜单。

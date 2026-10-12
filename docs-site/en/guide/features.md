@@ -1,11 +1,11 @@
 ---
-title: Features | PiDeck pi Agent desktop workbench
-description: "PiDeck features at a glance: multi-project pi Agent workspace, session history and restore, Git integration, built-in terminal and browser, visual config management — the open-source pi desktop client."
+title: Features | TC-Pi pi Agent desktop workbench
+description: "TC-Pi features at a glance: multi-project pi Agent workspace, session history and restore, Git integration, built-in terminal and browser, visual config management — the open-source pi desktop client."
 ---
 
 # Features
 
-PiDeck brings together project management, session management, Git operations, and terminal access in a single desktop application.
+TC-Pi brings together project management, session management, Git operations, and terminal access in a single desktop application.
 
 ## Multi-Project Workspace
 
@@ -13,14 +13,14 @@ Manage multiple local project directories in one window. Add, search, reorder, a
 
 ## Session History & Restore
 
-Never lose context. PiDeck saves every session, including:
+Never lose context. TC-Pi saves every session, including:
 
 - Full conversation history
 - Tool calls and agent responses
 - File changes made during the session
 - Timestamps for every interaction
 
-You can restore any previous session and continue where you left off. PiDeck also supports importing sessions from Claude Code and OpenAI Codex.
+You can restore any previous session and continue where you left off. TC-Pi also supports importing sessions from Claude Code and OpenAI Codex.
 
 ## Git Integration
 
@@ -36,7 +36,7 @@ The built-in Git panel provides a visual interface for common Git operations:
 
 ## File Editor
 
-Edit files without leaving PiDeck:
+Edit files without leaving TC-Pi:
 
 - Up to 5 concurrent file tabs
 - Monaco Editor (same engine as VS Code)
@@ -77,7 +77,7 @@ Visual editors for all settings:
 
 ## Cross-Platform
 
-PiDeck runs on all major platforms:
+TC-Pi runs on all major platforms:
 
 - **Windows** — NSIS installer or portable zip
 - **macOS** — DMG for Apple Silicon and Intel

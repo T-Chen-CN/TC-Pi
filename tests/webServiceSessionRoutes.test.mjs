@@ -978,7 +978,7 @@ test("web service dev mode falls back to the legacy page when dev server is down
 		async ({ baseUrl }) => {
 			const page = await fetch(baseUrl + "/");
 			assert.equal(page.status, 200);
-			assert.match(await page.text(), /PiDeck Web Service/);
+			assert.match(await page.text(), /TC-Pi Web Service/);
 		},
 		{ devRendererUrl: "http://127.0.0.1:1" },
 	);

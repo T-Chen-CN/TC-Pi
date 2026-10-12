@@ -32,7 +32,7 @@ test("dock retains settings updates and theme alongside search and automation", 
 	assert.equal((dockBlock.match(/variant="ghost"/g) ?? []).length, 3);
 	assert.doesNotMatch(dockBlock, /AnnouncementCenter|onOpenFeedback|title=\{themeToggleTitle\}/);
 	const about = readFileSync("src/renderer/src/components/app/AboutPopover.tsx", "utf8");
-	assert.match(about, /WEBSITE_URL = "https:\/\/pideck\.caoayu\.top\/"/);
+	assert.match(about, /WEBSITE_URL\s*=\s*`\$\{APP_PROJECT_URL\}#readme`/);
 	assert.match(about, /label=\{t\("about\.website"\)\}/);
 });
 

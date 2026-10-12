@@ -65,7 +65,7 @@ export function registerHostPluginsIpc(service: HostPluginService, getWindow: ()
 		result(async () => {
 			const window = trustedWindow(event);
 			// 路径只来自主进程对话框，渲染层无法指定任意文件。
-			const picked = await dialog.showOpenDialog(window, { title: "PiDeck host plugin", filters: [{ name: "PiDeck host plugin", extensions: ["pideck-plugin"] }], properties: ["openFile"] });
+			const picked = await dialog.showOpenDialog(window, { title: "TC-Pi host plugin", filters: [{ name: "TC-Pi host plugin", extensions: ["pideck-plugin"] }], properties: ["openFile"] });
 			if (picked.canceled || !picked.filePaths[0]) throw new Error("canceled");
 			return service.manager.installArchive(picked.filePaths[0]);
 		}),
@@ -75,7 +75,7 @@ export function registerHostPluginsIpc(service: HostPluginService, getWindow: ()
 			const window = trustedWindow(event);
 			// 与归档入口分开弹：Windows 上 openFile + openDirectory 同时给会退化成只能选目录，
 			// .pideck-plugin 反而选不到（见 shared/ipc.ts 的 hostPluginsInstallDirectory）。
-			const picked = await dialog.showOpenDialog(window, { title: "PiDeck host plugin folder", properties: ["openDirectory"] });
+			const picked = await dialog.showOpenDialog(window, { title: "TC-Pi host plugin folder", properties: ["openDirectory"] });
 			if (picked.canceled || !picked.filePaths[0]) throw new Error("canceled");
 			return service.manager.installDirectory(picked.filePaths[0]);
 		}),

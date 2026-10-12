@@ -1,12 +1,12 @@
 # GUI 扩展桥（`pi-deck-gui-bridge`）
 
-> 一个 pi 扩展，把 **pi 在 RPC 模式下被丢弃的声明式 UI 扩展点**接回 PiDeck。
+> 一个 pi 扩展，把 **pi 在 RPC 模式下被丢弃的声明式 UI 扩展点**接回 TC-Pi。
 >
 > **写 GUI 扩展 = 用同一套 `ctx.ui` API 写扩展。** 不需要学 React，不需要构建管线。
 > 另有一套 GUI 专属扩展点（`ctx.gui`），写法与 pi 原生扩展点**同形**。
 
 > 📋 **只想查「哪个扩展点能用」** → 看 [扩展点参考](gui-extension-points.md)
-> （权威清单：pi 原生 29 条 + 39 个事件 + PiDeck 专属 14 个落点，含每条的桥接状态与宿主）。
+> （权威清单：pi 原生 29 条 + 39 个事件 + TC-Pi 专属 14 个落点，含每条的桥接状态与宿主）。
 > 本文件讲**怎么用**，那份讲**有什么**。
 
 ---
@@ -24,14 +24,14 @@ pi 以 `--mode rpc` 运行时没有终端，`rpc-mode.js` 里一批 UI 方法被
 
 | 方法 | RPC 下的行为 |
 |---|---|
-| `setStatus` | 只转发 `pideck:auto-title`，其余被 PiDeck 丢弃 |
+| `setStatus` | 只转发 `pideck:auto-title`，其余被 TC-Pi 丢弃 |
 | `setWidget(key, string[])` | ✅ 可用 |
 | `setWidget(key, factory)` | ❌ **工厂形式被丢弃** |
 | `setFooter(factory)` | ❌ 空实现 |
 | `setHeader(factory)` | ❌ 空实现 |
 | `setWorkingMessage` / `setWorkingVisible` / `setWorkingIndicator` | ❌ 空实现 |
 | `setHiddenThinkingLabel` | ❌ 空实现 |
-| `setTitle` | 转发，但 PiDeck 侧无落点 |
+| `setTitle` | 转发，但 TC-Pi 侧无落点 |
 | `setEditorComponent` | ❌ 空实现 |
 | `custom()` | ❌ 返回 `undefined` |
 | `onTerminalInput()` | ❌ 空实现 |
@@ -44,13 +44,13 @@ pi 以 `--mode rpc` 运行时没有终端，`rpc-mode.js` 里一批 UI 方法被
 
 ## 2. 安装
 
-桥是 PiDeck 的**内置扩展**，随应用分发，无需手工安装。
+桥是 TC-Pi 的**内置扩展**，随应用分发，无需手工安装。
 
-它由 PiDeck 在 spawn pi 时通过 `-e` 注入，并注入三个环境变量：
+它由 TC-Pi 在 spawn pi 时通过 `-e` 注入，并注入三个环境变量：
 
 | 环境变量 | 作用 |
 |---|---|
-| `PIDECK_BRIDGE_URL` | PiDeck 监听的桥端点（`http://127.0.0.1:<port>/bridge/<token>`） |
+| `PIDECK_BRIDGE_URL` | TC-Pi 监听的桥端点（`http://127.0.0.1:<port>/bridge/<token>`） |
 | `PIDECK_BRIDGE_TOKEN` | 本次 spawn 独享的令牌（多会话天然隔离） |
 | `PIDECK_BRIDGE_PI_PATH` | pi 安装路径（桥据此定位 pi-tui 路径，作扩展点目录的种子与诊断） |
 
@@ -62,12 +62,12 @@ pi 以 `--mode rpc` 运行时没有终端，`rpc-mode.js` 里一批 UI 方法被
 
 这些**不需要 `ctx.gui`** —— 它们本来就是 pi 的 UI 扩展点，只是以前在 RPC 下是 no-op。
 
-| 位置 | 方法 | 落在 PiDeck 的 |
+| 位置 | 方法 | 落在 TC-Pi 的 |
 |---|---|---|
 | 顶部区 | `ctx.ui.setHeader(factory)` | 聊天区顶部 |
 | 底部状态区 | `ctx.ui.setFooter(factory)` | 底部状态区 |
 | 状态栏条目 | `ctx.ui.setStatus(key, text)` | 状态栏（多 key 共存） |
-| 输入框上方挂件 | `ctx.ui.setWidget(key, factory \| string[], { placement: "aboveEditor" })` | 输入框上方（PiDeck 原生输入框下方区域不挂桥） |
+| 输入框上方挂件 | `ctx.ui.setWidget(key, factory \| string[], { placement: "aboveEditor" })` | 输入框上方（TC-Pi 原生输入框下方区域不挂桥） |
 | 流式状态行 | `ctx.ui.setWorkingMessage` / `setWorkingVisible` / `setWorkingIndicator` | 流式状态行 |
 | 折叠思考块标签 | `ctx.ui.setHiddenThinkingLabel(label)` | 思考块标题 |
 | 会话标题 | `ctx.ui.setTitle(title)` | 会话标签 |
@@ -88,7 +88,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function myExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
-    // 这一行在 TUI 里本来就能工作，在 PiDeck 里以前是 no-op —— 现在两边都能工作
+    // 这一行在 TUI 里本来就能工作，在 TC-Pi 里以前是 no-op —— 现在两边都能工作
     ctx.ui.setHeader((_tui, theme) =>
       new Text(theme.fg("accent", "我的扩展已加载")),
     );
@@ -105,7 +105,7 @@ export default function myExtension(pi: ExtensionAPI): void {
 }
 ```
 
-**这个扩展完全不知道 PiDeck 存在**，但它写的 UI 会出现在 GUI 里。
+**这个扩展完全不知道 TC-Pi 存在**，但它写的 UI 会出现在 GUI 里。
 
 ---
 
@@ -115,7 +115,7 @@ export default function myExtension(pi: ExtensionAPI): void {
 `(…, theme) => Component` 工厂、同样的「传 `undefined` 即恢复默认」、
 同样的「带 `key` 可多贡献共存」。作者不学新概念，只是多了几个可挂的位置。
 
-| 方法 | 落在 PiDeck 的 |
+| 方法 | 落在 TC-Pi 的 |
 |---|---|
 | `ctx.gui.setSidebarPanel(key, factory, opts?)` | 侧边栏面板列表 |
 | `ctx.gui.setSidebarSection(key, factory, opts?)` | 侧边栏内分区 |
@@ -141,15 +141,15 @@ type GuiSlotOptions = { title?: string; order?: number; placement?: "above" | "b
 
 - `factory` 传 `undefined` → 移除该 key，位置**回到原样**（不占位）
 - `opts.order` 缺省 `1000`，升序；同 `order` 按 key 字母序
-- `opts.title` 可选，PiDeck 用它渲染分组标题
+- `opts.title` 可选，TC-Pi 用它渲染分组标题
 
 ### 权力边界：只追加
 
-- 扩展**只能往上面的位置插入内容**，**不能改动、不能顶掉** PiDeck 原有 UI
+- 扩展**只能往上面的位置插入内容**，**不能改动、不能顶掉** TC-Pi 原有 UI
 - 附加型位置（`toolExtra` / `messageExtra` / `thinkingExtra`）的语义是
   「**在默认内容旁边追加**」，**不是**「顶替默认内容」
 - 同 `key` 重复设置 → **后设覆盖**
-- 某位置 PiDeck 尚未实现 → 记为 pending，**不报错**
+- 某位置 TC-Pi 尚未实现 → 记为 pending，**不报错**
 
 ### 落点挂载现状
 
@@ -161,7 +161,7 @@ type GuiSlotOptions = { title?: string; order?: number; placement?: "above" | "b
 | 底部状态区 | `SessionView` → `BridgeSlot(target="footer")` | ✅ |
 | 状态栏条目 | `ComposerArea` → `BridgeStatusBar`（多 key 共存） | ✅ |
 | 输入框上方挂件 | `ComposerArea` → `BridgeWidgetSlot(aboveEditor)` | ✅ |
-| 输入框下方区域 | PiDeck 原生 composer，不挂 GUI 扩展桥 | ⛔ **刻意不接**（避免 TUI 组件树干扰原生布局） |
+| 输入框下方区域 | TC-Pi 原生 composer，不挂 GUI 扩展桥 | ⛔ **刻意不接**（避免 TUI 组件树干扰原生布局） |
 | 流式状态行 | `SessionMessageTimeline` → `BridgeWorkingLine`（旁插在原生指示器之后） | ✅ |
 | 会话标题 | `useBridgeSessionTitle` → `document.title` | ✅ |
 | 折叠思考块标签 | `ThinkingStep` → `ThinkingBlock(hiddenLabel)`，有值时替换折叠行耗时小字 | ✅ |
@@ -172,7 +172,7 @@ type GuiSlotOptions = { title?: string; order?: number; placement?: "above" | "b
 计划 §8.2 把 `editor` 标为「**替换组件**」，桥也确实拦截了它并推了节点树。
 但实测下来**替换会让输入框变成死控件**，因此**刻意不接**：
 
-1. **草稿状态不在 pi 里**。输入内容存在 PiDeck 的 `sessionDraftByIdAtom` /
+1. **草稿状态不在 pi 里**。输入内容存在 TC-Pi 的 `sessionDraftByIdAtom` /
    `sessionDraftBySessionIdAtomFamily`，由 `useSessionComposerController` 持有。
    扩展的编辑器组件活在 **pi 进程**，两者没有共享状态。
 2. **回灌延迟不可接受**。若靠桥把每次按键送回 pi、扩展处理后再推回来，
@@ -186,7 +186,7 @@ type GuiSlotOptions = { title?: string; order?: number; placement?: "above" | "b
 **桥的现有行为**：`setEditorComponent` 仍被拦截（不会让 pi 的 RPC 空实现吞掉调用），
 扩展可以调、桥也照常推节点，只是**宿主不替换输入框** → 表现为「这个点没生效」，**不报错、不影响输入**。
 
-**如果将来要做**：唯一可行的路径是「扩展只提供**样式/工具栏**，草稿仍由 PiDeck 持有」——
+**如果将来要做**：唯一可行的路径是「扩展只提供**样式/工具栏**，草稿仍由 TC-Pi 持有」——
 即把 `setEditorComponent` 降级成 `setComposerToolbar` 那样的附加型语义，
 而不是真的替换。这需要先和计划作者对齐语义，不宜擅自改。
 
@@ -305,8 +305,8 @@ new GuiStack({ direction: "column", gap: 8 }, [
 ```
 
 > **`onPress` 等回调是 pi 进程里的真闭包，不需要序列化。**
-> 桥给每个交互节点分配 `actionId`，只把这个 id 推给 PiDeck；
-> 用户点了 → PiDeck 回传 `actionId` → 桥在进程内调回调。
+> 桥给每个交互节点分配 `actionId`，只把这个 id 推给 TC-Pi；
+> 用户点了 → TC-Pi 回传 `actionId` → 桥在进程内调回调。
 
 ### 选项
 
@@ -362,7 +362,7 @@ interface GuiHandle {
 - `tone`：`default` / `muted` / `accent` / `success` / `warning` / `danger`
 - `variant`：`solid` / `outline` / `ghost`
 
-真实色值由 PiDeck 主题与亮/暗模式决定 → 天然无样式污染，且自动跟随主题。
+真实色值由 TC-Pi 主题与亮/暗模式决定 → 天然无样式污染，且自动跟随主题。
 **指定颜色值会被忽略。**
 
 ---
@@ -421,13 +421,13 @@ const picked = await ctx.gui.custom<number>((gui, theme, kb, done) => {
 |---|---|---|
 | **`ctx.ui.custom()`** | 它画的是 `render(width): string[]`，即**字符行**。观感是终端风，与 GUI 原生风格不合 | 用 **`ctx.gui.custom()`** —— 注册方法同形，画笔换成 GUI 原生控件 |
 | **`ctx.ui.onTerminalInput()`** | 语义是「监听原始终端按键」。GUI 里**没有终端** | 用 GUI 控件自己的交互（`actionId`） |
-| **`ctx.ui.addAutocompleteProvider()`** | GUI 输入框有自己的补全机制。硬接会把 pi-tui 的补全模型塞进 DOM，收益低于成本 | 无（GUI 补全由 PiDeck 提供） |
+| **`ctx.ui.addAutocompleteProvider()`** | GUI 输入框有自己的补全机制。硬接会把 pi-tui 的补全模型塞进 DOM，收益低于成本 | 无（GUI 补全由 TC-Pi 提供） |
 
 ---
 
 ## 9. 事件回灌：扩展的回调怎么被触发
 
-GUI 上的一次点击 → PiDeck 回传事件 → 桥在 pi 进程内调**公开方法** →
+GUI 上的一次点击 → TC-Pi 回传事件 → 桥在 pi 进程内调**公开方法** →
 扩展自己的 `onSelect` / `onSubmit` 回调**原样触发**。扩展作者感觉不到桥在中间。
 
 | GUI 操作 | 桥对组件做的 |
@@ -461,7 +461,7 @@ GUI 上的一次点击 → PiDeck 回传事件 → 桥在 pi 进程内调**公�
 
 桥的任何失败都只表现为「**某个点在 GUI 里没出现**」：
 
-- pi 会话照常，PiDeck 照常
+- pi 会话照常，TC-Pi 照常
 - 未知组件 → 降级为**剥了 ANSI 的等宽文本块**，绝不白屏
 - 任一适配器取不到私有字段 → 该组件降级，不抛错
 - 非法贡献（`key` 为空 / 返回非 `GuiNode` / 节点过深或过多）→ 该贡献隐藏并记日志
@@ -473,13 +473,13 @@ GUI 上的一次点击 → PiDeck 回传事件 → 桥在 pi 进程内调**公�
 
 - 桥注入的所有 GUI 状态**挂在 `runtimeGeneration` 上**，走现有 widgets 同一套重置路径
 - 不写 localStorage、不写配置文件；pi 进程退出后**不留任何磁盘痕迹**
-- 应用重启后所有落点回到 PiDeck 原生形态，**无残留**
+- 应用重启后所有落点回到 TC-Pi 原生形态，**无残留**
 
 ---
 
 ## 13. 排障
 
-桥的日志走 **stderr**（不污染 RPC 的 stdout JSONL），可在 PiDeck 的日志面板看到，
+桥的日志走 **stderr**（不污染 RPC 的 stdout JSONL），可在 TC-Pi 的日志面板看到，
 前缀 `[pi-deck-gui-bridge]`。
 
 常见日志：

@@ -980,7 +980,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 				// 不做无谓重试，把原始错误直接还给用户。
 				const layoutSpecific = failed && (outcome.exitCode === -1 || /EACCES|EPERM|permission denied|ENOENT/i.test(outcome.stderr));
 				if (layoutSpecific && hasPortableNpm) {
-					void appLogger.warn("pi", "Runtime pi system-global install hit a layout failure; falling back to PiDeck prefix", {
+					void appLogger.warn("pi", "Runtime pi system-global install hit a layout failure; falling back to TC-Pi prefix", {
 						exitCode: outcome.exitCode,
 						stderrPreview: outcome.stderr.slice(0, 200),
 					});
@@ -1514,7 +1514,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 			}
 			if (settings.wslEnabled && settings.wslDistro && settings.wslUser && resolveWslEnvironment) {
 				const environment = await resolveWslEnvironment(settings.wslDistro, settings.wslUser, {
-					warn: (msg: string, detail: unknown) => console.warn("[PiDeck] " + String(msg), detail),
+					warn: (msg: string, detail: unknown) => console.warn("[TC-Pi] " + String(msg), detail),
 				});
 				if (configureSessionScannerWsl) await configureSessionScannerWsl(environment);
 				if (configureSkillManagerWsl) configureSkillManagerWsl(environment);

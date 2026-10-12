@@ -9,9 +9,10 @@ import { PiLogoCanvas } from "./PiLogoCanvas";
 import { PiTuiLogoCanvas, useLogoStyle } from "./PiTuiLogo";
 import { Button } from "../ui-shadcn/button";
 import { ChangelogDialog } from "./settings/ChangelogDialog";
+import { APP_PROJECT_URL } from "../../../../shared/appBrand";
 
-/** 官网入口：站点自己的自定义域名（CNAME 即是它），不随仓库 owner / 改名漂移；点击强制系统浏览器打开。 */
-const WEBSITE_URL = "https://pideck.caoayu.top/";
+/** 当前产品主页使用维护仓库的 README，避免将此分支的用户引向上游产品主页。 */
+const WEBSITE_URL = `${APP_PROJECT_URL}#readme`;
 
 interface AboutPopoverProps {
 	/** 应用/pi/pi-ai 版本与时间信息，由 App 从主进程 AppInfo IPC 拉取后传入。 */
@@ -21,7 +22,7 @@ interface AboutPopoverProps {
 }
 
 /**
- * 左上角品牌区「关于」弹框：点击 PiDeck 品牌弹出 MorphPopover，
+ * 左上角品牌区「关于」弹框：点击产品字标弹出 MorphPopover，
  * 展示 Logo、应用版本（等宽小字）、开发分支，以及 pi CLI / pi-ai 目录
  * 版本、Electron/Chromium/Node 栈版本、打包/安装时间与官网/GitHub/发布链接。
  */
@@ -49,17 +50,20 @@ export function AboutPopover(props: AboutPopoverProps) {
 					<div className="flex items-center gap-3">
 						{logoStyle === "pi-tui" ? <PiTuiLogoCanvas size={40} playOnClick /> : <PiLogoCanvas size={40} playOnClick />}
 						<div className="min-w-0 flex-1">
-							<div className="font-[PiDeckDepartureMono] text-lg font-normal uppercase leading-tight tracking-wide text-foreground">PiDeck</div>
+							<div className="whitespace-nowrap font-[PiDeckDepartureMono] text-lg font-normal leading-tight tracking-wide text-foreground">{t("app.brandName")}</div>
 							{/* 版本号用等宽小字：此前是带 ⓘ 图标的胶囊徽标，图标语义与「查看版本信息」
                   重复，胶囊边框在 40px logo 旁显得笨重；改为纯文本与弹框内版本行同源观感 */}
 							<div className="font-mono text-micro leading-tight tabular-nums text-muted-foreground">v{info.version}</div>
 						</div>
-						{info.devBranch && (
-							<AnimatedBadge status="warning" size="sm" bare>
-								{t("about.devBranch")}: {info.devBranch}
-							</AnimatedBadge>
-						)}
 					</div>
+					{/* 分支名单独占一行，避免长分支把产品名称压成两行。 */}
+					{info.devBranch && (
+						<AnimatedBadge status="warning" size="sm" bare className="max-w-full" title={info.devBranch}>
+							<span className="truncate">
+								{t("about.devBranch")}: {info.devBranch}
+							</span>
+						</AnimatedBadge>
+					)}
 
 					<p className="text-xs leading-relaxed text-muted-foreground">{t("about.description")}</p>
 

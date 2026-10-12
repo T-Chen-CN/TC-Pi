@@ -62,7 +62,7 @@ const SAFE_ERROR_MESSAGES = new Set([
 	"Source changed. Please scan again.",
 	"Source changed or is no longer safe. Please scan again.",
 	"MCP definition unavailable.",
-	"PiDeck MCP configuration is invalid; repair it before importing.",
+	"TC-Pi MCP configuration is invalid; repair it before importing.",
 	"MCP config could not be saved.",
 	"Target already contains this MCP server.",
 	"Target already contains this skill.",

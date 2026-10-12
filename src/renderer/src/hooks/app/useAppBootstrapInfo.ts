@@ -36,7 +36,7 @@ export function useAppBootstrapInfo(api: AppInfoApi): { appInfo: AppInfo; system
 			.then((info) => {
 				setAppInfo(info);
 				// 与窗口标题一致：开发态功能分支时文档标题带分支名
-				document.title = info.devBranch ? `PiDeck · ${info.devBranch}` : "PiDeck";
+				document.title = info.devBranch ? `TC-Pi · ${info.devBranch}` : "TC-Pi";
 			})
 			.catch(() => undefined);
 	}, [api]);

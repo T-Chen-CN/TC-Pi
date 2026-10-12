@@ -292,10 +292,10 @@ export class PiProcess extends EventEmitter {
 				noExtensions: Boolean(this.settings?.piRpcNoExtensions),
 			});
 			if (builtInPaths.length > 0 && !this.settings?.piRpcNoExtensions) {
-				void getAppLogger()?.info("pi-process", "Loading PiDeck built-in extensions via -e", {
+				void getAppLogger()?.info("pi-process", "Loading TC-Pi built-in extensions via -e", {
 					extensions: builtInPaths.map((path) => path.split(/[/\\]/).pop()).join(", "),
 				});
-				console.log("[PiProcess] Loading PiDeck built-in extensions via -e:", builtInPaths.map((path) => path.split(/[/\\]/).pop()).join(", "));
+				console.log("[PiProcess] Loading TC-Pi built-in extensions via -e:", builtInPaths.map((path) => path.split(/[/\\]/).pop()).join(", "));
 			}
 
 			// 后续信任标志 / session / WSL 路径改写都基于已含 -e 的参数列表

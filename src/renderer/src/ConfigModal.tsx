@@ -64,7 +64,7 @@ function sectionTabValue(section: ConfigSection, tab: ConfigTab): string {
 }
 
 /** localStorage 键：Pi 管理页上次打开的 tab（重开弹窗时恢复位置，跨应用重启保留）。 */
-const CONFIG_LAST_TAB_KEY = "pideck-config-last-tab";
+const CONFIG_LAST_TAB_KEY = "TC-Pi-config-last-tab";
 
 /** 全部合法 section / config 组子 tab，用于校验持久化值（避免版本更新后残留旧值导致无高亮）。 */
 const CONFIG_SECTIONS: readonly ConfigSection[] = ["config", "security", "skills", "prompts", "extensions", "mcp"];
@@ -1661,7 +1661,7 @@ function ConfigModalContent(props: ConfigModalContentProps) {
 			const a = document.createElement("a");
 			a.href = url;
 			// 文件名含时间戳，便于用户区分多次备份
-			a.download = `pideck-config-${new Date().toISOString().slice(0, 10)}.json`;
+			a.download = `TC-Pi-config-${new Date().toISOString().slice(0, 10)}.json`;
 			a.click();
 			URL.revokeObjectURL(url);
 			showToast(t("config.exported"));

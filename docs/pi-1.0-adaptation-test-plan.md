@@ -15,7 +15,7 @@
 | 项 | 判据 | 证据 |
 |---|---|---|
 | T1 迁移 | `Global resource migration completed {applied:0, unresolved:2}`，状态入库 | `~/.config/PiDeck/logs/app-2026-10-04.log` 20:36:59 / 20:38:38；`~/.config/PiDeck/pi-native-resources.json` 的 `global:settings` + `project:b8b3720b…`。2 条 unresolved = 本机未安装的 `npm:@adrianapan/pikit`、`npm:pi-mcp-adapter`，旧记录按设计保留（没静默丢弃） |
-| T2 启动形态 | 20:36 之后 spawn args 无白名单注入 | 同日志：`--mode rpc --no-themes --offline` + 14 个 PiDeck `-e`；对照 19:00:14 旧构建 args 里仍有 `--no-extensions …` |
+| T2 启动形态 | 20:36 之后 spawn args 无白名单注入 | 同日志：`--mode rpc --no-themes --offline` + 14 个 TC-Pi `-e`；对照 19:00:14 旧构建 args 里仍有 `--no-extensions …` |
 | T3/T4 技能开关 | 关 → `skills:["-<SKILL.md 绝对路径>"]` 且 `skill:image-gen` 离开命令列表；开 → `+` 规则且命令恢复 | 探针输出 + 新会话 `/` 菜单实测一致 |
 | T5 包停用/启用（附带做了） | 关 → `packages` 四类空过滤；开 → 恢复 `{"source":"npm:pi-tracker"}`（不是全部强开） | 日志 `Extension toggled` 20:51:23/26/30；探针里 `analytics`/`budget` 命令随状态同步出现 |
 | T6 pi 内置扩展 | 关 mcp → `-builtin:mcp` 且 `mcp` 命令消失；开 → `+builtin:mcp` 且命令恢复；llama.cpp 同法 | 日志 `pi built-in extension toggled` 20:51:44/46、20:53:11 |
@@ -69,7 +69,7 @@ node -e "const s=require(process.env.HOME+'/.pi/agent/settings.json');console.lo
 ### T2 白名单移除后的启动形态
 | 步骤 | 预期 |
 |---|---|
-| 1. 启动任一会话，观察日志 `spawn等效命令` | **没有** `--no-extensions`/`--no-skills`/`--no-prompt-templates` + 逐条路径的注入；只有 `--mode rpc --no-session --offline --no-themes` + PiDeck 自带扩展的少量 `-e` |
+| 1. 启动任一会话，观察日志 `spawn等效命令` | **没有** `--no-extensions`/`--no-skills`/`--no-prompt-templates` + 逐条路径的注入；只有 `--mode rpc --no-session --offline --no-themes` + TC-Pi 自带扩展的少量 `-e` |
 | 2. 会话内输入 `/` 查看命令列表 | 之前禁用的技能/扩展命令**不再出现**（原生规则生效）；未禁用的全部正常 |
 | 3. 开发设置打开 `piRpcNoExtensions` 重启会话 | 扩展一个都不加载（诊断语义保留），关闭后恢复 |
 
@@ -87,7 +87,7 @@ node -e "const s=require(process.env.HOME+'/.pi/agent/settings.json');console.lo
 | 步骤 | 预期 |
 |---|---|
 | 1. 配置页 → 技能 → 关闭任意技能 | 列表立即显示停用 |
-| 2. `cat ~/.pi/agent/settings.json` | `skills` 数组多了 `-<技能SKILL.md绝对路径>`（**不是**写 PiDeck 私有字段） |
+| 2. `cat ~/.pi/agent/settings.json` | `skills` 数组多了 `-<技能SKILL.md绝对路径>`（**不是**写 TC-Pi 私有字段） |
 | 3. 重启该会话 → `/技能名` | 命令消失 |
 | 4. 重新打开该技能 | `-` 条目换成 `+` 条目；重启后命令恢复 |
 | 5. 提示词页重复 1-4 | `prompts` 数组同样变化，`/模板名` 行为一致 |
@@ -106,7 +106,7 @@ node -e "const s=require(process.env.HOME+'/.pi/agent/settings.json');console.lo
 | 1. 扩展页顶部「pi 内置扩展」区 | mcp / llama.cpp / codemode / tool-search 四行，默认全启用 |
 | 2. 关闭 mcp | `settings.json` 出现 `-builtin:mcp`；重启会话后 MCP 页配的服务器不加载 |
 | 3. 重新打开 | 出现 `+builtin:mcp`；恢复 |
-| 4. （若用 1.0.0）在 TUI 里 `pi config` 关一个内置扩展，回 PiDeck 打开面板 | PiDeck 面板**显示已停用**（读取同一份原生配置，不覆盖 TUI 的选择） |
+| 4. （若用 1.0.0）在 TUI 里 `pi config` 关一个内置扩展，回 TC-Pi 打开面板 | TC-Pi 面板**显示已停用**（读取同一份原生配置，不覆盖 TUI 的选择） |
 
 ### T7 项目作用域
 | 步骤 | 预期 |

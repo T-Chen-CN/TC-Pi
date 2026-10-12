@@ -50,7 +50,7 @@ export function describeSpawnFailure(context: SpawnFailureContext): string | nul
 				context.isWindows ? "（Windows 会把「工作目录无效」误报成 spawn <cmd.exe> ENOENT，真正原因不是 pi 或 cmd.exe 缺失）" : "（进程启动时无法切换到该目录）",
 				`原始错误：${raw}`,
 				"处理：确认项目路径是否被移动/重命名/删除，或磁盘（含网络盘）是否已挂载；",
-				"在 PiDeck 中重新指定该项目的目录后重启会话。",
+				"在 TC-Pi 中重新指定该项目的目录后重启会话。",
 			].join("\n");
 		}
 		if (!context.piCommandExists) {

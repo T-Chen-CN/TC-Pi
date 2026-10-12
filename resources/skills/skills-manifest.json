@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "version": "1.0.0",
-  "bundleSha256": "e1a5d67641e1d6800101464b2b8617af3360fe724b8ac053b8dc8672de74307f",
+  "bundleSha256": "b8b29aea492465583073642b89cfda6d1fc725082bd906dc269a712300d8ba5a",
   "fileCount": 2,
   "files": [
     {
       "name": "mcp-setup/SKILL.md",
-      "sha256": "5e786339e2af6defbcbf7a047e8cee662b88afc25930f46b01e1c1002c102329",
-      "bytes": 4767
+      "sha256": "e49bc9f6a064048b8aead208d4befd524d65f1a68e3008b01eb9ad05965baa09",
+      "bytes": 4763
     },
     {
       "name": "usage-probe/SKILL.md",
-      "sha256": "7a09edba8411783f83ba2c5151f2499d77b74b2b149582fd8a4755440266909b",
-      "bytes": 9170
+      "sha256": "a540bdb1678330832d708491f20f031a8e540dea5bd1f22a5d7c3652877f82b5",
+      "bytes": 9169
     }
   ]
 }

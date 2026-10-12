@@ -1,10 +1,10 @@
 # 当前版本架构
 
-PiDeck 使用 Electron、React、TypeScript 与 Vite。主进程负责窗口、Pi 子进程、文件、Git、终端与设置；渲染层负责工作台界面；preload 暴露最小桌面 API。
+TC-Pi 使用 Electron、React、TypeScript 与 Vite。主进程负责窗口、Pi 子进程、文件、Git、终端与设置；渲染层负责工作台界面；preload 暴露最小桌面 API。
 
 ## Pi 与宿主边界
 
-Pi 负责模型请求、工具调用及会话存储，PiDeck 经 stdio JSON-RPC 管理它。认证使用专用认证子进程；提示词增强使用单条补全侧车；GUI 扩展桥承载声明式 UI 与模型请求快照。它们均有独立的用途和生命周期边界。
+Pi 负责模型请求、工具调用及会话存储，TC-Pi 经 stdio JSON-RPC 管理它。认证使用专用认证子进程；提示词增强使用单条补全侧车；GUI 扩展桥承载声明式 UI 与模型请求快照。它们均有独立的用途和生命周期边界。
 
 会话记录 ID 跨重启稳定，agentId 只表示当前进程。运行时操作与事件绑定 sessionId、agentId 和 runtimeGeneration，拒绝迟到结果。
 

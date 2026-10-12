@@ -374,7 +374,7 @@ export class UpdateService {
 			() => {
 				this.installWatchdog = null;
 				if (!this.isInstallInProgress()) return;
-				this.restoreAfterInstallFailure("The update installer did not start before PiDeck finished waiting to exit.");
+				this.restoreAfterInstallFailure("The update installer did not start before TC-Pi finished waiting to exit.");
 			},
 			Math.max(0, timeoutMs),
 		);

@@ -40,7 +40,7 @@ export function ModelsExportPanel(props: ModelsExportPanelProps) {
 		const blob = new Blob([encoded], { type: "text/plain" });
 		const a = document.createElement("a");
 		a.href = URL.createObjectURL(blob);
-		a.download = `pideck-models-${new Date().toISOString().slice(0, 10)}.txt`;
+		a.download = `TC-Pi-models-${new Date().toISOString().slice(0, 10)}.txt`;
 		a.click();
 		URL.revokeObjectURL(a.href);
 		setNotice(t("config.models.transfer.saved"));

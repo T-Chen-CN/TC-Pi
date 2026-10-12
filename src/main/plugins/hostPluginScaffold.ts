@@ -9,7 +9,7 @@ import type { HostPluginPermission, HostPluginScaffoldInput } from "../../shared
 import { isHostPluginId, isPluginRecord, parseHostPluginManifest } from "./hostPluginManifest";
 import { scaffoldNetworkDemo } from "./hostPluginScaffoldNetwork";
 
-const NOTICE = "由 PiDeck 脚手架生成；改完点「重新扫描」，授权指纹会随之失效，需要重新确认。";
+const NOTICE = "由 TC-Pi 脚手架生成；改完点「重新扫描」，授权指纹会随之失效，需要重新确认。";
 
 /** 面板标题与插件名同源：脚手架只填一个名字，避免表单字段堆成墙。 */
 function manifestJson(input: HostPluginScaffoldInput): string {
@@ -79,7 +79,7 @@ function navigateBlock(permissions: HostPluginPermission[]): { button: string; r
       open.addEventListener("click", () => void reveal(session.id, entry.id));
       article.append(open);
 `,
-		reveal: `/** 让 PiDeck 工作台打开该会话并定位到条目。 */
+		reveal: `/** 让 TC-Pi 工作台打开该会话并定位到条目。 */
 async function reveal(sessionId, entryId) {
   await pideck.workbench.navigate(sessionId, entryId);
 }
@@ -122,8 +122,8 @@ function appJs(input: HostPluginScaffoldInput): string {
 const pideck = window.pideck;
 
 const copy = {
-  "zh-CN": { title: "${input.name}", search: "搜索会话标题…", empty: "当前项目还没有已保存的会话。", more: "加载更多", loading: "读取中…", open: "在 PiDeck 中打开", last: "上次查看", guide: "开发指南", noPermission: "这个示例没有声明 sessions.read：只演示 context（项目/会话/语言/主题）与 storage。" },
-  "en-US": { title: "${input.name}", search: "Search session titles…", empty: "No saved sessions in this project yet.", more: "Load more", loading: "Loading…", open: "Open in PiDeck", last: "Last viewed", guide: "Developer guide", noPermission: "This sample declares no sessions.read: it only demonstrates context (project/session/locale/theme) and storage." },
+  "zh-CN": { title: "${input.name}", search: "搜索会话标题…", empty: "当前项目还没有已保存的会话。", more: "加载更多", loading: "读取中…", open: "在 TC-Pi 中打开", last: "上次查看", guide: "开发指南", noPermission: "这个示例没有声明 sessions.read：只演示 context（项目/会话/语言/主题）与 storage。" },
+  "en-US": { title: "${input.name}", search: "Search session titles…", empty: "No saved sessions in this project yet.", more: "Load more", loading: "Loading…", open: "Open in TC-Pi", last: "Last viewed", guide: "Developer guide", noPermission: "This sample declares no sessions.read: it only demonstrates context (project/session/locale/theme) and storage." },
 };
 
 const nodes = {
@@ -146,7 +146,7 @@ function report(error) {
 function renderContext(context) {
   state.copy = copy[context.locale] || copy["zh-CN"];
   document.documentElement.lang = context.locale;
-  // context.theme 跟随 PiDeck 主题；样式优先消费 tokens 注入的 CSS 变量（见 styles.css）。
+  // context.theme 跟随 TC-Pi 主题；样式优先消费 tokens 注入的 CSS 变量（见 styles.css）。
   document.documentElement.dataset.theme = context.theme;
   nodes.title.textContent = state.copy.title;
   // 没声明 sessions.read 时页面没有搜索框，所以逐个取节点而不是假定存在。
@@ -311,7 +311,7 @@ ${externalLinkBlock(input.permissions)}main().catch(report);
 }
 
 function stylesCss(): string {
-	return `/* PiDeck 会把语义色注入为 CSS 变量（context.tokens）。这里只消费它们并给出兜底值，
+	return `/* TC-Pi 会把语义色注入为 CSS 变量（context.tokens）。这里只消费它们并给出兜底值，
    所以亮色/暗色与主题强调色切换都不需要插件自己判断。 */
 :root {
   color-scheme: dark;
@@ -457,7 +457,7 @@ function readme(input: HostPluginScaffoldInput): string {
 		"",
 		"## 怎么跑起来",
 		"",
-		"1. 这个目录已经**直接在 PiDeck 插件目录里**（设置 → PiDeck 插件 → 打开插件目录 可定位）。",
+		"1. 这个目录已经**直接在 TC-Pi 插件目录里**（设置 → TC-Pi 插件 → 打开插件目录 可定位）。",
 		"2. 回到设置页点「重新扫描」，在列表里点「授权并启用」；面板入口出现在同一行的按钮上。",
 		"3. 改 `app.html` / `app.js` / `styles.css` 后重复第 2 步即可看到效果——指纹会变，所以要重新授权一次。",
 		"",
@@ -468,7 +468,7 @@ function readme(input: HostPluginScaffoldInput): string {
 		"| `pideck-plugin.json` | 清单：id、面板入口、`permissions`（当前：" + permissions + "） |",
 		"| `app.html` | 面板入口页（manifest 的 `contributes.panels[0].entry`） |",
 		"| `app.js` | 面板逻辑：只用 `window.pideck`，无框架、无 CDN、页面不直接联网 |",
-		"| `styles.css` | 消费 PiDeck 主题变量，亮/暗色自动适配 |",
+		"| `styles.css` | 消费 TC-Pi 主题变量，亮/暗色自动适配 |",
 		"",
 		"## 可以用的能力",
 		"",

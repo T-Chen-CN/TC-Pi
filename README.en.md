@@ -1,8 +1,8 @@
-# PiDeck
+# TC-Pi
 
 [简体中文](README.md)
 
-This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). PiDeck is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
+This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). TC-Pi is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
 Maintained at [T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi). Application updates use this repository’s [Releases](https://github.com/T-Chen-CN/TC-Pi/releases).
 
 [![Version](https://img.shields.io/badge/version-0.9.1-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)

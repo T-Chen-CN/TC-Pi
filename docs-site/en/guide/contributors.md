@@ -4,7 +4,7 @@ outline: false
 
 # Contributors
 
-PiDeck is an open-source project and everyone is welcome to contribute.
+TC-Pi is an open-source project and everyone is welcome to contribute.
 
 ## Core Maintainer
 
@@ -36,7 +36,7 @@ PiDeck is an open-source project and everyone is welcome to contribute.
 
 ## How to Contribute
 
-PiDeck welcomes contributions of all kinds:
+TC-Pi welcomes contributions of all kinds:
 
 - **Code** — Bug fixes, features, and improvements
 - **Documentation** — Improvements to this site and guides
@@ -51,4 +51,4 @@ PiDeck welcomes contributions of all kinds:
 3. Make your changes
 4. Submit a Pull Request
 
-Please read the [contributing guidelines](https://github.com/ayuayue/PiDeck/blob/main/CONTRIBUTING.md) before starting.
+Please read the [contributing guidelines](https://github.com/T-Chen-CN/TC-Pi/blob/main/CONTRIBUTING.md) before starting.

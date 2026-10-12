@@ -1,11 +1,11 @@
 {
-  "name": "pi-desktop",
+  "name": "tc-pi",
   "version": "0.9.1",
   "packageManager": "npm@11.6.2",
   "engines": {
     "npm": "^11.6.2"
   },
-  "description": "PiDeck is an open-source desktop workbench to manage multiple pi AI coding agents across local project folders with session history, Git integration, terminal, and config management.",
+  "description": "TC-Pi is an open-source desktop workbench to manage multiple pi AI coding agents across local project folders with session history, Git integration, terminal, and config management.",
   "private": true,
   "license": "MIT",
   "author": {
@@ -115,10 +115,10 @@
   },
   "build": {
     "appId": "com.ayuayue.pi-desktop",
-    "productName": "PiDeck",
+    "productName": "TC-Pi",
     "protocols": [
       {
-        "name": "PiDeck Agent Link",
+        "name": "TC-Pi Agent Link",
         "schemes": [
           "pideck"
         ]

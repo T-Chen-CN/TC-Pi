@@ -2,11 +2,11 @@
 layout: home
 # 首页 title/description：面向「pi desktop / pi 桌面客户端 / AI 编码助手桌面」等核心搜索词，
 # 覆盖全局默认值（VitePress home 布局不会从正文提取描述）。
-title: PiDeck - pi desktop 桌面工作台 | 多项目 pi Agent 客户端
-description: PiDeck 是开源的 pi desktop 桌面工作台（pi 桌面客户端），在统一窗口管理多个 pi AI 编码助手会话、Git、终端与模型配置，支持导入 Codex/Claude 会话，覆盖 Windows、macOS、Linux。
+title: TC-Pi - pi desktop 桌面工作台 | 多项目 pi Agent 客户端
+description: TC-Pi 是开源的 pi desktop 桌面工作台（pi 桌面客户端），在统一窗口管理多个 pi AI 编码助手会话、Git、终端与模型配置，支持导入 Codex/Claude 会话，覆盖 Windows、macOS、Linux。
 
 hero:
-  name: PiDeck
+  name: TC-Pi
   text: 多项目 pi Agent <span class="keep-together">桌面工作台</span>
   tagline: 在统一的桌面工作区中管理本地 pi 编码助手会话、配置、Git 和终端，支持 Windows、macOS、Linux，让本地 AI 编码工作流更稳定高效。
   actions:
@@ -53,12 +53,12 @@ features:
 ---
 
 ::: info
-TC-Pi v0.9.1 是此分支的首个独立发布版本，应用内品牌仍为 PiDeck。下载与更新使用 TC-Pi Releases，功能以 [当前功能手册](/guide/feature-reference) 为准。
+TC-Pi v0.9.1 是此分支的首个独立发布版本，当前应用品牌统一为 TC-Pi。下载与更新使用 TC-Pi Releases，功能以 [当前功能手册](/guide/feature-reference) 为准。
 :::
 
 
 <figure class="home-showcase">
-  <img src="/images/overview.png" alt="PiDeck 工作区与对话界面截图">
+  <img src="/images/overview.png" alt="TC-Pi 工作区与对话界面截图">
   <figcaption>工作区、会话、文件抽屉、Git 分支和工具调用集中在同一个桌面窗口中。</figcaption>
 </figure>
 
@@ -66,7 +66,7 @@ TC-Pi v0.9.1 是此分支的首个独立发布版本，应用内品牌仍为 PiD
 
 ## 面向本地开发的桌面控制台
 
-`PiDeck` 不是 pi 的分支。它是一个轻量 Electron 外壳，通过启动多个 `pi --mode rpc` 进程，把项目管理、会话管理、配置管理和桌面交互整合起来，Agent 能力仍由 pi 原生提供。
+`TC-Pi` 不是 pi 的分支。它是一个轻量 Electron 外壳，通过启动多个 `pi --mode rpc` 进程，把项目管理、会话管理、配置管理和桌面交互整合起来，Agent 能力仍由 pi 原生提供。
 
 <div class="info-strip">
   <div>
@@ -108,34 +108,12 @@ TC-Pi v0.9.1 是此分支的首个独立发布版本，应用内品牌仍为 PiD
   </div>
 </div>
 
-## 社区交流
+## 反馈与交流
 
-加入 PiDeck 社区群进行交流、反馈和讨论：
-
-| 渠道 | 入口 |
-|---|---|
-| **QQ 交流群** | `1026218644`（点右侧按钮复制） <CopyText text="1026218644" /> |
-| **微信群** | 扫描下方二维码（群二维码 7 天有效，过期请加作者微信） |
-| **作者微信** | `caoayu97`（加好友请备注「PiDeck」） <CopyText text="caoayu97" /> |
-
-<p class="community-block">
-  <img class="community-qr" src="/images/wechat-qrcode.png" alt="PiDeck 微信群二维码" />
-</p>
-
----
+请通过 [TC-Pi Issues](https://github.com/T-Chen-CN/TC-Pi/issues) 提交问题或建议。此分支基于 [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck)，保留上游项目与依赖的许可证及作者署名。
 
 ## 下一步
 
 - 想直接使用：前往 [下载安装](/guide/getting-started#下载安装)。
 - 想从源码运行：查看 [快速开始](/guide/getting-started#从源码运行)。
 - 想了解功能边界：查看 [功能介绍](/guide/features)。
-
----
-
-## 赞助
-
-如果 PiDeck 对你有帮助，欢迎请作者喝杯咖啡。微信扫码即可赞赏，感谢支持。
-
-<p class="sponsor-block">
-  <img class="sponsor-qr" src="/images/wechat_pay.png" alt="微信赞赏码" />
-</p>

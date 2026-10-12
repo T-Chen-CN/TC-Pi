@@ -2,7 +2,7 @@
  * 真实 app 端到端检测验证（临时）：对每个更新源（官方 + 3 镜像）启动打包的 win-unpacked app，
  * 检查「首次后台检查」是否成功完成 —— 成功信号：updateLastCheckAt 被写入 userData/settings.json。
  *
- * 依赖：release/win-unpacked/PiDeck.exe（已重打包，含 setFeedUrl feedOverride 保护修复）。
+ * 依赖：release/win-unpacked/TC-Pi.exe（已重打包，含 setFeedUrl feedOverride 保护修复）。
  * 用法：node scripts/app-smoke-update-sources.mjs
  */
 import { spawn, spawnSync } from "node:child_process";
@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const EXE = join("release", "win-unpacked", "PiDeck.exe");
+const EXE = join("release", "win-unpacked", "TC-Pi.exe");
 const SETTINGS = join("settings.json");
 
 const SOURCES = [
@@ -74,7 +74,7 @@ for (const source of SOURCES) {
 	}
 
 	// 杀进程（含子进程树）
-	spawnSync("taskkill", ["/F", "/T", "/IM", "PiDeck.exe"], { stdio: "ignore" });
+	spawnSync("taskkill", ["/F", "/T", "/IM", "TC-Pi.exe"], { stdio: "ignore" });
 	// 隔离 userData 清理（保留日志供排查会占用磁盘；直接删干净）
 	spawnSync("powershell", ["-NoProfile", "-Command", `Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '${userDataDir}'`], { stdio: "ignore" });
 	await new Promise((r) => setTimeout(r, 2000));

@@ -1,19 +1,19 @@
 ---
-title: FAQ | PiDeck pi desktop workbench
-description: "Frequently asked questions about PiDeck (pi desktop): installation issues, pi not detected, session restore failures, model config errors, proxy setup, and their fixes."
+title: FAQ | TC-Pi pi desktop workbench
+description: "Frequently asked questions about TC-Pi (pi desktop): installation issues, pi not detected, session restore failures, model config errors, proxy setup, and their fixes."
 ---
 
 # Frequently Asked Questions
 
 ## General
 
-### What is PiDeck?
+### What is TC-Pi?
 
-PiDeck is an open-source desktop workbench for managing multiple pi AI coding agents across local project folders. It provides a unified interface for sessions, Git, terminal, and configuration management.
+TC-Pi is an open-source desktop workbench for managing multiple pi AI coding agents across local project folders. It provides a unified interface for sessions, Git, terminal, and configuration management.
 
-### Is PiDeck a fork of pi?
+### Is TC-Pi a fork of pi?
 
-No. PiDeck is a lightweight Electron shell that launches `pi --mode rpc` processes. The agent capabilities are provided by pi itself — PiDeck manages the project and session layer on top.
+No. TC-Pi is a lightweight Electron shell that launches `pi --mode rpc` processes. The agent capabilities are provided by pi itself — TC-Pi manages the project and session layer on top.
 
 ### Which platforms are supported?
 
@@ -31,7 +31,7 @@ Open the session timeline from the toolbar. You can browse past conversations by
 
 ### Can I import sessions from other tools?
 
-Yes. PiDeck supports importing sessions from Claude Code and OpenAI Codex.
+Yes. TC-Pi supports importing sessions from Claude Code and OpenAI Codex.
 
 ### How does the session reference (&) work?
 
@@ -43,17 +43,17 @@ Type `&` in the composer to search and reference past sessions from the same pro
 
 Node.js 20 or higher is required to run from source.
 
-### Can I use PiDeck with self-hosted models?
+### Can I use TC-Pi with self-hosted models?
 
 Yes. In the Models settings, you can configure custom API endpoints for any compatible provider.
 
-### Does PiDeck collect telemetry?
+### Does TC-Pi collect telemetry?
 
-No. PiDeck does not collect any usage data or telemetry. All data stays on your machine.
+No. TC-Pi does not collect any usage data or telemetry. All data stays on your machine.
 
-### How do I update PiDeck?
+### How do I update TC-Pi?
 
-When a new version is released on GitHub, PiDeck will show an in-app notification. You can download the latest version from the notification or from the GitHub Releases page.
+When a new version is released on GitHub, TC-Pi will show an in-app notification. You can download the latest version from the notification or from the GitHub Releases page.
 
 ## Troubleshooting
 
@@ -69,7 +69,7 @@ Make sure you have initialized a Git repository in your project folder. If the p
 
 ### Terminal is not working
 
-PiDeck tries PowerShell, cmd, and sh in order. If none are available, the terminal will show an error. Install a supported shell and restart PiDeck.
+TC-Pi tries PowerShell, cmd, and sh in order. If none are available, the terminal will show an error. Install a supported shell and restart TC-Pi.
 
 ### The app won't start
 
@@ -80,5 +80,5 @@ PiDeck tries PowerShell, cmd, and sh in order. If none are available, the termin
 ### Still stuck?
 
 - Check the [Troubleshooting guide](/en/guide/troubleshooting) for symptom-based paths
-- Browse [GitHub Issues](https://github.com/ayuayue/PiDeck/issues)
+- Browse [GitHub Issues](https://github.com/T-Chen-CN/TC-Pi/issues)
 - Join the **QQ group: 1026218644**, or add the author's **WeChat: caoayu97** to be added to the WeChat group

@@ -388,7 +388,7 @@ export class BuiltInExtensionsUpdater {
 			const response = await this.fetchImpl(url, {
 				signal: controller.signal,
 				redirect: "follow",
-				headers: { "user-agent": "PiDeck-extensions-updater" },
+				headers: { "user-agent": "TC-Pi-extensions-updater" },
 			});
 			if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 			return await this.readBodyWithCap(response, maxBytes, controller, url);

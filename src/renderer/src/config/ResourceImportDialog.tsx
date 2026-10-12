@@ -11,7 +11,7 @@ function formatImportMessage(message: string): string {
 	const unsupported = /^Unsupported transport:\s*(.+)$/.exec(message);
 	if (unsupported) return t("config.import.blockerUnsupportedTransport", { transport: unsupported[1] });
 	if (message === "Exactly one transport is required.") return t("config.import.blockerTransportRequired");
-	if (message === "MCP name is invalid for PiDeck.") return t("config.import.blockerInvalidName");
+	if (message === "MCP name is invalid for TC-Pi.") return t("config.import.blockerInvalidName");
 	if (message === "Converted MCP definition is invalid.") return t("config.import.blockerInvalidDefinition");
 	if (message === "Skill name cannot be converted to a safe name.") return t("config.import.blockerSkillName");
 	if (message === "MCP server definition must be an object.") return t("config.import.blockerDefinitionObject");
@@ -32,7 +32,7 @@ function formatImportMessage(message: string): string {
 	if (message === "Target already contains this resource." || message === "Target already contains this MCP server." || message === "Target already contains this skill.") return t("config.import.conflict");
 	if (message === "Resource cannot be imported.") return t("config.import.itemNotImportable");
 	if (message === "MCP definition unavailable.") return t("config.import.itemNotImportable");
-	if (message === "PiDeck MCP configuration is invalid; repair it before importing." || message === "MCP config could not be saved.") return t("config.import.mcpTargetInvalid");
+	if (message === "TC-Pi MCP configuration is invalid; repair it before importing." || message === "MCP config could not be saved.") return t("config.import.mcpTargetInvalid");
 	if (message === "Skill target is unavailable.") return t("config.import.skillTargetInvalid");
 	if (message === "Some skill entries were skipped because they are unsafe.") return t("config.import.warningSkillUnsafeEntries");
 	if (message === "Skill source is not a safe directory.") return t("config.import.warningSkillSymlink");

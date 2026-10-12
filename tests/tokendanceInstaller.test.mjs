@@ -72,7 +72,7 @@ test("一键安装：pi models.json 写入 provider（baseUrl/归因头/模型�
 	assert.equal(provider.baseUrl, "https://tokendance.space/gateway/v1");
 	assert.equal(provider.api, "openai-completions");
 	// 请求维度归因：X-App-URL 覆盖 Key 上的 app_url
-	assert.equal(provider.headers["X-App-URL"], "https://pideck.caoayu.top/");
+	assert.equal(provider.headers["X-App-URL"], "https://github.com/T-Chen-CN/TC-Pi");
 	assert.equal(provider.models.length, 2);
 	// 保存顺序与模型下拉列表一致（按名称/id 正序）：deepseek-v4-flash 排在 glm-4.7 之前
 	assert.deepEqual(

@@ -14,13 +14,13 @@ export function isSupportedBackend(backend: unknown): boolean {
 }
 
 export function requireSupportedBackend(backend: unknown): void {
-	if (!isSupportedBackend(backend)) throw new Error("This PiDeck distribution only supports the pi backend.");
+	if (!isSupportedBackend(backend)) throw new Error("This TC-Pi distribution only supports the pi backend.");
 }
 
 /** Historic runtime flags are readable metadata, never a way to restart removed chat modes. */
 export function requireSupportedSessionRuntime(input: { backend?: unknown; noSession?: unknown }): void {
 	requireSupportedBackend(input.backend);
-	if (input.noSession === true) throw new Error("Anonymous chats are not supported in this PiDeck distribution.");
+	if (input.noSession === true) throw new Error("Anonymous chats are not supported in this TC-Pi distribution.");
 }
 
 /** Old default preferences may fall back to pi; existing session identities never do. */

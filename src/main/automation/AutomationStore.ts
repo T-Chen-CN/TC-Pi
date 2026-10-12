@@ -79,7 +79,7 @@ export class AutomationStore {
 			run.endedAt = endedAt;
 			run.durationMs = run.startedAt ? Math.max(0, endedAt - run.startedAt) : undefined;
 			run.updatedAt = endedAt;
-			run.error = "PiDeck stopped before this automation run completed";
+			run.error = "TC-Pi stopped before this automation run completed";
 			run.events = appendRunEvent(run.events, "interrupted", endedAt, run.error);
 			shouldPersist = true;
 		}

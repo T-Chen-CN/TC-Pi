@@ -11,16 +11,16 @@ const { buildDevConfig, DEV_OVERRIDES } = await import("../scripts/dist-dev.js")
 
 test("身份四件套覆盖：productName/appId/协议 scheme 与 stable 区分", () => {
 	const config = buildDevConfig();
-	assert.equal(config.productName, "PiDeck Dev");
+	assert.equal(config.productName, "TC-Pi Dev");
 	assert.equal(config.appId, "com.ayuayue.pi-desktop-dev");
-	assert.deepEqual(config.protocols, [{ name: "PiDeck Dev Agent Link", schemes: ["pideck-dev"] }]);
+	assert.deepEqual(config.protocols, [{ name: "TC-Pi Dev Agent Link", schemes: ["pideck-dev"] }]);
 });
 
-test("三平台 artifactName 含 PiDeck-Dev 前缀、无空格、mac/linux 显式含 ${arch}", () => {
+test("三平台 artifactName 含 TC-Pi-Dev 前缀、无空格、mac/linux 显式含 ${arch}", () => {
 	const config = buildDevConfig();
 	const names = [config.win.artifactName, config.nsis.artifactName, config.portable.artifactName, config.mac.artifactName, config.linux.artifactName];
 	for (const name of names) {
-		assert.ok(name.startsWith("PiDeck-Dev-"), name);
+		assert.ok(name.startsWith("TC-Pi-Dev-"), name);
 		assert.ok(!name.includes(" "), name);
 	}
 	assert.ok(config.mac.artifactName.includes("${arch}"));

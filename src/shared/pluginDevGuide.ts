@@ -48,14 +48,14 @@ type Dict = {
 };
 
 const ZH: Dict = {
-	title: "PiDeck 插件开发指南（AI 编写插件用）",
+	title: "TC-Pi 插件开发指南（AI 编写插件用）",
 	whatIsHeading: "一、插件是什么",
-	whatIs: ["PiDeck 的插件 = **pi 扩展**：一个 TypeScript 文件（pi 用 jiti 直接加载，无需编译打包），运行在 pi 进程里。", "它能用 pi 的全部原生扩展点（命令、工具、事件、模型供应商…），再通过 GUI 桥把声明式 UI 渲染进 PiDeck 界面。", "本文件是完整规格说明——把它作为提示词交给任意 AI，即可让它按规范写出能直接运行的插件。"],
+	whatIs: ["TC-Pi 的插件 = **pi 扩展**：一个 TypeScript 文件（pi 用 jiti 直接加载，无需编译打包），运行在 pi 进程里。", "它能用 pi 的全部原生扩展点（命令、工具、事件、模型供应商…），再通过 GUI 桥把声明式 UI 渲染进 TC-Pi 界面。", "本文件是完整规格说明——把它作为提示词交给任意 AI，即可让它按规范写出能直接运行的插件。"],
 	installHeading: "二、放哪里、怎么生效",
-	install: ["- 用户级（所有项目生效）：把 `.ts` 文件放进 `{USER_DIR}`（不存在就创建）", "- 项目级（仅当前项目）：放进 `{PROJECT_DIR}`", "- 生效方式：**重启会话**（PiDeck 会话工具栏的重启按钮）。设置 → 扩展页可启用/禁用单个扩展", "- 多文件插件：用子目录 + `index.ts` 入口；npm 依赖写在旁边的 package.json 里"],
+	install: ["- 用户级（所有项目生效）：把 `.ts` 文件放进 `{USER_DIR}`（不存在就创建）", "- 项目级（仅当前项目）：放进 `{PROJECT_DIR}`", "- 生效方式：**重启会话**（TC-Pi 会话工具栏的重启按钮）。设置 → 扩展页可启用/禁用单个扩展", "- 多文件插件：用子目录 + `index.ts` 入口；npm 依赖写在旁边的 package.json 里"],
 	quickstartHeading: "三、三分钟起步（复制 demo 改）",
 	quickstart: [
-		"1. 把应用内置的 `{DEMO}` 复制到上述目录（PiDeck 设置 → 扩展 → 插件开发 → 「复制 demo 插件」）",
+		"1. 把应用内置的 `{DEMO}` 复制到上述目录（TC-Pi 设置 → 扩展 → 插件开发 → 「复制 demo 插件」）",
 		"2. 重启会话：侧栏出现「Demo 统计」面板（含 Hello/选文件/打开按钮），`/demo` 命令可执行；demo 刻意只占侧栏一个落点，不碰输入区等共享位置",
 		"3. demo 演示了全部三层能力：命令注册、事件统计、GUI 落点与宿主服务——照着改就是你的插件",
 	],
@@ -63,7 +63,7 @@ const ZH: Dict = {
 	piApiLead: "默认导出一个工厂函数，收到 `pi: ExtensionAPI`：",
 	eventsHeading: "常用事件（pi.on）",
 	eventsLead: "handler 签名 `(event, ctx) => void | 效果`；完整 39 个事件见 pi 官方 docs/extensions.md。",
-	guiHeading: "五、PiDeck 专属：ctx.ui.gui（GUI 落点）",
+	guiHeading: "五、TC-Pi 专属：ctx.ui.gui（GUI 落点）",
 	guiLead: [
 		"入口：事件回调的 `ctx.ui.gui`（桥挂载后所有事件里可靠可用；纯终端宿主为 `undefined`，**用前必须判空**）。",
 		"统一签名：`set*(key, factory | undefined, options?)`，`factory: (gui, theme, ctx) => GuiComponent | GuiNode`；传 `undefined` 清除落点。",
@@ -76,9 +76,9 @@ const ZH: Dict = {
 	constraintsHeading: "七、硬约束（违反 = 内容被隐藏/降级，不报错）",
 	constraintsLead: "排查「为什么我的 UI 没出现」先对照这张表：",
 	securityHeading: "八、安全模型（必读）",
-	security: ["- 插件运行在 pi 的 Node 进程里，**拥有用户本人的全部权限**（文件、网络、子进程）。", "- PiDeck 不做进程内沙箱；防护靠知情同意——只安装信任来源的插件。", "- UI 侧的声明式约束（tone 色、节点目录、上限）只保护界面，不限制插件代码本身。"],
+	security: ["- 插件运行在 pi 的 Node 进程里，**拥有用户本人的全部权限**（文件、网络、子进程）。", "- TC-Pi 不做进程内沙箱；防护靠知情同意——只安装信任来源的插件。", "- UI 侧的声明式约束（tone 色、节点目录、上限）只保护界面，不限制插件代码本身。"],
 	debugHeading: "九、调试",
-	debug: ["- 桥日志走 pi 进程 stderr（`[pi-deck-gui-bridge]` 前缀，落 PiDeck 日志）：贡献被隐藏的原因都在里面", "- 改完插件 → 重启会话（当前无热重载）", "- 落点贡献被隐藏的常见原因：返回了 React 元素 / 节点超 2000 / factory 抛错 / tone 拼写错"],
+	debug: ["- 桥日志走 pi 进程 stderr（`[pi-deck-gui-bridge]` 前缀，落 TC-Pi 日志）：贡献被隐藏的原因都在里面", "- 改完插件 → 重启会话（当前无热重载）", "- 落点贡献被隐藏的常见原因：返回了 React 元素 / 节点超 2000 / factory 抛错 / tone 拼写错"],
 	forAiHeading: "十、写给 AI 的实现要求",
 	forAi: [
 		"1. 产出单文件 TypeScript（默认导出工厂函数），只用上表列出的 API 与节点 kind",
@@ -100,11 +100,11 @@ const ZH: Dict = {
 };
 
 const EN: Dict = {
-	title: "PiDeck Plugin Development Guide (for AI-assisted authoring)",
+	title: "TC-Pi Plugin Development Guide (for AI-assisted authoring)",
 	whatIsHeading: "1. What a plugin is",
 	whatIs: [
-		"A PiDeck plugin = **a pi extension**: one TypeScript file (loaded by pi via jiti — no build step) running inside the pi process.",
-		"It can use every native pi extension point (commands, tools, events, providers…), and renders declarative UI into PiDeck through the GUI bridge.",
+		"A TC-Pi plugin = **a pi extension**: one TypeScript file (loaded by pi via jiti — no build step) running inside the pi process.",
+		"It can use every native pi extension point (commands, tools, events, providers…), and renders declarative UI into TC-Pi through the GUI bridge.",
 		"This file is the full spec — hand it to any AI as a prompt and it can write a working plugin.",
 	],
 	installHeading: "2. Where it goes and how it activates",
@@ -116,7 +116,7 @@ const EN: Dict = {
 	],
 	quickstartHeading: "3. Three-minute quickstart (copy the demo)",
 	quickstart: [
-		"1. Copy the bundled `{DEMO}` into the directory above (PiDeck → Settings → Extensions → Plugin development → “Copy demo plugin”)",
+		"1. Copy the bundled `{DEMO}` into the directory above (TC-Pi → Settings → Extensions → Plugin development → “Copy demo plugin”)",
 		"2. Restart the session: a “Demo stats” panel appears in the sidebar (with Hello / pick-file / open buttons) and `/demo` runs. The demo deliberately occupies only the sidebar slot — it never touches the composer or other shared areas",
 		"3. The demo exercises all three layers — command, event stats, GUI slots — copy and modify it",
 	],
@@ -124,7 +124,7 @@ const EN: Dict = {
 	piApiLead: "Default-export a factory that receives `pi: ExtensionAPI`:",
 	eventsHeading: "Common events (pi.on)",
 	eventsLead: "Handler signature: `(event, ctx) => void | effect`. See pi's official docs/extensions.md for all 39 events.",
-	guiHeading: "5. PiDeck-specific: ctx.ui.gui (GUI slots)",
+	guiHeading: "5. TC-Pi-specific: ctx.ui.gui (GUI slots)",
 	guiLead: [
 		"Entry: `ctx.ui.gui` inside event handlers (reliable on every event once the bridge mounts; `undefined` in a plain terminal — **always guard**).",
 		"Uniform signature: `set*(key, factory | undefined, options?)`, `factory: (gui, theme, ctx) => GuiComponent | GuiNode`; pass `undefined` to clear.",
@@ -139,11 +139,11 @@ const EN: Dict = {
 	securityHeading: "8. Security model (read this)",
 	security: [
 		"- Plugins run inside pi's Node process with **the user's full permissions** (files, network, subprocesses).",
-		"- PiDeck has no in-process sandbox; protection is informed consent — install only plugins from sources you trust.",
+		"- TC-Pi has no in-process sandbox; protection is informed consent — install only plugins from sources you trust.",
 		"- The declarative UI constraints (tone colors, node catalog, caps) protect the interface only, not plugin code.",
 	],
 	debugHeading: "9. Debugging",
-	debug: ["- Bridge logs go to pi's stderr (`[pi-deck-gui-bridge]` prefix, visible in PiDeck logs): hidden-contribution reasons appear there", "- Edit → restart the session (no hot reload yet)", "- Common hidden-contribution causes: returned a React element / nodes over 2000 / factory threw / tone typo"],
+	debug: ["- Bridge logs go to pi's stderr (`[pi-deck-gui-bridge]` prefix, visible in TC-Pi logs): hidden-contribution reasons appear there", "- Edit → restart the session (no hot reload yet)", "- Common hidden-contribution causes: returned a React element / nodes over 2000 / factory threw / tone typo"],
 	forAiHeading: "10. Implementation requirements for the AI",
 	forAi: [
 		"1. Produce a single TypeScript file (default-export factory) using only the APIs and node kinds listed above",
@@ -191,7 +191,7 @@ export function buildPluginDevGuideMarkdown(locale: GuideLocale, paths: PluginDe
 	return [
 		`# ${dict.title}`,
 		"",
-		`> ${locale === "zh-CN" ? "生成时间无关的规格文档；能力清单与 PiDeck 内部实现由契约测试保证同步。" : "A spec document; the capability catalog is kept in sync with PiDeck internals by contract tests."}`,
+		`> ${locale === "zh-CN" ? "生成时间无关的规格文档；能力清单与 TC-Pi 内部实现由契约测试保证同步。" : "A spec document; the capability catalog is kept in sync with TC-Pi internals by contract tests."}`,
 		"",
 		`## ${dict.whatIsHeading}`,
 		"",

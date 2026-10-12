@@ -1,3 +1,5 @@
+import { t } from "../../i18n";
+import { getWordmarkGlyph } from "./wordmarkGlyphs";
 import { useCallback, useEffect, useRef } from "react";
 
 /**
@@ -512,68 +514,7 @@ export function PiLogoCanvas(props: PiLogoCanvasProps) {
 	);
 }
 
-// ── 右侧「PiDeck」字标：与 logo 同一套 canvas 方块绘制 ──────────────
-
-/**
- * 5×7 点阵（i 为 3×7）。笔画加粗：竖干双列 / 横画更满，小字号下仍够「重」。
- */
-const WORDMARK_GLYPHS: Record<string, number[][]> = {
-	P: [
-		[1, 1, 1, 1, 0],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 1],
-		[1, 1, 1, 1, 0],
-		[1, 1, 0, 0, 0],
-		[1, 1, 0, 0, 0],
-		[1, 1, 0, 0, 0],
-	],
-	i: [
-		[1, 1, 0],
-		[0, 0, 0],
-		[1, 1, 0],
-		[1, 1, 0],
-		[1, 1, 0],
-		[1, 1, 0],
-		[1, 1, 1],
-	],
-	D: [
-		[1, 1, 1, 1, 0],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 1],
-		[1, 1, 1, 1, 0],
-	],
-	e: [
-		[0, 0, 0, 0, 0],
-		[0, 1, 1, 1, 0],
-		[1, 1, 0, 0, 1],
-		[1, 1, 1, 1, 1],
-		[1, 1, 0, 0, 0],
-		[1, 1, 0, 0, 1],
-		[0, 1, 1, 1, 0],
-	],
-	c: [
-		[0, 0, 0, 0, 0],
-		[0, 1, 1, 1, 0],
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 0, 0],
-		[1, 1, 0, 0, 0],
-		[1, 1, 0, 0, 1],
-		[0, 1, 1, 1, 0],
-	],
-	k: [
-		[1, 1, 0, 0, 1],
-		[1, 1, 0, 1, 0],
-		[1, 1, 1, 0, 0],
-		[1, 1, 0, 0, 0],
-		[1, 1, 1, 0, 0],
-		[1, 1, 0, 1, 0],
-		[1, 1, 0, 0, 1],
-	],
-};
-
+// ── 右侧产品字标：沿用 logo 的绘制风格，字形表在 wordmarkGlyphs.ts 维护 ──
 const WORDMARK_ROWS = 7;
 const WORDMARK_GAP = 1;
 
@@ -583,7 +524,7 @@ function buildWordmarkCells(text: string): { cells: Cells; cols: number; rows: n
 	const color = wordmarkColor();
 
 	for (const ch of text) {
-		const glyph = WORDMARK_GLYPHS[ch];
+		const glyph = getWordmarkGlyph(ch);
 		if (!glyph) {
 			cursorX += 3 + WORDMARK_GAP;
 			continue;
@@ -656,12 +597,12 @@ export type PiDeckWordmarkCanvasProps = {
 };
 
 /**
- * 右侧 PiDeck 字标：与左侧 logo 同一套 bevel 方块 canvas 绘制。
+ * 右侧产品字标：与左侧 logo 同一套 bevel 方块 canvas 绘制。
  * 主题切换时自动重绘 ink/white。
  */
 export function PiDeckWordmarkCanvas(props: PiDeckWordmarkCanvasProps) {
 	const cellSize = props.cellSize ?? 5;
-	const text = props.text ?? "PiDeck";
+	const text = props.text ?? t("app.brandName");
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
 	const paint = useCallback(() => {

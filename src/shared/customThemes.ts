@@ -339,7 +339,7 @@ export const DEMO_CUSTOM_THEME: CustomThemePackage = {
 	id: "berry-night-demo",
 	name: "莓果夜色（示例）",
 	version: "1.0.0",
-	author: "PiDeck",
+	author: "TC-Pi",
 	description: "内置示例：暖莓色双档主题，复制为新主题后可自由修改。",
 	appearance: {
 		light: {

@@ -50,7 +50,7 @@ export function ImageActionButtons(props: { image: ImageContent | null | undefin
 			const link = document.createElement("a");
 			link.href = dataUrl;
 			const ext = imageDownloadExt(props.image?.mimeType ?? "");
-			link.download = `pideck-image-${Date.now()}.${ext}`;
+			link.download = `TC-Pi-image-${Date.now()}.${ext}`;
 			link.click();
 		});
 	};

@@ -124,7 +124,7 @@ test("sidebar brand reserves vertical space for the wordmark and branch", () => 
 	// 两行品牌在左栏局部留白，不扩大整页的窗口控制栏。
 	assert.match(brand, /PiLogoCanvas size=\{18\}/);
 	assert.match(brand, /brand-wordmark/);
-	assert.match(brand, /PiDeck · \$\{branch\}/);
+	assert.match(brand, /\$\{t\("app\.brandName"\)\}\s*·\s*\$\{branch\}/);
 	assert.match(sidebar, /list-toolbar\s+flex\s+h-14\b/);
 	assert.match(sidebar, /list-toolbar[^"\n]*\bpy-2\b/);
 	assert.doesNotMatch(sidebar, /list-toggle-native floating/);

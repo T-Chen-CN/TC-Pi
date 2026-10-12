@@ -537,7 +537,7 @@ export class BuiltinContentUpdater {
 			const response = await this.fetchImpl(url, {
 				signal: controller.signal,
 				redirect: "follow",
-				headers: { "user-agent": "PiDeck-content-updater" },
+				headers: { "user-agent": "TC-Pi-content-updater" },
 			});
 			if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 			const buffer = Buffer.from(await response.arrayBuffer());

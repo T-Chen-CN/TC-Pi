@@ -99,7 +99,7 @@ export type EnhancePromptServiceOptions = {
 const LAUNCH_FAILURE_HINT: Record<PiAuthHostLaunchFailureReason, string> = {
 	wsl: "pi 运行在 WSL 中，提示词增强暂不可用。",
 	"no-pi-entry": "找不到 pi 可加载的 JS 入口（可能是编译版单文件 pi），提示词增强暂不可用。",
-	"helper-missing": "应用缺少增强助手文件 resources/pi-enhance-host.mjs，请重新安装或更新 PiDeck。",
+	"helper-missing": "应用缺少增强助手文件 resources/pi-enhance-host.mjs，请重新安装或更新 TC-Pi。",
 };
 
 /** 本地结算时各错误分类的默认详情；不覆盖助手/调用方给出的具体原因。 */

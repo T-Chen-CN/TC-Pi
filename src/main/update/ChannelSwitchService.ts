@@ -79,7 +79,7 @@ export class ChannelSwitchService {
 		this.push({ phase: "querying" });
 		try {
 			const response = await this.deps.netFetch(GITHUB_RELEASES_API, {
-				headers: { "User-Agent": "PiDeck-ChannelSwitchService", Accept: "application/vnd.github+json" },
+				headers: { "User-Agent": "TC-Pi-ChannelSwitchService", Accept: "application/vnd.github+json" },
 			});
 			if (!response.ok) {
 				throw new Error(`GitHub releases API ${response.status}`);

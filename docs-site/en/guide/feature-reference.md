@@ -1,8 +1,8 @@
-# PiDeck
+# TC-Pi
 
 [简体中文](/guide/feature-reference)
 
-This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). PiDeck is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
+This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). TC-Pi is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
 
 ## Current features
 

@@ -5,7 +5,7 @@ name: Release
 #
 # 通道维度（2026-09 channel-switch 起）：workflow_dispatch 新增 channel 输入——
 #   stable（默认）：正式 Release，历史行为不变；
-#   dev：PiDeck Dev 预发布 Release（prerelease=true，构建走 dist:*:dev 双品牌包）。
+#   dev：TC-Pi Dev 预发布 Release（prerelease=true，构建走 dist:*:dev 双品牌包）。
 # dev 发版统一走本入口选 channel=dev（tag 须含 -beta 段，如 v0.8.0-beta.1）；
 # push tag v* 恒按 stable 处理。build-dev.yml 是 dev 的另一手动构建入口，
 # 同样恒 prerelease（发布语义与本 workflow 对齐）。
@@ -44,7 +44,7 @@ on:
         type: string
         default: ""
       channel:
-        # 通道维度：stable = 正式 Release（默认，历史行为）；dev = PiDeck Dev 预发布
+        # 通道维度：stable = 正式 Release（默认，历史行为）；dev = TC-Pi Dev 预发布
         # Release（prerelease=true，构建走 dist:*:dev 双品牌包）。dev 发版统一走本入口，
         # tag 须含 -beta 段（resolve-version 里校验）；push tag v* 恒按 stable。
         description: "发布通道：stable=正式版；dev=开发版预发布（tag 需形如 v0.8.0-beta.1）"
@@ -179,7 +179,7 @@ jobs:
           - platform: windows
             os: windows-latest
             command: npm run build && npx electron-builder --win nsis portable zip --publish never
-            # dev 通道：PiDeck Dev 双品牌包（经 scripts/dist-dev.js）。--publish never 显式
+            # dev 通道：TC-Pi Dev 双品牌包（经 scripts/dist-dev.js）。--publish never 显式
             # 关闭 electron-builder 在 CI 对 tagged checkout 的 onTagOrDraft 自动发布——
             # 发布统一由下方 softprops 步骤完成，保持「单发布方」不变量。dist:mac:dev 自身
             # 不带架构参数（runner 是 arm64），x64/arm64 用 `npm run <script> -- <args>` 透传。

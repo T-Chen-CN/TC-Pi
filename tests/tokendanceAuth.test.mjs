@@ -106,7 +106,7 @@ test("start(callback)：callback_url 进入授权 URL，且不带 verifier（只
 	assert.equal(url.searchParams.get("callback_url"), listener.callbackUrl);
 	assert.equal(url.searchParams.get("code_challenge_method"), "S256");
 	// 归因仍走固定 app_url：随机回环端口不得写进 Key 归因
-	assert.equal(url.searchParams.get("app_url"), "https://pideck.caoayu.top/");
+	assert.equal(url.searchParams.get("app_url"), "https://github.com/T-Chen-CN/TC-Pi");
 	assert.ok(!started.authUrl.includes("verifier"), "verifier 不得出现在授权 URL");
 });
 

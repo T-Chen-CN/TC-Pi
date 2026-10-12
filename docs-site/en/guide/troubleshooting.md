@@ -1,6 +1,6 @@
 ---
-title: Troubleshooting | Diagnose PiDeck pi desktop issues
-description: "Troubleshooting guide for PiDeck: sessions failing to start, pi connection errors, blank screens, Git panel issues, terminal input problems — with log inspection."
+title: Troubleshooting | Diagnose TC-Pi pi desktop issues
+description: "Troubleshooting guide for TC-Pi: sessions failing to start, pi connection errors, blank screens, Git panel issues, terminal input problems — with log inspection."
 ---
 
 # Troubleshooting Guide
@@ -34,7 +34,7 @@ description: "Troubleshooting guide for PiDeck: sessions failing to start, pi co
 ### Weird window behavior (multiple instances / won't close)
 
 - Settings → General → Window: check "Close to tray" — the window may be hidden, not quit;
-- The single-instance switch needs an **app restart**; different PiDeck versions can run side by side (version-based mutex), so don't mistake this for a bug.
+- The single-instance switch needs an **app restart**; different TC-Pi versions can run side by side (version-based mutex), so don't mistake this for a bug.
 
 ### Wrong language / fonts
 
@@ -186,7 +186,7 @@ Settings → Storage & logs:
 
 ### Privacy & telemetry
 
-PiDeck sends an **anonymous, low-frequency** `app_heartbeat` (version spread/platform/active installs) by default; no project paths, code, or message content. Disable in Settings → Dev → Privacy → telemetry. Check log excerpts for sensitive information before sharing.
+TC-Pi sends an **anonymous, low-frequency** `app_heartbeat` (version spread/platform/active installs) by default; no project paths, code, or message content. Disable in Settings → Dev → Privacy → telemetry. Check log excerpts for sensitive information before sharing.
 
 ---
 
@@ -219,7 +219,7 @@ Settings → Dev → Update source: switch gateway (ghfast / ghproxy.net / CN mi
 ## 10. Still stuck?
 
 1. Inspect relevant error logs in settings storage management;
-2. Search or open an Issue at [GitHub Issues](https://github.com/ayuayue/PiDeck/issues) (attach relevant errors + version + repro steps);
+2. Search or open an Issue at [GitHub Issues](https://github.com/T-Chen-CN/TC-Pi/issues) (attach relevant errors + version + repro steps);
 3. Join the community **QQ group: 1026218644** or add the author's **WeChat: caoayu97**.
 
 > When debugging, confirm the version first, then cross-check the [changelog](/en/changelog) for known issues.

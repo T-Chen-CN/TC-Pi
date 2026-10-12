@@ -14,7 +14,7 @@ MarkdownStream 在渲染副本中把 `\(...\)` 转为行内数学，把 `\[...\]
 - [x] `npx playwright test e2e/math-delimiters.spec.ts`：真实 Electron + mock stdio，通过
 - [x] 非显然逻辑注释及真实 remark-math / KaTeX 回归测试
 
-验证工作区 `PiDeck-math-pr` 从修复提交独立创建，不包含原工作区其他未提交的 Ask UI 改动。依赖通过本机 node_modules junction 复用。
+验证工作区 `TC-Pi-math-pr` 从修复提交独立创建，不包含原工作区其他未提交的 Ask UI 改动。依赖通过本机 node_modules junction 复用。
 
 此前原工作区全量测试超时；独立工作区直接以 node 启动测试出现打包测试无法找到 tsc 等失败，使用上述 npm 脚本完整重跑后通过。最终 E2E 增补只涉及测试 mock 与测试用例，不改变生产实现。
 

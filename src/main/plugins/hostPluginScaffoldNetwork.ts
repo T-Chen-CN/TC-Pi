@@ -66,7 +66,7 @@ function wireNetworkDemo() {
 			"",
 			'- `pideck.network.request({ url, method: "GET" })`：宿主代发请求，页面的 `fetch` 仍被禁用。',
 			...urls.map((url) => `- 可修改输入框访问：\`${url}\`（路径按你的接口调整，域名/端口不能超出清单）。`),
-			"- HTTPS origin 必须是公网地址；本地只允许已授权的 `http://127.0.0.1:<端口>`。本地服务由你自行启动，PiDeck 不执行 BAT。",
+			"- HTTPS origin 必须是公网地址；本地只允许已授权的 `http://127.0.0.1:<端口>`。本地服务由你自行启动，TC-Pi 不执行 BAT。",
 			'- POST 示例：`await pideck.network.request({ url, method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ example: true }) })`。',
 			"- 不默认上传会话；同时授权会话读取与联网意味着插件可以发送会话内容，启用前请核对代码与目标地址。",
 			"- 无浏览器 Cookie/宿主凭据；JSON/text 响应上限 1 MiB，POST 正文上限 256 KiB，默认超时 15 秒、最多 30 秒。",

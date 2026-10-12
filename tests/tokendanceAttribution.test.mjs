@@ -8,7 +8,7 @@ import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 const mod = loadTsCommonJs("src/main/config/tokendanceAttribution.ts");
 const { isTokendanceBaseUrl, ensureTokendanceAttribution } = mod;
-const APP_URL = "https://pideck.caoayu.top/";
+const APP_URL = "https://github.com/T-Chen-CN/TC-Pi";
 const HEADER = "X-App-URL";
 
 function provider(overrides = {}) {

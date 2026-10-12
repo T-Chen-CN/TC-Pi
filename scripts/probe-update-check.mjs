@@ -129,7 +129,7 @@ try {
 }
 
 record(upgrade.hasUpdate === true, "旧客户端判定 hasUpdate=true", `latest=${upgrade.latestVersion}`);
-record(/\/PiDeck\/releases/.test(upgrade.releaseUrl ?? ""), "release 指向 PiDeck 仓库（非旧名 pi-desktop）", upgrade.releaseUrl ?? "(missing)");
+record(/\/TC-Pi\/releases/.test(upgrade.releaseUrl ?? ""), "release 指向 TC-Pi 仓库（非旧名 pi-desktop）", upgrade.releaseUrl ?? "(missing)");
 record((upgrade.assets?.length ?? 0) > 0, "latest.yml 解析出资产清单", `${upgrade.assets?.length ?? 0} 个资产`);
 
 const recommended = upgrade.recommendedAsset;

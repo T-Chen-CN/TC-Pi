@@ -122,7 +122,7 @@ async function answerPrompt(id, prompt) {
 		}
 		if (!command) {
 			// 宿主断开：按取消处理，交给上层走取消收尾。
-			throw new Error("PiDeck auth host: host closed the connection");
+			throw new Error("TC-Pi auth host: host closed the connection");
 		}
 		if (command.cmd === "cancel") {
 			// 只结束提问会留下 pi 的回调服务器/设备码轮询，必须中止整个流程。

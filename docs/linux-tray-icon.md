@@ -1,13 +1,13 @@
 # Linux / GNOME 托盘图标不显示：根因与修复
 
-适用场景：GNOME（Wayland 或 X11）+ AppIndicator 托盘扩展，PiDeck 图标不出现，且每次启动必现（偶发 ≠ 本文档问题）。
+适用场景：GNOME（Wayland 或 X11）+ AppIndicator 托盘扩展，TC-Pi 图标不出现，且每次启动必现（偶发 ≠ 本文档问题）。
 
 ## 现象
 
-- 顶栏没有 PiDeck 图标，但 fcitx5、clash-verge 等其它应用图标正常；
+- 顶栏没有 TC-Pi 图标，但 fcitx5、clash-verge 等其它应用图标正常；
 - `journalctl --user -b | grep "initalizing proxy"` 可见：
   `While initalizing proxy for org.freedesktop.StatusNotifierItem-<pid>-1: ... org.freedesktop.DBus.Error.Failed: error occurred in Get`；
-- 关键：PiDeck 默认开启「关闭窗口时隐藏到系统托盘」（`closeToTray`），图标缺席时点 X 会让窗口隐藏到无处可寻（进程仍在跑、pi 会话照常）。此时可再次启动 PiDeck 把窗口唤回。
+- 关键：TC-Pi 默认开启「关闭窗口时隐藏到系统托盘」（`closeToTray`），图标缺席时点 X 会让窗口隐藏到无处可寻（进程仍在跑、pi 会话照常）。此时可再次启动 TC-Pi 把窗口唤回。
 
 ## 根因（2026-09 实测）
 
@@ -17,7 +17,7 @@
 - GNOME 扩展 **v65 及更早**（Debian 13 打包的 `gnome-shell-extension-appindicator 59-4`）初始化恰好走「逐个 Get」；
 - 扩展 1s/2s/3s 三轮全部被拒后 `destroy()` 该图标且**不再重试**，图标从此缺席。
 
-因此 Electron 系应用（PiDeck、Slack、Discord 等）在这类扩展上 100% 复现，而 Qt/Tauri 应用正常（它们的实现接受逐个 Get）。
+因此 Electron 系应用（TC-Pi、Slack、Discord 等）在这类扩展上 100% 复现，而 Qt/Tauri 应用正常（它们的实现接受逐个 Get）。
 
 ## 修复：托盘扩展升级到 v66+
 
@@ -51,9 +51,9 @@ dbus-send --session --dest=org.kde.StatusNotifierWatcher --print-reply /StatusNo
   string:RegisteredStatusNotifierItems | grep StatusNotifierItem
 ```
 
-列表里有 `org.freedesktop.StatusNotifierItem-<PiDeck pid>-<n>` 即成功。
+列表里有 `org.freedesktop.StatusNotifierItem-<TC-Pi pid>-<n>` 即成功。
 
-## PiDeck 侧的配合诊断
+## TC-Pi 侧的配合诊断
 
 `src/main/tray/trayRegistrationVerify.ts` 在启动 6 秒后（扩展的三轮窗口结束）查一次 watcher 列表并记日志：
 

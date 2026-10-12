@@ -1,7 +1,7 @@
 # pi 1.0.4 适配实施计划
 
 > 状态：**已执行（2026-10）**。P1 配置、P2 目录、P4 会话已落地；P3（嵌套工具展示）按用户要求后置，未实施。
-> 核查基线：PiDeck `dev`，起点 HEAD `0e4e8bf4`；本机 pi 1.0.4；项目 `@earendil-works/pi-ai` 已为 1.0.4。
+> 核查基线：TC-Pi `dev`，起点 HEAD `0e4e8bf4`；本机 pi 1.0.4；项目 `@earendil-works/pi-ai` 已为 1.0.4。
 > 落地提交：`90dedf04`（配置）、`4fe72c54`（目录）、`7b16d801`（会话读取）、`9a2cb8d8`（会话写入）。
 > 范围：配置保存、模型目录去白名单、嵌套工具展示、原生会话记录及编辑／删除。分类模型的产品入口与调用支持后置。
 
@@ -14,7 +14,7 @@
 | 模型目录 | 提取时按白名单丢字段，`type` 等不可恢复 | 单文件继续用，但不再摘字段：保留官方分组结构与全部字段，紧凑序列化 |
 | 嵌套工具 | 没有处理父子关联及持久化调用摘要 | codemode 等父工具下面显示子调用；实时与历史恢复不重复、不串会话 |
 | 原生会话读取 | 文件读取链路未处理 `context_edit` | 能分清原始历史与当前有效上下文，正确呈现原生编辑／排除状态 |
-| 消息编辑／删除 | 原地改文本或写 PiDeck `deleted` 墓碑 | 后续普通编辑／删除追加 pi 原生 `context_edit`，保留原文与父子链 |
+| 消息编辑／删除 | 原地改文本或写 TC-Pi `deleted` 墓碑 | 后续普通编辑／删除追加 pi 原生 `context_edit`，保留原文与父子链 |
 
 明确不做：旧 Azure 键自动迁移、历史墓碑改写、迁移向导、classifier 界面／调用 API、独立生图服务改造、替 pi 执行工具或模型调用。已经适配的 MCP exposure、defaultTools 和 `session_info` 不重做。
 
@@ -233,7 +233,7 @@
 - pi 1.0.4：`docs/session-format.md`、`docs/rpc.md`、`docs/rpc-commands.md`、`docs/message-types.md`、`docs/extensions.md`、`docs/codemode.md`、`docs/models.md`。
 - pi 源码：`dist/core/session-manager.js` 的 `appendContextEdit`／`buildSessionProjection`，`dist/modes/rpc/rpc-mode.js` 的 `get_entries`／`get_messages`，`dist/core/agent-session.js` 的嵌套调用处理。
 - pi-ai：`dist/types.d.ts` 的 `NestedToolCalls`／`ToolResultMessage`；pi-agent-core：`dist/agent-loop.js` 的 `createToolResultMessage`。
-- PiDeck：本计划各阶段列出的生产模块与现有测试，以及 `docs/maintenance-domains.md`。此前已执行的 `docs/pi-1.0-adaptation-test-plan.md` 是另一轮验证记录，不覆盖本次计划。
+- TC-Pi：本计划各阶段列出的生产模块与现有测试，以及 `docs/maintenance-domains.md`。此前已执行的 `docs/pi-1.0-adaptation-test-plan.md` 是另一轮验证记录，不覆盖本次计划。
 
 ## 9. 合并回主线的执行记录（2026-10-08 完成）
 

@@ -68,7 +68,7 @@ const state: DemoState = {
 export default function demoPlugin(pi: ExtensionAPI): void {
 	// ── 1. /demo 命令：pi 原生扩展点 ─────────────────────────────
 	pi.registerCommand("demo", {
-		description: "PiDeck 插件 Demo：打开说明浮层",
+		description: "TC-Pi 插件 Demo：打开说明浮层",
 		handler: async (_args, ctx) => {
 			const gui = getGui(ctx);
 			if (gui) {
@@ -222,12 +222,12 @@ function statsPanelNode(): GuiNode {
 function showAboutOverlay(gui: GuiLike): void {
 	gui.overlay({
 		kind: "card",
-		title: "PiDeck 插件 Demo",
+		title: "TC-Pi 插件 Demo",
 		children: [
 			{
 				kind: "markdown",
 				md: [
-					"这个面板由 `ctx.ui.gui.overlay()` 渲染——你的插件可以在 PiDeck 里：",
+					"这个面板由 `ctx.ui.gui.overlay()` 渲染——你的插件可以在 TC-Pi 里：",
 					"",
 					"- 注册 `/命令`（本文件的 `/demo`）",
 					"- 监听会话/消息/工具事件",

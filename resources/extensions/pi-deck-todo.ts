@@ -326,7 +326,7 @@ export default function piDeckTodoExtension(pi: ExtensionAPI): void {
 				return;
 			}
 			if (command === "collapse" || command === "expand") {
-				ctx.ui.notify("待办计划可在 PiDeck 输入框上方展开或折叠。", "info");
+				ctx.ui.notify("待办计划可在 TC-Pi 输入框上方展开或折叠。", "info");
 				return;
 			}
 			if (!state.activePlan) {

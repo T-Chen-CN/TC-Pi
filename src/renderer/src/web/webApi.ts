@@ -282,7 +282,7 @@ export async function downloadSessionHtml(sessionId: string): Promise<void> {
 	const url = URL.createObjectURL(blob);
 	const anchor = document.createElement("a");
 	anchor.href = url;
-	anchor.download = `pideck-session-${sessionId.replace(/[^\w.-]+/g, "_")}.html`;
+	anchor.download = `TC-Pi-session-${sessionId.replace(/[^\w.-]+/g, "_")}.html`;
 	document.body.appendChild(anchor);
 	anchor.click();
 	anchor.remove();

@@ -9,14 +9,15 @@
  */
 import { PiLogoCanvas } from "../components/app/PiLogoCanvas";
 import { PiTuiLogoCanvas, useLogoStyle } from "../components/app/PiTuiLogo";
+import { t } from "../i18n";
 
 export function WebBrandLockup() {
 	const logoStyle = useLogoStyle();
 	return (
-		<div className="brand-lockup flex h-9 min-w-0 items-center gap-2.5" aria-label="PiDeck">
+		<div className="brand-lockup flex h-9 min-w-0 items-center gap-2.5" aria-label={t("app.brandName")}>
 			{logoStyle === "pi-tui" ? <PiTuiLogoCanvas size={18} playOnClick /> : <PiLogoCanvas size={18} playOnClick />}
-			<span className="brand-wordmark translate-x-0.5 truncate text-[18px] font-[PiDeckDepartureMono] font-normal uppercase leading-none text-zinc-950 dark:text-white" aria-hidden="true">
-				PiDeck
+			<span className="brand-wordmark translate-x-0.5 truncate text-[18px] font-[PiDeckDepartureMono] font-normal leading-none text-zinc-950 dark:text-white" aria-hidden="true">
+				{t("app.brandName")}
 			</span>
 		</div>
 	);

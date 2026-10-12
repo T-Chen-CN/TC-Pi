@@ -202,15 +202,15 @@ const UI_HANDLING: Record<string, { status: ExtPoint["status"]; note: string }> 
 	setWorkingIndicator: { status: "wired", note: "流式状态行指示器" },
 	setHiddenThinkingLabel: { status: "wired", note: "折叠思考块标签" },
 	setTitle: { status: "wired", note: "会话标题（document.title）" },
-	select: { status: "passthrough", note: "PiDeck 已有时间线卡片" },
-	confirm: { status: "passthrough", note: "PiDeck 已有确认卡片" },
-	input: { status: "passthrough", note: "PiDeck 已有输入卡片" },
-	notify: { status: "passthrough", note: "PiDeck 已有 toast" },
-	editor: { status: "passthrough", note: "PiDeck 已有多行编辑器弹框" },
+	select: { status: "passthrough", note: "TC-Pi 已有时间线卡片" },
+	confirm: { status: "passthrough", note: "TC-Pi 已有确认卡片" },
+	input: { status: "passthrough", note: "TC-Pi 已有输入卡片" },
+	notify: { status: "passthrough", note: "TC-Pi 已有 toast" },
+	editor: { status: "passthrough", note: "TC-Pi 已有多行编辑器弹框" },
 	pasteToEditor: { status: "passthrough", note: "走 setEditorText 原路" },
 	// 注：桥的 createGuiNamespace 是显式列举（不是 Proxy 透传 ctx.ui），没有 setEditorText；
 	// 在 PiDeck 里取不到这个方法，所以草稿改为在面板内展示 + 复制。
-	setEditorText: { status: "passthrough", note: "pi 原生方法；桥未透传（PiDeck 面板里取不到）" },
+	setEditorText: { status: "passthrough", note: "pi 原生方法；桥未透传（TC-Pi 面板里取不到）" },
 	getEditorText: { status: "passthrough", note: "同步读，RPC 下返回空串" },
 	getEditorComponent: { status: "passthrough", note: "RPC 下恒返回 undefined" },
 	getToolsExpanded: { status: "passthrough", note: "已有落点" },
@@ -222,7 +222,7 @@ const UI_HANDLING: Record<string, { status: ExtPoint["status"]; note: string }> 
 	custom: { status: "not-bridged", note: "画的是字符行；GUI 对应物是 ctx.gui.custom()" },
 	onTerminalInput: { status: "not-bridged", note: "GUI 里没有终端" },
 	addAutocompleteProvider: { status: "not-bridged", note: "GUI 输入框有自己的补全机制" },
-	setEditorComponent: { status: "not-bridged", note: "拦截但不替换：草稿状态在 PiDeck 侧，替换会做出死控件" },
+	setEditorComponent: { status: "not-bridged", note: "拦截但不替换：草稿状态在 TC-Pi 侧，替换会做出死控件" },
 };
 
 // ── 4. 汇总 ─────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ function buildDraft(selectedIds: string[], purposes: Map<string, string>, name: 
 
 // ── 6. 面板渲染 ─────────────────────────────────────────────────
 
-const GROUP_TITLE: Record<ExtPoint["group"], string> = { ui: "pi 原生 UI 扩展点", event: "pi 扩展事件", gui: "PiDeck 专属落点" };
+const GROUP_TITLE: Record<ExtPoint["group"], string> = { ui: "pi 原生 UI 扩展点", event: "pi 扩展事件", gui: "TC-Pi 专属落点" };
 
 /** 分组顺序（折叠按钮的排列顺序）。 */
 const GROUPS: readonly { id: ExtPoint["group"]; title: string }[] = [
@@ -370,7 +370,7 @@ function renderPanel(catalog: Catalog, selected: Set<string>, purposes: Map<stri
 		},
 	];
 	if (!catalog.typesPath) {
-		children.push({ kind: "banner", id: "warn", tone: "warning", message: "读不到 pi 的类型定义，只列出 PiDeck 专属落点。pi 升级后重开会话即可。" });
+		children.push({ kind: "banner", id: "warn", tone: "warning", message: "读不到 pi 的类型定义，只列出 TC-Pi 专属落点。pi 升级后重开会话即可。" });
 	}
 
 	if (hitGroups.length === 0) {

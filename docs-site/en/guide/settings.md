@@ -1,11 +1,11 @@
 ---
-title: Settings & Skills | Visual pi configuration in PiDeck
-description: "Configure pi visually in PiDeck: models.json / auth.json editors, provider and model management, skills and extensions, proxy settings — no more hand-editing JSON in your pi desktop."
+title: Settings & Skills | Visual pi configuration in TC-Pi
+description: "Configure pi visually in TC-Pi: models.json / auth.json editors, provider and model management, skills and extensions, proxy settings — no more hand-editing JSON in your pi desktop."
 ---
 
 # Settings & Skills
 
-PiDeck provides visual configuration management for all its settings.
+TC-Pi provides visual configuration management for all its settings.
 
 ## Opening Settings
 
@@ -36,7 +36,7 @@ Manage authentication credentials:
 
 ## Web Service and LAN Access
 
-Enable the service from the Web settings page to access PiDeck from another device's browser. The service is off by default. New configurations listen on `0.0.0.0` (all IPv4 interfaces); an explicitly configured address is preserved.
+Enable the service from the Web settings page to access TC-Pi from another device's browser. The service is off by default. New configurations listen on `0.0.0.0` (all IPv4 interfaces); an explicitly configured address is preserved.
 
 - **Access tokens are enabled by default**: API requests require a token even through localhost. The page provides a read-only link containing the token, link copying, and QR codes.
 - **Disabling authentication**: Any device that can reach the listening address can use the service directly. Disable it only on a trusted network; never expose an unauthenticated service to the public Internet.
@@ -44,7 +44,7 @@ Enable the service from the Web settings page to access PiDeck from another devi
 
 ## Skills
 
-Skills extend the agent's capabilities. PiDeck supports two levels:
+Skills extend the agent's capabilities. TC-Pi supports two levels:
 
 ### Global Skills
 
@@ -64,7 +64,7 @@ Skills that apply only to a specific project. Accessible from the project contex
 
 ## Extensions
 
-Extensions add new functionality to PiDeck itself (not the agent). Manage them in the Extensions tab:
+Extensions add new functionality to TC-Pi itself (not the agent). Manage them in the Extensions tab:
 
 - **Installed Extensions** — View and manage installed extensions.
 - **Extension Store** — Browse and install community extensions.

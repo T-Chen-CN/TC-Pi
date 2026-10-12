@@ -46,7 +46,7 @@
 4. **字段分层（按使用频率）**：`env`（stdio 放 Key，高频）留主表单可选区；`headers` 并入认证卡「API Key」项；`timeout`/`exposure`/`toolExposure`/OAuth 高级/`cwd` 进「高级」折叠。
 6. **供应商清单零维护**：认证页由 pi-auth-host import 用户安装的 pi 本体枚举供应商；MCP 页下拉读 auth.json 键名（已登录供应商）。pi 新增供应商零改动同步。
 5. **不做自维护 MCP 目录**：登录能力由服务器侧 401 声明、客户端自动响应，新服务零成本支持；协议面跟随 pi（升级后跑 smoke-pi-native-resources + diff `pi mcp --help`）。若未来 pi 提供官方目录再接。
-6. **供应商登录的供应商清单零维护**：认证页由 pi-auth-host 直接 `import` 用户安装的 pi 本体（ModelRuntime）枚举；MCP 页下拉读 auth.json 键名（=已登录供应商）。pi 新增供应商自动出现，PiDeck 不持有清单；唯一耦合是 auth.json 结构约定（变更时下拉变空，可见失败）。
+6. **供应商登录的供应商清单零维护**：认证页由 pi-auth-host 直接 `import` 用户安装的 pi 本体（ModelRuntime）枚举；MCP 页下拉读 auth.json 键名（=已登录供应商）。pi 新增供应商自动出现，TC-Pi 不持有清单；唯一耦合是 auth.json 结构约定（变更时下拉变空，可见失败）。
 
 ## 4. 分片实施
 

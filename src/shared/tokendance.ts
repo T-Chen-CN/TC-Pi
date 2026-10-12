@@ -10,6 +10,8 @@
  *  - OAuth 式授权：/auth + PKCE(S256)，code 在 /portal/api/v1/auth/keys 交换。
  */
 
+import { APP_DISPLAY_NAME, APP_PROJECT_URL } from "./appBrand";
+
 /** 内置供应商名（pi models.json 的 provider key、模型选择器分组名）。 */
 export const TOKENDANCE_PROVIDER = "tokendance";
 
@@ -17,7 +19,7 @@ export const TOKENDANCE_PROVIDER = "tokendance";
 export const TOKENDANCE_BASE_URL = "https://tokendance.space/gateway/v1";
 
 /** PiDeck 的 App URL：写入 API Key 归因 + 请求头 X-App-URL 的值。 */
-export const TOKENDANCE_APP_URL = "https://pideck.caoayu.top/";
+export const TOKENDANCE_APP_URL = APP_PROJECT_URL;
 
 /** OAuth 授权页（PKCE headless 模式：无 callback_url，确认后展示一次性 code）。 */
 export const TOKENDANCE_AUTH_URL = "https://tokendance.space/auth";
@@ -26,7 +28,7 @@ export const TOKENDANCE_AUTH_URL = "https://tokendance.space/auth";
 export const TOKENDANCE_EXCHANGE_URL = "https://tokendance.space/portal/api/v1/auth/keys";
 
 /** 授权页展示的应用名（key_name 参数，也是新 Key 的默认名称）。 */
-export const TOKENDANCE_KEY_NAME = "PiDeck";
+export const TOKENDANCE_KEY_NAME = APP_DISPLAY_NAME;
 
 /** 兜底解析内置端点时发出的归因请求头（请求维度归因，覆盖 Key 上的 app_url）。 */
 export const TOKENDANCE_APP_URL_HEADER = "X-App-URL";

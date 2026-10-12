@@ -134,7 +134,7 @@ test("dev 代理：文档请求上游非 200 → 回退 A1 内嵌页（保持兼
 			const res = await fetch(`${baseUrl}/web.html`);
 			assert.equal(res.status, 200);
 			const body = await res.text();
-			assert.ok(body.includes("PiDeck Web Service"), "应回退 A1 vanilla 内嵌页");
+			assert.ok(body.includes("TC-Pi Web Service"), "应回退 A1 vanilla 内嵌页");
 		});
 	} finally {
 		await vite.close();
@@ -149,7 +149,7 @@ test("dev 代理：dev server 未就绪 → 文档回退 A1、模块请求 503",
 	await withManager(deadUrl, async (baseUrl) => {
 		const doc = await fetch(`${baseUrl}/`);
 		assert.equal(doc.status, 200);
-		assert.ok((await doc.text()).includes("PiDeck Web Service"));
+		assert.ok((await doc.text()).includes("TC-Pi Web Service"));
 		const mod = await fetch(`${baseUrl}/src/web-main.tsx`);
 		assert.equal(mod.status, 503, "模块请求应 503 而非 HTML");
 		assert.ok(!(mod.headers.get("content-type") ?? "").includes("text/html"));

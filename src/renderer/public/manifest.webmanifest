@@ -1,7 +1,7 @@
 {
-	"name": "PiDeck",
-	"short_name": "PiDeck",
-	"description": "在浏览器中管理并运行 pi 编码助手会话（PiDeck Web 端）",
+	"name": "TC-Pi",
+	"short_name": "TC-Pi",
+	"description": "在浏览器中管理并运行 pi 编码助手会话（TC-Pi Web 端）",
 	"lang": "zh-CN",
 	"start_url": "/",
 	"scope": "/",

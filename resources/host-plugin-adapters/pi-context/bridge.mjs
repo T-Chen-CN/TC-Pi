@@ -38,8 +38,8 @@ export async function createPiContextHost() {
 		if (!note) return;
 		const zh = data.context.locale.startsWith("zh");
 		const messages = zh
-			? ["PiDeck 历史日志估算（非真实模型请求快照）", `概览最多 ${HISTORY_LIMITS.sessions} 个会话 / 每会话 ${HISTORY_LIMITS.overviewEntries} 条，详情最多 ${HISTORY_LIMITS.detailEntries} 条 / 8 MiB`, "图片数据已省略"]
-			: ["PiDeck historical-log estimate (not actual model request input)", `Overview: up to ${HISTORY_LIMITS.sessions} sessions / ${HISTORY_LIMITS.overviewEntries} entries each; detail: ${HISTORY_LIMITS.detailEntries} entries / 8 MiB`, "Image data omitted"];
+			? ["TC-Pi 历史日志估算（非真实模型请求快照）", `概览最多 ${HISTORY_LIMITS.sessions} 个会话 / 每会话 ${HISTORY_LIMITS.overviewEntries} 条，详情最多 ${HISTORY_LIMITS.detailEntries} 条 / 8 MiB`, "图片数据已省略"]
+			: ["TC-Pi historical-log estimate (not actual model request input)", `Overview: up to ${HISTORY_LIMITS.sessions} sessions / ${HISTORY_LIMITS.overviewEntries} entries each; detail: ${HISTORY_LIMITS.detailEntries} entries / 8 MiB`, "Image data omitted"];
 		if (!data.context.projectId) messages.push(zh ? "请先选择项目" : "Select a project first");
 		if (data.status.partial) messages.push(zh ? "已达到读取上限或存在过大条目，当前统计不完整" : "Read limits or oversized entries: statistics are incomplete");
 		if (data.status.missingPrompt) messages.push(zh ? "日志缺少系统提示词或工具定义，空白不代表实际没有" : "Prompt/tool definitions missing from logs; empty does not mean absent in the real request");

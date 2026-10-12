@@ -49,6 +49,7 @@ import { createWindowZoomShortcutHandler } from "./windowZoom";
 import iconPath from "../../build/icon.png?asset";
 import { mainProcessT, normalizeMainProcessLocale, type MainProcessLocale, type MainProcessTranslationKey } from "../shared/i18n/mainProcessCopy";
 import { ipcChannels } from "../shared/ipc";
+import { APP_DISPLAY_NAME, APP_DEV_DISPLAY_NAME } from "../shared/appBrand";
 import { buildSessionOriginKey, canonicalizeSessionPath, toAbsoluteSessionPath } from "../shared/sessionIdentity";
 import { msUntilNextThemeBoundary, resolveAppColorScheme } from "../shared/themeSchedule";
 import type { AgentTab, AgentUiRequest, AppLogLevel, AppSettings, SendPromptInput, SendPromptResult, SessionCommandError, SessionCommandResult, SessionRecord, SessionRuntimeEvent, SessionRuntimeTarget } from "../shared/types";
@@ -63,6 +64,9 @@ import { recordUserDataNameMigrationNotice, runUserDataNameMigration, type UserD
 
 // 构建标记：npm run dist:*:dev 打包时由 vite define 注入 true（构建期替换，非运行时环境变量）。
 declare const __PIDECK_DEV_BUILD__: boolean;
+
+// 应用名控制系统菜单等显示文字；userData 随后仍按历史目录显式设置，改品牌不搬用户数据。
+app.setName(app.isPackaged && __PIDECK_DEV_BUILD__ ? APP_DEV_DISPLAY_NAME : APP_DISPLAY_NAME);
 
 // dev 构建（PiDeck Dev 安装包）只影响通知归属（AUMID）与 deep link scheme（pideck-dev://），
 // userData 与正式版**共用** pi-desktop——双通道共用数据目录是刻意决策（2026-09）：
@@ -997,7 +1001,7 @@ function setupTray() {
 	/** 创建托盘实例；首次创建与自愈重建共用同一条路径，避免两处行为漂移。 */
 	const createTrayInstance = (): Tray => {
 		const instance = new Tray(icon.resize({ width: 16, height: 16 }));
-		instance.setToolTip("PiDeck");
+		instance.setToolTip(APP_DISPLAY_NAME);
 		// 双击托盘图标恢复窗口（Windows 常见交互）
 		instance.on("double-click", () => {
 			if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1084,7 +1088,7 @@ function printStartupInfo() {
 			"color: #8b5cf6; font-weight: bold;"
 		);
 		console.log(
-			"%c│                      PiDeck Desktop                      │",
+			"%c│                      TC-Pi Desktop                      │",
 			"color: #8b5cf6; font-weight: bold; font-size: 16px;"
 		);
 		console.log(
@@ -1355,7 +1359,7 @@ async function createWindow() {
 		minWidth: MIN_WINDOW_WIDTH,
 		minHeight: MIN_WINDOW_HEIGHT,
 		// 多 worktree 并行 dev：标题带分支名，任务栏/Alt-Tab 一眼区分窗口
-		title: isolateDevByGitBranch && !isSharedDevBranch(devGitBranch) ? `PiDeck · ${devGitBranch}` : "PiDeck",
+		title: isolateDevByGitBranch && !isSharedDevBranch(devGitBranch) ? `${APP_DISPLAY_NAME} · ${devGitBranch}` : APP_DISPLAY_NAME,
 		icon: iconPath,
 		frame: windowOptions.frame,
 		titleBarStyle: windowOptions.titleBarStyle,
@@ -3635,7 +3639,7 @@ app
 		void appLogger?.error("app", "Application startup failed", error);
 		void import("electron")
 			.then(({ dialog }) => {
-				dialog.showErrorBox("PiDeck failed to start", error instanceof Error ? (error.stack ?? error.message) : String(error));
+				dialog.showErrorBox("TC-Pi failed to start", error instanceof Error ? (error.stack ?? error.message) : String(error));
 			})
 			.catch(() => undefined);
 	});

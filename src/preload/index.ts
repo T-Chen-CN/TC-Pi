@@ -1187,7 +1187,7 @@ try {
 	ipcRenderer.send(ipcChannels.preloadReady);
 } catch (error) {
 	const detail = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) };
-	console.error("[PiDeck preload] Failed to expose desktop API", detail);
+	console.error("[TC-Pi preload] Failed to expose desktop API", detail);
 	ipcRenderer.send(ipcChannels.preloadError, detail);
 }
 

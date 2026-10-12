@@ -43,7 +43,7 @@ async function keyExists(key: string): Promise<boolean> {
  * @param appPath dev 模式下的应用根目录，packaged 模式传空串
  * @param menuTitle 右键菜单显示名（新建目录场景），默认英文
  */
-export async function registerShellContextMenu(exePath: string, appPath = "", menuTitle = "Open with PiDeck"): Promise<void> {
+export async function registerShellContextMenu(exePath: string, appPath = "", menuTitle = "Open with TC-Pi"): Promise<void> {
 	const add = (key: string, value: string, valueName?: string) =>
 		execFileAsync(
 			"reg",

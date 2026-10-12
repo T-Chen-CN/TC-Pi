@@ -144,8 +144,8 @@ export type LoopbackCallbackListener = {
 export type CallbackServerFactory = () => Promise<LoopbackCallbackListener>;
 
 /** 回调页文案：主进程无法走渲染层 i18n，中英双语一行带过（不反射任何查询参数）。 */
-const CALLBACK_DONE_HTML = "<!doctype html><meta charset=utf-8><title>PiDeck</title>" + '<p style="font:14px system-ui;max-width:28rem;margin:6rem auto;text-align:center">' + "授权已完成，可以关闭本页面返回 PiDeck。<br>Authorization complete — you can close this page.</p>";
-const CALLBACK_ERROR_HTML = "<!doctype html><meta charset=utf-8><title>PiDeck</title>" + '<p style="font:14px system-ui;max-width:28rem;margin:6rem auto;text-align:center">' + "回调地址无效，请回到 PiDeck 重新发起授权。Invalid callback — please restart authorization in PiDeck.</p>";
+const CALLBACK_DONE_HTML = "<!doctype html><meta charset=utf-8><title>TC-Pi</title>" + '<p style="font:14px system-ui;max-width:28rem;margin:6rem auto;text-align:center">' + "授权已完成，可以关闭本页面返回 TC-Pi。<br>Authorization complete — you can close this page.</p>";
+const CALLBACK_ERROR_HTML = "<!doctype html><meta charset=utf-8><title>TC-Pi</title>" + '<p style="font:14px system-ui;max-width:28rem;margin:6rem auto;text-align:center">' + "回调地址无效，请回到 TC-Pi 重新发起授权。Invalid callback — please restart authorization in TC-Pi.</p>";
 
 /**
  * 默认监听器实现：node:http + 127.0.0.1:0（系统分配空闲端口）。

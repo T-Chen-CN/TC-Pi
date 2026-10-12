@@ -228,7 +228,7 @@ export class ResourceImportManager {
 	private async existingMcpNames(target: ResourceImportTarget): Promise<Set<string>> {
 		if (target.scope === "global") {
 			const snapshot = await this.configManager.getMcpConfig();
-			if (snapshot.writableError) throw new Error("PiDeck MCP configuration is invalid; repair it before importing.");
+			if (snapshot.writableError) throw new Error("TC-Pi MCP configuration is invalid; repair it before importing.");
 			// `servers` is the effective merged view and includes read-only Claude/Codex
 			// layers.  Conflict detection for a PiDeck target must inspect only the
 			// writable ~/.pi/agent/mcp.json layer; otherwise importing an external entry
@@ -267,7 +267,7 @@ export class ResourceImportManager {
 		if (!candidate.mcpDefinition) throw new Error("MCP definition unavailable.");
 		if (target.scope === "global") {
 			const snapshot = await this.configManager.getMcpConfig();
-			if (snapshot.writableError) throw new Error("PiDeck MCP configuration is invalid; repair it before importing.");
+			if (snapshot.writableError) throw new Error("TC-Pi MCP configuration is invalid; repair it before importing.");
 			if (Object.keys(snapshot.writableFile?.mcpServers ?? {}).some((name) => name.toLowerCase() === candidate.targetName.toLowerCase())) throw new ResourceImportConflictError("Target already contains this MCP server.");
 			const writableFile = snapshot.writableFile ?? { mcpServers: {} };
 			const file: McpConfigFile = {

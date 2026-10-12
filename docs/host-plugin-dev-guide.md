@@ -2,11 +2,11 @@
 title: 宿主插件开发指南
 ---
 
-# PiDeck 宿主插件开发指南
+# TC-Pi 宿主插件开发指南
 
-> **宿主插件（Host Plugin）** 是挂在 **PiDeck 桌面壳**上的本地静态扩展：一组 HTML / CSS / JS 文件放进一个目录，配一个 `pideck-plugin.json` 声明，就能在 PiDeck 里拥有自己的面板，读取当前项目的会话数据。
+> **宿主插件（Host Plugin）** 是挂在 **TC-Pi 桌面壳**上的本地静态扩展：一组 HTML / CSS / JS 文件放进一个目录，配一个 `pideck-plugin.json` 声明，就能在 TC-Pi 里拥有自己的面板，读取当前项目的会话数据。
 >
-> 它属于 **PiDeck 的能力域**（不依赖 pi 进程、不执行命令）。页面不能直接联网，但可在声明目的地并获用户授权后，通过 `window.pideck.network.request()` 调用 HTTPS API 或已启动的本地服务。需要拦截模型请求、深度接入 pi 会话流的场景，请改用 pi 扩展 + GUI 桥，见 `docs/plugin-dev-guide.md`。
+> 它属于 **TC-Pi 的能力域**（不依赖 pi 进程、不执行命令）。页面不能直接联网，但可在声明目的地并获用户授权后，通过 `window.pideck.network.request()` 调用 HTTPS API 或已启动的本地服务。需要拦截模型请求、深度接入 pi 会话流的场景，请改用 pi 扩展 + GUI 桥，见 `docs/plugin-dev-guide.md`。
 
 ---
 
@@ -14,36 +14,36 @@ title: 宿主插件开发指南
 
 | ✅ 能做 | ❌ 不能做 |
 |--------|----------|
-| 在 PiDeck 里注册自己的面板（大弹框 `modal` 或工作区内联页 `page`） | 页面直接联网（`fetch`/`XMLHttpRequest`/WebSocket 仍被禁止） |
+| 在 TC-Pi 里注册自己的面板（大弹框 `modal` 或工作区内联页 `page`） | 页面直接联网（`fetch`/`XMLHttpRequest`/WebSocket 仍被禁止） |
 | 经 `network.request` 调用已授权的公网 HTTPS API / 本地固定端口 HTTP 服务 | 访问未声明的地址、局域网、任意端口；自动执行 BAT 或启动服务 |
 | 读取**当前项目**的会话目录：`sessions.list` / `get` / `search` | 读取其他项目的会话、读取任意本地文件 |
 | 读取会话的活跃分支历史：`sessions.entries`（分页、有预算） | 修改会话、发消息、调用 pi 或任何 RPC 命令 |
-| 让 PiDeck 打开某个会话并定位到某条消息：`workbench.navigate` | 让 PiDeck 执行任意动作（没有通用 IPC 通道） |
+| 让 TC-Pi 打开某个会话并定位到某条消息：`workbench.navigate` | 让 TC-Pi 执行任意动作（没有通用 IPC 通道） |
 | 用系统浏览器打开 https 链接：`workbench.openExternal` | 打开本地文件、`file://`、带账号密码的 URL |
 | 每插件 1 MiB 私有 JSON 存储：`storage.*` | 访问别的插件的数据或应用数据目录 |
 | 订阅 `context.changed` / `sessions.changed` 事件做实时刷新 | 访问 `require` / `process` / `ipcRenderer` / Node 或 Electron API |
-| 注册命令到 PiDeck 命令面板（Ctrl+K） | 注册全局快捷键、改 PiDeck 界面、注入脚本到主界面 |
+| 注册命令到 TC-Pi 命令面板（Ctrl+K） | 注册全局快捷键、改 TC-Pi 界面、注入脚本到主界面 |
 
 适合做的：**会话数据查看器、统计面板、本地可视化、导出预览、第三方 API 工具、已启动本地服务的前端**。会话 API 仍然只读；网络 POST 则可能改变远端/本地服务的数据，不能把「联网」理解成无副作用。
 
-> **隐私重点**：同时授予 `sessions.read` 与网络权限，插件就有能力把读取到的会话内容发送给声明的地址。授权弹窗会列出具体 origin / 本地端口并警告；PiDeck 不替插件判断上传内容的用途。只安装可信代码，作者应让数据发送行为明确、可理解。
+> **隐私重点**：同时授予 `sessions.read` 与网络权限，插件就有能力把读取到的会话内容发送给声明的地址。授权弹窗会列出具体 origin / 本地端口并警告；TC-Pi 不替插件判断上传内容的用途。只安装可信代码，作者应让数据发送行为明确、可理解。
 
 ## 2. 需要什么环境
 
 | 项目 | 要求 |
 |------|------|
 | 写代码 | 任意文本编辑器。**不需要** Node、npm、打包器、TypeScript——插件就是浏览器里的 HTML/CSS/JS |
-| 运行 | 一个支持所用 API 的 PiDeck（页面在独立 Chromium 沙箱里，与 pi 版本无关） |
-| 调试 | PiDeck 内置的开发者工具（面板上右键 → 检查） |
+| 运行 | 一个支持所用 API 的 TC-Pi（页面在独立 Chromium 沙箱里，与 pi 版本无关） |
+| 调试 | TC-Pi 内置的开发者工具（面板上右键 → 检查） |
 | 打包/转换脚本 | Node 20+（只有在跑 `scripts/pack-host-plugin.mjs` 等命令行脚本时才需要） |
 | 网络 | 离线插件不需要；HTTPS 插件需要可达的公网接口；本地插件需要用户已启动、且端口已授权的服务 |
-| 本地服务环境 | 由服务自身决定（可能需要 Node / Python 等）。PiDeck 不安装这些环境、不执行启动脚本 |
+| 本地服务环境 | 由服务自身决定（可能需要 Node / Python 等）。TC-Pi 不安装这些环境、不执行启动脚本 |
 
 ## 3. 五分钟做出第一个插件（推荐路径）
 
-### 3.1 用脚手架生成（设置 → PiDeck 插件 → 「新建插件…」）
+### 3.1 用脚手架生成（设置 → TC-Pi 插件 → 「新建插件…」）
 
-1. 打开 **设置 → PiDeck 插件**；
+1. 打开 **设置 → TC-Pi 插件**；
 2. 点 **「新建插件…」**，填：
    - **插件 ID**：小写字母开头，`[a-z0-9.-]`，≤80 字符，例如 `demo.viewer`（同时是生成目录名）；
    - **显示名**：面板与命令里的名字；
@@ -61,7 +61,7 @@ title: 宿主插件开发指南
 | `pideck-plugin.json` | manifest：ID、权限、面板与命令声明。**权限以它为准** |
 | `app.html` | 面板入口。manifest 的 `entry` 必须指向一个 `.html`，且只能在包内 |
 | `app.js` | 示例逻辑：读 context、列会话、翻历史、存一点私有状态 |
-| `styles.css` | 消费 PiDeck 注入的主题变量（`--color-*`），亮暗色自动适配 |
+| `styles.css` | 消费 TC-Pi 注入的主题变量（`--color-*`），亮暗色自动适配 |
 | `README.md` | 改哪里、怎么打包、约束清单 |
 
 > 脚手架按你勾的权限生成代码：没勾 `sessions.read` 就不会出现会话列表代码；没勾网络权限就不会生成网络按钮。勾了网络时生成的是**点击才请求**的示例，不自动请求、不上传会话、不启动服务。模板与 manifest 使用同一份目的地声明。
@@ -71,7 +71,7 @@ title: 宿主插件开发指南
 ```
 改 app.js / styles.css
       ↓
-设置 → PiDeck 插件 → 「重新扫描」        ← 内容变了会要求重新授权
+设置 → TC-Pi 插件 → 「重新扫描」        ← 内容变了会要求重新授权
       ↓
 「授权并启用」→ 打开面板 → 右键 → 检查   ← 看 console / 断点
 ```
@@ -137,7 +137,7 @@ for (const session of page.sessions) {
 }
 ```
 
-把目录放进插件目录（设置 → PiDeck 插件 → 「打开插件目录」），点「重新扫描」→「授权并启用」，面板即可挂载。
+把目录放进插件目录（设置 → TC-Pi 插件 → 「打开插件目录」），点「重新扫描」→「授权并启用」，面板即可挂载。
 
 > 已经有 pi-context？不用手写，见第 10 节的一次性转换脚本。需要联网示例，见第 5.5 节。
 
@@ -175,8 +175,8 @@ for (const session of page.sessions) {
 ### 4.3 面板页运行环境
 
 - 每个面板实例是一个独立沙箱视图：`sandbox: true`、无 Node、无 Electron、专属 partition；
-- 入口页由 PiDeck 用 `pideck-plugin://<实例ID>/app.html` 提供，引用包内文件用**相对路径**（不要带 `?query`）；
-- CSP 由宿主注入：脚本样式只能来自本包，`connect-src 'none'`（**页面不能直接联网**）；允许的网络请求只由 PiDeck 主进程经受控 API 执行，不能加载 CDN 脚本或远端页面；
+- 入口页由 TC-Pi 用 `pideck-plugin://<实例ID>/app.html` 提供，引用包内文件用**相对路径**（不要带 `?query`）；
+- CSP 由宿主注入：脚本样式只能来自本包，`connect-src 'none'`（**页面不能直接联网**）；允许的网络请求只由 TC-Pi 主进程经受控 API 执行，不能加载 CDN 脚本或远端页面；
 - 用 ES Module（`<script type="module" src="app.js">`）即可 `import` 包内其他模块。
 
 ## 5. `window.pideck` API 参考
@@ -207,9 +207,9 @@ for (const session of page.sessions) {
 ```ts
 type HostPluginContext = {
 	projectId?: string; // 当前项目（未选项目时为 undefined）
-	projectName?: string; // 项目显示名（PiDeck 侧补全，可直接当标题用）
+	projectName?: string; // 项目显示名（TC-Pi 侧补全，可直接当标题用）
 	sessionId?: string; // 当前会话
-	sessionTitle?: string; // 当前会话标题（PiDeck 侧补全）
+	sessionTitle?: string; // 当前会话标题（TC-Pi 侧补全）
 	locale: "zh-CN" | "en-US"; // 跟随界面语言
 	theme: "light" | "dark"; // 跟随明暗主题
 	tokens?: Record<string, string>; // 主题色变量（CSS 自定义属性）
@@ -220,8 +220,8 @@ type HostPluginContext = {
 const { projectName, sessionTitle, locale, theme } = await pideck.context.get();
 ```
 
-- 作用域由 **PiDeck 分配**，不接受插件传参：插件只能看到当前项目。
-- `projectName` / `sessionTitle` 由 PiDeck 补全，插件自己伪造无效；拿不到就是 `undefined`，**不要假设一定有值**。
+- 作用域由 **TC-Pi 分配**，不接受插件传参：插件只能看到当前项目。
+- `projectName` / `sessionTitle` 由 TC-Pi 补全，插件自己伪造无效；拿不到就是 `undefined`，**不要假设一定有值**。
 
 ### 5.2 sessions
 
@@ -274,11 +274,11 @@ await pideck.storage.remove("layout");
 ### 5.4 workbench
 
 ```js
-await pideck.workbench.navigate("session-id", "entry-id"); // 让 PiDeck 打开该会话并定位到条目（entryId 可省）
-await pideck.workbench.openExternal("https://github.com/ayuayue/PiDeck/blob/main/docs/host-plugin-dev-guide.md");
+await pideck.workbench.navigate("session-id", "entry-id"); // 让 TC-Pi 打开该会话并定位到条目（entryId 可省）
+await pideck.workbench.openExternal("https://github.com/T-Chen-CN/TC-Pi/blob/main/docs/host-plugin-dev-guide.md");
 ```
 
-- `navigate` 只对**当前项目的可读会话**生效，否则 `session-not-authorized`；它由 PiDeck 主界面执行，插件页不做任何跳转。
+- `navigate` 只对**当前项目的可读会话**生效，否则 `session-not-authorized`；它由 TC-Pi 主界面执行，插件页不做任何跳转。
 - `openExternal` 只接受 **https** 且不能带账号密码；系统浏览器打开。带 `http:`、`file:`、`javascript:`、`pideck-plugin:` 一律 `invalid-request`。
 
 ### 5.5 network：第三方 API 与已启动本地服务
@@ -328,7 +328,7 @@ const saved = await pideck.network.request({
 });
 ```
 
-认证接口可由插件提供 `Authorization` / `X-API-Key` 等请求头；凭据由插件作者/用户管理，**PiDeck 不提供自己的 Cookie、pi 登录凭据或模型 API key**。不要把真实密钥写进插件包/日志；`storage` 是本地 JSON 存储，不是加密密钥保险箱。当前没有 Cookie 会话、OAuth 登录或安全密钥托管 API。
+认证接口可由插件提供 `Authorization` / `X-API-Key` 等请求头；凭据由插件作者/用户管理，**TC-Pi 不提供自己的 Cookie、pi 登录凭据或模型 API key**。不要把真实密钥写进插件包/日志；`storage` 是本地 JSON 存储，不是加密密钥保险箱。当前没有 Cookie 会话、OAuth 登录或安全密钥托管 API。
 
 #### C. 已启动本地服务
 
@@ -373,7 +373,7 @@ type HostPluginNetworkResponse = {
 | 重定向 | 最多 3 次，仅同 origin；每跳复查授权与 DNS 并固定已验证 IP；POST 在 301/302/303 转 GET，307/308 保留方法与正文 |
 | 并发 / 频率 | 与其他 API 共用每实例 2 个在途 / 每秒 20 次预算 |
 | 生命周期 | 关闭面板、上下文变化、禁用、指纹变化、应用退出都会中止在途请求；取消不等于回滚服务已执行的操作 |
-| 连接方式 | 主进程直连，不使用 PiDeck 浏览器 Cookie、模型代理设置或共享连接池；无浏览器 CORS 限制，但所有目的地/地址门禁仍生效 |
+| 连接方式 | 主进程直连，不使用 TC-Pi 浏览器 Cookie、模型代理设置或共享连接池；无浏览器 CORS 限制，但所有目的地/地址门禁仍生效 |
 | 尚未提供 | WebSocket、SSE/流式消费、大文件、自动启动服务、任意命令执行 |
 
 如果原项目用 `fetch`，应把调用改为 `pideck.network.request()` 并将 `response.json()` 改成 `JSON.parse(response.body)`；它不是与 fetch 完全等价的替换。
@@ -383,7 +383,7 @@ type HostPluginNetworkResponse = {
 仓库目录：**`docs/examples/host-plugins/example.network`**（`pideck-plugin.json` + `app.html` + `app.js` + `styles.css` + `README.md`）。
 
 1. 先阅读 demo 的 README，把 HTTPS 占位 origin / 接口路径或本地端口改成自己的；
-2. 设置 → PiDeck 插件 → **从文件夹安装…**，选择含 manifest 的那一层；
+2. 设置 → TC-Pi 插件 → **从文件夹安装…**，选择含 manifest 的那一层；
 3. 核对授权弹窗目的地 → 授权并启用 → 打开面板；
 4. 分别点击 HTTPS / 本地按钮观察结果。**首次加载零请求，不读取会话，不自动启动服务**；
 5. 修改外部开发目录后重新安装；修改安装目录后重新扫描 + 重新授权。
@@ -409,7 +409,7 @@ const off = pideck.onEvent((event) => {
 
 ### 5.7 主题与样式
 
-PiDeck 把语义色注入为 CSS 变量（`:root`，随主题/语言实时更新），直接用即可：
+TC-Pi 把语义色注入为 CSS 变量（`:root`，随主题/语言实时更新），直接用即可：
 
 `--color-bg-app`、`--color-bg-panel`、`--color-bg-input`、`--color-text-primary`、`--color-text-secondary`、`--color-border-default`、`--color-accent`、`--color-text-inverse`。
 
@@ -438,7 +438,7 @@ body {
 | 项目隔离 | 会话读取逐条校验归属（含 fork 祖先链逐跳校验）；跨项目一律 `session-not-authorized`，也不泄露「该会话是否存在」 |
 | 指纹授权 | 授权 = 整包逐文件 sha256。内容一变授权即失效，必须重新确认；启用中的插件不能被静默替换（`plugin-in-use`） |
 | 频率限制 | 每实例同时最多 2 个在途请求，每秒最多 20 个请求，超出 `rate-limited` |
-| 隐私 | `projectName` / `sessionTitle` 由 PiDeck 补全；未授权项目的会话标题根本不会下发 |
+| 隐私 | `projectName` / `sessionTitle` 由 TC-Pi 补全；未授权项目的会话标题根本不会下发 |
 
 ## 7. 错误码
 
@@ -489,7 +489,7 @@ body {
 - **白屏**：99% 是 `app.js` 抛错——先看 console；其次是 manifest 的 `entry` 指错、文件名带空格/中文。
 - **改文件后面板没变**：改安装目录后必须**重新扫描 + 重新授权**（指纹机制），旧实例会被卸载；改外部开发目录后先重新安装。
 - **网络调用失败**：先确认使用 `pideck.network.request` 而不是 `fetch`，再核对权限 / origin / 端口。`localhost` 不是 `127.0.0.1` 的替代写法；本地服务要自行启动。接口若总是返回压缩或二进制，请改服务配置，当前不支持这类响应。
-- **想脱离 PiDeck 调 UI**：可以在普通浏览器里起个假 `window.pideck` 来调样式，但权限/沙箱行为仍要在 PiDeck 里验证：
+- **想脱离 TC-Pi 调 UI**：可以在普通浏览器里起个假 `window.pideck` 来调样式，但权限/沙箱行为仍要在 TC-Pi 里验证：
 
 ```html
 <script>
@@ -501,7 +501,7 @@ body {
 </script>
 ```
 
-- **插件目录在哪**：设置 → PiDeck 插件 → 「打开插件目录」（即应用数据目录下的插件目录）。
+- **插件目录在哪**：设置 → TC-Pi 插件 → 「打开插件目录」（即应用数据目录下的插件目录）。
 - 回归测试参考：`tests/hostPlugins.test.mjs`、`tests/hostPluginScaffold.test.mjs`、`tests/hostPluginArchive.test.mjs`。
 
 ## 9. 打包与分发（`.pideck-plugin`）
@@ -524,7 +524,7 @@ node scripts/pack-host-plugin.mjs <插件目录> [输出.pideck-plugin]
 node scripts/convert-pi-context-host-plugin.mjs "<pi-context 目录>" "<输出目录>"
 ```
 
-产物默认禁用；上游接缝变化时转换器报错而不是生成不确定产物。转换后的版本使用 PiDeck 的只读会话 API，**不需要运行原项目的 BAT / Web 服务，也不需要网络权限**。其他工具是否需要后端，必须按其真实接口判断，不能照搬这条结论。
+产物默认禁用；上游接缝变化时转换器报错而不是生成不确定产物。转换后的版本使用 TC-Pi 的只读会话 API，**不需要运行原项目的 BAT / Web 服务，也不需要网络权限**。其他工具是否需要后端，必须按其真实接口判断，不能照搬这条结论。
 
 ## 11. 让 AI 帮你写插件
 

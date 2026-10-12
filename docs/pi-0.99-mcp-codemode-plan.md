@@ -11,7 +11,7 @@
 1. **日常启停采用 pi 原生配置**。最终正常会话不再通过 `--no-extensions/--no-skills/--no-prompt-templates` 加全量路径白名单控制普通资源。
 2. **全局页面只管理当前 pi 环境的全局配置；项目右键资源管理固定管理所选项目**。项目操作不得偷偷写全局，也不增加来回切作用域的下拉。
 3. **扩展包总开关表示整包启停**：包声明的 extensions、skills、prompts、themes 一起停用；重新启用恢复停用前的资源过滤。独立文件扩展没有“附带技能”的推断关系，不按名称猜关联。
-4. **PiDeck 自带扩展仅供 PiDeck**：继续随桌面会话附加，不安装到 pi 用户资源目录、不创建 TUI 共享包、不把应用资源路径持久化到 pi 的全局 `packages/extensions`。
+4. **TC-Pi 自带扩展仅供 TC-Pi**：继续随桌面会话附加，不安装到 pi 用户资源目录、不创建 TUI 共享包、不把应用资源路径持久化到 pi 的全局 `packages/extensions`。
 5. **pi 原生内置扩展必须有图形开关**：mcp、codemode、tool-search、llama.cpp；全局和项目均支持，按原生 `builtin:` 规则保存。此项是必做，不再标“可选”。
 6. **MCP 全局和项目都可管理**。项目 MCP 写 `.pi/mcp.json`，不是 `.pi/settings.json`。这取代旧计划“只做全局 MCP”的范围。
 7. **MCP OAuth、登出、连接检测统一调用 `pi mcp` CLI**，不通过 RPC 发 `/mcp login`，不另建 SDK 桥。授权链接只在登录区域内显示，不能为链接弹 toast，也不能自动再开一次浏览器。0.99.2 新增的 `auth.provider` 使用供应商既有登录凭据，属于另一种认证模式；其操作边界与该版 CLI 缺口见 7.4。
@@ -19,7 +19,7 @@
 9. **第三方 MCP adapter 不再作为支持路线**：删除安装引导；检测已安装者，给卸载命令和真实导航；直接开始聊天的用户也能收到准确提醒。不自动卸载用户扩展。
 10. 设置变更默认作用于**下一次启动/重启的会话**；不擅自重启正在工作的 Agent。MCP OAuth 成功后的凭据更新遵循 pi 原生下一轮读取行为。
 
-普通资源改为原生配置后，使用同一 pi 环境、配置目录和项目的 TUI 也会遵循这些选择。这是产品行为，页面说明一次即可；PiDeck 自带扩展仍仅在桌面运行。
+普通资源改为原生配置后，使用同一 pi 环境、配置目录和项目的 TUI 也会遵循这些选择。这是产品行为，页面说明一次即可；TC-Pi 自带扩展仍仅在桌面运行。
 
 ### 0.2 工作区基线与保护
 
@@ -35,7 +35,7 @@
 
 | 范围 | 当前事实 | 执行要求 |
 |---|---|---|
-| 扩展/skills/prompts 启停 | 全局写 PiDeck `disabled*`；项目写 `.pi/settings.json` 的私有 `disabled*` / `pideckDisabledGlobal*`；运行时仍算白名单 | 迁移为原生规则后退出白名单，不只是换字段名 |
+| 扩展/skills/prompts 启停 | 全局写 TC-Pi `disabled*`；项目写 `.pi/settings.json` 的私有 `disabled*` / `pideckDisabledGlobal*`；运行时仍算白名单 | 迁移为原生规则后退出白名单，不只是换字段名 |
 | PiProcess 内置恢复 | 白名单下无条件补回四个 `builtin:` | 最终删除这条补回路径；正常发现由 pi 尊重原生开关，诊断总关不得补回 |
 | pi 内置扩展 UI | 尚未做 | 全局与项目都补齐 |
 | MCP 配置 | 已收敛两层与 stdio/http；仍浅合并同名 server，接受无传输的 `enabled` 覆盖；校验前会丢掉部分非法值 | 修成 pi 原生语义，保留原文及未知数据 |
@@ -84,7 +84,7 @@
 - `toolExposure` 精确名称优先；通配模式只有 `*`，多模式按原始顺序首个命中。不得排序这个对象来“格式化”。
 - **不是所有 `auth` 都是 adapter 遗留字段**：0.99.2 支持 HTTP `auth:{provider}`，配置文件里只允许全局层；项目层含它会被跳过。要求 HTTPS，仅 `localhost/127.0.0.1/[::1]` 允许 HTTP。不要把它随 legacy 清理删除。OAuth 另支持 `clientId/clientSecret/callbackPort/callbackUrl/scope/clientName`。
 - 0.99.2 将 MCP namespace/tool name 中不属于 `[A-Za-z0-9_]` 的字符替换为 `_`，碰撞工具都加 hash 后缀；配置 server 名仍保持用户原名。`toolExposure` 的键始终匹配 server 原始工具名，不是规范化的 RPC 工具名。
-- 默认 codemode 不再把 MCP 工具/指令塞进工具描述。MCP 摘要由 pi 放在 `mcp_servers` 系统提示词段，`description` 参与摘要和搜索排序；scripts 用 `searchTools/describeTool/describeNamespace/ALL_TOOLS` 发现。PiDeck 不自行生成这段提示词。
+- 默认 codemode 不再把 MCP 工具/指令塞进工具描述。MCP 摘要由 pi 放在 `mcp_servers` 系统提示词段，`description` 参与摘要和搜索排序；scripts 用 `searchTools/describeTool/describeNamespace/ALL_TOOLS` 发现。TC-Pi 不自行生成这段提示词。
 - 原生校验对同时出现 command/url 的对象按 type/有效分支判定，type 省略时可优先接受 HTTP；当前 UI 新建只生成选中的一种传输，但读取/原文保存不能谎称 pi 一定拒绝这种历史对象。
 - `pi mcp add/remove` 才支持 `-l`。**`list/login/logout` 不接受 `-l`**，由 cwd、agentDir 和已保存项目信任决定读取范围。
 - `pi mcp` 命令的项目判定直接读 `ProjectTrustStore`，不能假定会话的一次性 `--approve` 能代替这条 CLI 的已保存信任。
@@ -113,16 +113,16 @@
 
 | 上游变化 | 本轮动作 | 所属阶段 |
 |---|---|---|
-| 默认 codemode MCP 后台连接，不再阻塞首轮；只有含 direct exposure 的服务器参与首轮等待（最多 10 秒，含 toolExposure 的 direct 覆盖） | PiDeck 不在 prompt 之前主动跑 `mcp list`/等待所有连接，不因工具描述暂时无 MCP 条目而报配置失效；连接状态显示与请求发送解耦 | A5/M2/M3/V1 |
+| 默认 codemode MCP 后台连接，不再阻塞首轮；只有含 direct exposure 的服务器参与首轮等待（最多 10 秒，含 toolExposure 的 direct 覆盖） | TC-Pi 不在 prompt 之前主动跑 `mcp list`/等待所有连接，不因工具描述暂时无 MCP 条目而报配置失效；连接状态显示与请求发送解耦 | A5/M2/M3/V1 |
 | `mcp_servers` 摘要、`description`、`describeNamespace()`；codemode-deferred 合并为别名 | 补 description 编辑/保留/导入，改中英文 exposure 文案，只给四个 canonical 选项；模型请求日志展示 pi 真实请求，不自行重写 prompt/tool description | M1/M3/T1 |
 | namespace 中 `-` → `_`、碰撞工具都加 hash；server 名碰撞被拒绝 | 校验配置冲突；运行时名称按 RPC 原样消费，不自算 hash、不改历史消息。`toolKind.ts` 现有 `mcp__` 前缀判断可兼容；补旧名/新名/带 hash 名测试 | M1/M2/V1 |
 | `oauth.clientName`；provider token 认证 | 补有效值与操作模式，clientName 改名需登出再注册；HTTPS/全局限制；provider-auth 不显示 MCP OAuth 登录/登出。CLI 回调缺口见 7.4 | M1/M2/M3 |
 | `/reload` 激活新加到 defaultTools 的工具，但不关闭被移除工具、不重开会话内已关闭且未新加的工具；CLI tools flags 仍优先 | 保留桌面“新建/重启后完整生效”策略，不新增自动 `/reload` 或不存在的 RPC；说明配置预计状态与运行态可以不同 | T1/V1 |
-| Anthropic workload identity federation | 核对现有环境透传并补测试，认证交换/文件读取/刷新均交给 pi；不增加 PiDeck 联邦凭据存储或新认证桥，见 3.2 | A1/A5/V1 |
+| Anthropic workload identity federation | 核对现有环境透传并补测试，认证交换/文件读取/刷新均交给 pi；不增加 TC-Pi 联邦凭据存储或新认证桥，见 3.2 | A1/A5/V1 |
 | `/mcp` TUI 授权链接改成终端超链接；TUI 长单行结果按视觉行折叠 | 这不是 CLI/RPC wire 改动。独立 `pi mcp login` 仍输出明文 URL；M2 按 CLI 分块/CRLF 测试，不把 OSC 超链接带到 GUI，不移植 TUI renderer | M2/V1 |
-| Windows 独立包 codemode worker、非法 codemode image、model lookup、扩展 provider 默认模型、strict schema、Retry-After、Z.AI CN overflow 等修复 | 由实际 pi 0.99.2 runtime 获得。做相关现有启动/事件/显示回归，不在 PiDeck 重写 worker、图像校验、模型选择或供应商重试 | A5/V1 |
+| Windows 独立包 codemode worker、非法 codemode image、model lookup、扩展 provider 默认模型、strict schema、Retry-After、Z.AI CN overflow 等修复 | 由实际 pi 0.99.2 runtime 获得。做相关现有启动/事件/显示回归，不在 TC-Pi 重写 worker、图像校验、模型选择或供应商重试 | A5/V1 |
 
-本次 compare 没有模型 catalog 源数据变更。PiDeck 构建期 `pi-ai@0.99.1` 只生成静态 catalog，DSH 又有自己的运行时依赖；**不为对齐外部 CLI 版本而顺手 bump 这两条依赖或重新生成 catalog**。以后出现实际模型数据变化再独立更新。
+本次 compare 没有模型 catalog 源数据变更。TC-Pi 构建期 `pi-ai@0.99.1` 只生成静态 catalog，DSH 又有自己的运行时依赖；**不为对齐外部 CLI 版本而顺手 bump 这两条依赖或重新生成 catalog**。以后出现实际模型数据变化再独立更新。
 
 ## 2. 总体模块边界
 
@@ -135,10 +135,10 @@
 | 默认工具/codemode 子设置 | 同上 | 同上，仅这块工具设置 | pi |
 | MCP server / 自动 codemode | `<agentDir>/mcp.json` | `<project>/.pi/mcp.json` | pi |
 | 技能/模板正文 | 当前全局资源目录 | `.pi/skills`、`.pi/prompts`；用户明确选择时 `.agents/skills` | pi |
-| OAuth tokens | 不由 PiDeck 编辑；pi CLI 写 agentDir | 不放项目目录 | pi |
-| PiDeck 自带扩展全局开关 | PiDeck `removedBuiltInExtensions` | 不适用 | PiDeck 选择本次附加扩展 |
-| PiDeck 自带扩展的项目覆盖 | 不适用 | `.pi/settings.json` 下 `pideck.extensions`（见 4.4） | 仅 PiDeck |
-| 迁移记录/操作恢复快照 | PiDeck userData 的单一状态文件 | 同一文件按环境与项目键分区 | 仅用于迁移、包过滤恢复及识别 PiDeck 创建的继承覆盖；不能决定运行时加载 |
+| OAuth tokens | 不由 TC-Pi 编辑；pi CLI 写 agentDir | 不放项目目录 | pi |
+| TC-Pi 自带扩展全局开关 | TC-Pi `removedBuiltInExtensions` | 不适用 | TC-Pi 选择本次附加扩展 |
+| TC-Pi 自带扩展的项目覆盖 | 不适用 | `.pi/settings.json` 下 `pideck.extensions`（见 4.4） | 仅 TC-Pi |
+| 迁移记录/操作恢复快照 | TC-Pi userData 的单一状态文件 | 同一文件按环境与项目键分区 | 仅用于迁移、包过滤恢复及识别 TC-Pi 创建的继承覆盖；不能决定运行时加载 |
 
 默认路径只是展示默认值，不能在新代码里绕开实际 agentDir、WSL HOME、自定义 pi 命令。
 
@@ -179,7 +179,7 @@
 4. JSON 读取与 pi 一样兼容 UTF-8 BOM。JSON 损坏、顶层类型错误、已知字段类型不合法时不按 `{}` 写回。显示错误并保留原文，关闭可视化保存；不要先归一化丢掉非法字段再宣称合法。
 5. 单文件写 tmp → rename；project 写入复用 `projectFileAccess` 的 canonical 边界与临写前再校验，拒绝路径逃逸/junction。读取外部引用是展示能力，不等于可以写/删它。
 6. pi 的 settings 写入使用 `proper-lockfile`，锁目标为同一路径且 `realpath:false`。仓库 lockfile 已有该依赖但仅为传递依赖；实现时将它声明为直接依赖（用途：与 pi 协调配置写入，不另造锁协议），使用异步锁，锁内重读。不得在 UI 主线程照抄 pi 的忙等循环。
-7. PiDeck 所有触达同文件的写入入口共享服务：资源开关、设置页、相关 raw 保存、MCP 编辑/导入及迁移。CLI 安装/卸载等操作不在外层持有同一锁时执行，以免 pi 自己取锁死锁。
+7. TC-Pi 所有触达同文件的写入入口共享服务：资源开关、设置页、相关 raw 保存、MCP 编辑/导入及迁移。CLI 安装/卸载等操作不在外层持有同一锁时执行，以免 pi 自己取锁死锁。
 8. 原文编辑器及不合作的外部编辑器仍可能竞争：revision 检测能避免已观察到的陈旧覆盖，不能宣称任意外部写入都受锁保护。遇到冲突报告，不循环覆盖。
 
 ### 3.2 当前环境必须同源
@@ -198,7 +198,7 @@
 - MCP 表单、工具设置：沿用草稿 + 保存；作用域切换/关闭沿用 dirty 保护。项目工具“恢复继承”删除该项目字段，不复制当前全局值。
 - 保存后提示“新会话或重启后生效”，已有会话允许继续使用启动时配置；不擅自重启，也不使用不存在的 `reload_config` RPC。
 - 资源列表/草稿命令补全读“配置预计状态”；运行中命令用现有 `get_commands` 数据。不能把预期状态冒充当前 Agent 已加载状态。
-- 文件在 TUI/编辑器外部被修改后，页面刷新重新读取，不用 PiDeck enabled 缓存反向覆盖。包操作成功后失效所有关联的扩展/技能/提示词列表。
+- 文件在 TUI/编辑器外部被修改后，页面刷新重新读取，不用 TC-Pi enabled 缓存反向覆盖。包操作成功后失效所有关联的扩展/技能/提示词列表。
 
 ## 4. 原生资源开关的具体规则
 
@@ -241,11 +241,11 @@
 - 独立技能/模板可编辑、重命名、删除，保留现有边界与回收站机制。重命名时同步本次资源的原生精确规则，不清除同名其他来源的规则。
 - 安装技能/模板写正文文件，启停写配置；安装/删除不应留幽灵禁用记录。新包默认按其 manifest 加载，安装与“手工额外开启每个文件”不绑定。
 
-### 4.4 PiDeck 自带扩展
+### 4.4 TC-Pi 自带扩展
 
 - 全局继续用 `removedBuiltInExtensions` 选择随包/热更新覆盖层中的入口，再通过 `-e` 附加；这不是用户资源的全量白名单。
 - 项目覆盖采用 `.pi/settings.json` 中 `pideck.extensions: {"pi-deck-todo.ts": false}` 这样的明确命名空间：缺键继承，true/false 本项目启用/停用。只接受 `BUILT_IN_EXTENSIONS` 已知入口名，未知字段保留但不执行。
-- 仅项目信任放行时读取项目覆盖；旧 `pideckDisabledGlobalExtensions` 中 PiDeck 自带项迁到这个命名空间，普通项迁到原生配置。
+- 仅项目信任放行时读取项目覆盖；旧 `pideckDisabledGlobalExtensions` 中 TC-Pi 自带项迁到这个命名空间，普通项迁到原生配置。
 - `INTERNAL_BUILT_IN_EXTENSIONS` 不变成用户可关闭资源；正常模式始终保留内部 shell-proxy，诊断无扩展模式遵循现有总关语义。
 - 保持 GUI 桥入口顺序、热更新完整快照/依赖校验以及供应目录解析；不改扩展本体来“适配 TUI”。
 - 现有第三方 todo/plan/ask 冲突处理不扩大；所需的 enabled 判定改为原生有效状态，避免仅看旧私有字段误禁用自带扩展。列表读取不得新增文件删除副作用。
@@ -254,10 +254,10 @@
 
 ### 5.1 必须覆盖的旧数据
 
-- PiDeck settings：`disabledExtensions`（scope/source）、`disabledSkills`、`disabledPrompts`、`disableExtensionWhitelist`。
+- TC-Pi settings：`disabledExtensions`（scope/source）、`disabledSkills`、`disabledPrompts`、`disableExtensionWhitelist`。
 - 项目 `.pi/settings.json`：`disabledExtensions`、`disabledSkills`、`disabledPrompts`、`pideckDisabledGlobalExtensions/Skills/Prompts`。
 - 旧版本/手工遗留在 pi 全局 settings 中的同类禁用字段：识别并列入迁移，不当成原生生效字段。
-- PiDeck 自带项：保留全局 `removedBuiltInExtensions`，项目项迁到 4.4；内部适配器不接受遗留禁用记录。
+- TC-Pi 自带项：保留全局 `removedBuiltInExtensions`，项目项迁到 4.4；内部适配器不接受遗留禁用记录。
 
 ### 5.2 迁移顺序与失败处理
 
@@ -265,7 +265,7 @@
 2. 原旧记录确实按名称影响多个资源时，列出旧解析器实际匹配的同作用域集合并逐项迁移；没有来源或 `scope:unknown` 且无法确定时列 unresolved，不随意扩到所有项目。
 3. 写任何配置前为相关原文保存保护备份；迁移备份覆盖本次项目 settings，而不只有 ConfigBackupManager 的全局文件。备份放 userData，不在项目里散落包含私人配置的备份。
 4. 锁内校验 revision → 先写原生配置 → 读回并验证预期规则 → 再清理**已成功迁移**的旧记录、登记版本。任一步失败不能先删除旧禁用数据。
-5. 崩溃重试按 before/after 指纹幂等恢复；跨原生配置与 PiDeck settings 不是单次文件 rename，必须有状态记录。回滚只在目标仍等于本次 after 时还原，不能覆盖用户后续编辑。
+5. 崩溃重试按 before/after 指纹幂等恢复；跨原生配置与 TC-Pi settings 不是单次文件 rename，必须有状态记录。回滚只在目标仍等于本次 after 时还原，不能覆盖用户后续编辑。
 6. 按环境/项目惰性迁移：全局首次使用时处理，已信任项目在打开管理页或新建运行时前处理；不扫描和改写所有磁盘项目，不为迁移自动信任项目。
 7. 活跃旧禁用项 unresolved/写入失败时，对受影响环境或项目返回明确的迁移错误，**不能删除白名单后仍继续启动并悄悄加载已禁用资源**。其他无关项目可继续。
 8. 旧 `disableExtensionWhitelist:true` 下普通扩展禁用列表当时是不生效的：归档为待处理，不自动变成一批新的原生禁用；保持原有效状态并提示用户可重新应用这些选择。
@@ -282,7 +282,7 @@
 ### 5.4 PiProcess 与调用者收口
 
 - 移除正常启动的三类 `resolveEnabled*Paths` 注入、全量参数预算降级，以及 `appendBuiltInExtensionSpecifierArgs` 无条件带回逻辑。
-- 保留诊断用 `piRpcNoExtensions/piRpcNoSkills`、已有 startup fallback、trust flags、代理/安全环境、PiDeck 自带附加扩展。拒绝 trust 用原生 `--no-approve`，不需要额外全局白名单；版本无法保证 trust 隔离则维持 fail-closed。
+- 保留诊断用 `piRpcNoExtensions/piRpcNoSkills`、已有 startup fallback、trust flags、代理/安全环境、TC-Pi 自带附加扩展。拒绝 trust 用原生 `--no-approve`，不需要额外全局白名单；版本无法保证 trust 隔离则维持 fail-closed。
 - `AgentManager` 新建/重启/恢复、`PiModelCapabilityCache` 及其他 PiProcess 构造点须一起核对，不能模型列表与会话使用两套资源选择。
 - 去掉用户可见“禁用 -e 参数/白名单总开关”和失效白名单超限提醒。尚供只读发现/迁移使用的模块保留；无调用者的启动白名单代码及专属 IPC 才删除。
 - 现有 RPC 不兼容扩展处置、启动失败快退、WSL 参数转换均需回归；不顺手扩大自动搬文件/禁用范围。
@@ -308,7 +308,7 @@
 - 项目自己新增/编辑/删除/导入 server 只写 `.pi/mcp.json`，不改全局；只查看不创建文件。
 - 继承全局 server：提供“在本项目停用”“创建项目覆盖”“恢复继承”，不提供全局删除。
 - **在本项目停用继承 server**：写有效的最小停用定义，例如 `{url:<继承URL>,enabled:false}` 或 `{command:<继承command>,enabled:false}`，必要时保留对应 type；不能只写 enabled。停用定义不复制全局 headers/env/oauth/auth。URL 的 userinfo/query 也可能含凭据，不能一面复制这类 URL 一面声称“不复制凭据”；检测到敏感形态时停在项目定义编辑器，明确展示待写内容与所需传输，不自动改写目标或复制敏感值。
-- PiDeck 创建的这种停用定义，在辅助状态里保存 after 指纹与用途；匹配时 UI 主动作是“恢复继承”（删除该项目定义）。不能简单移除 enabled 导致一个丢失 args/headers 的半截定义开始运行。外部改过该条后按普通项目覆盖处理，不自动删除。
+- TC-Pi 创建的这种停用定义，在辅助状态里保存 after 指纹与用途；匹配时 UI 主动作是“恢复继承”（删除该项目定义）。不能简单移除 enabled 导致一个丢失 args/headers 的半截定义开始运行。外部改过该条后按普通项目覆盖处理，不自动删除。
 - “创建项目覆盖”进入完整编辑器：从有效配置提取非敏感字段，明确需要本项目提供的 env/headers/auth 方式；不能自动复制全局明文凭据。**全局 `auth.provider` 禁止直接复制进项目**；可在项目停用或恢复继承，但不能伪造一个 pi 不支持的 provider-auth 项目覆盖。
 - 删除项目同名覆盖后，重新显示继承全局的状态（可能仍为 disabled）；界面不能把“删除覆盖”误报为“服务器已从全部配置删除”。
 - `autoEnableCodemode`：全局未设置/开/关；项目继承/开/关，恢复继承删项目键。默认 true；说明它仅控制自动启用工具。
@@ -328,7 +328,7 @@
 ### 7.1 执行作用域
 
 - `PiMcpCli` 注入统一环境解析与进程执行器，接受 scope/projectId，而非任意 cwd。
-- 全局：使用当前 agentDir + PiDeck 控制的无项目配置工作目录，确保 list/login/logout 不读恰好位于应用 cwd 的 `.pi/mcp.json`。说明全局检测中的相对 command/cwd 是该检测环境的结果，不等于每个项目都能连接。
+- 全局：使用当前 agentDir + TC-Pi 控制的无项目配置工作目录，确保 list/login/logout 不读恰好位于应用 cwd 的 `.pi/mcp.json`。说明全局检测中的相对 command/cwd 是该检测环境的结果，不等于每个项目都能连接。
 - 项目：cwd 为所选项目 runtime 路径，验证 pi 的已保存 trust；有效列表包含继承 global + project 整体覆盖。未信任时不声称“项目检测成功”，也不偷偷持久化 trust。
 - 不给 list/login/logout 加 `-l` 或无效的 `--no-approve/--approve` 参数。不能通过复制 credentials 到临时 agentDir 来模拟 scope。
 - `PiLocator` 最新命令来源/安装器改动必须复用，WSL warm-up/转换、env 透传和自定义 pi 路径一起覆盖。
@@ -339,7 +339,7 @@
 - list：默认 30s，显式 maxBuffer；退出 0/1 且报告形状完整才解析；报告有 errors/未连接不能显示全绿。spawn/信号/超时明确返回失败。
 - login：pi timeout 秒数校验为有限正数并设置合理上限；宿主额外宽限有限；输出用有上限尾部缓冲。支持取消，关闭页面/窗口时取消并清理订阅、timer、进程。
 - stdout 用逐行增量解析器，不对累积半截内容反复跑 URL 正则。完整 URL 才推送，去重，只允许 http/https；stdout/stderr 各自处理，stderr 尾部错误要可见。按 0.99.2 CLI 的明文 `Sign in to MCP server ... in your browser:` + 下一行 URL 验证，覆盖分块、CRLF 和 EOF；本版超链接修复在 `/mcp` TUI，不要把 CLI 解析器误改成必须有 OSC 8。
-- 原生 pi 已经开浏览器，PiDeck 不自动再开。仅在当前登录区域展示可点击授权链接，点击走现成受控 openExternal；链接不进 toast、常规日志或模型上下文。
+- 原生 pi 已经开浏览器，TC-Pi 不自动再开。仅在当前登录区域展示可点击授权链接，点击走现成受控 openExternal；链接不进 toast、常规日志或模型上下文。
 - 同一 server/同一环境避免并行 login/logout/list 状态互相覆盖；旧 operation 的迟到结果不能更新新作用域或已关闭的页面。
 - 终止使用项目已有跨平台进程收尾手段；不能只 resolve UI promise 却留下 CLI/stdio MCP 子进程。异常/取消/close 只能 settle 一次。
 - CLI 输出可能含第三方错误/URL：复用脱敏工具，日志只保留必要元信息，授权 URL、token/headers 不落日志。
@@ -354,7 +354,7 @@
 
 ### 7.4 provider token 认证的单独处理（0.99.2 必须覆盖）
 
-- `auth.provider` 是复用 pi 供应商登录 token，既不是 MCP OAuth，也不是让 PiDeck 读取 `auth.json` 再填 Authorization。MCP OAuth 登录/登出按钮仅在 HTTP 且无 Authorization header、无 auth.provider 时适用；header 名判断不区分大小写。
+- `auth.provider` 是复用 pi 供应商登录 token，既不是 MCP OAuth，也不是让 TC-Pi 读取 `auth.json` 再填 Authorization。MCP OAuth 登录/登出按钮仅在 HTTP 且无 Authorization header、无 auth.provider 时适用；header 名判断不区分大小写。
 - provider 模式显示“使用供应商登录”，操作导航到现有供应商认证入口；WSL 沿用该入口的“不支持桌面认证，改用终端 `/login <provider>`”说明。不得替用户运行 `pi mcp login/logout`，也不在关闭/删除 MCP 时登出共享供应商。
 - **已验证的上游 CLI 缺口**：0.99.2 `extensions/mcp/cli.ts:createConnection` 未向 `McpServerConnection` 传 `providerToken`；session 的连接路径有这个回调。纯内存探针确认，无回调时 token 为 undefined，提供模拟回调时才有值；未读取任何真实凭据或连接服务器。
 - 因此该版本 `pi mcp list --json` 对 provider-auth 的报告不能验证会话中的 provider 认证。保留原始检测结果，但给这类行明确标注“CLI 尚不能验证此认证方式”，不能把 needs-auth 直接提示成“再次 MCP OAuth 登录”或断言供应商未登录。普通 OAuth/stdio/http 检测不受此限制。
@@ -386,15 +386,15 @@
 - codemode 子字段始终允许预配置，不以是否恰好存在字符串 `+codemode` 来禁用。显示说明：扩展可用且工具被手动/MCP 激活后这些值生效；若对应扩展被配置关闭，可显示原因但不擅自打开。
 - `mode` 只写 on/only，budget 为非负整数，0 必须保留；清空恢复该层默认/继承。修改一个键时保留 codemode 的未知字段，只有整个对象真的为空才删除。
 - 不在 PiProcess 额外拼 `--tools` 覆盖原生配置。MCP 自动激活继续交给 pi。
-- 0.99.2 的 `/reload` 是增量激活，不等于把运行中工具集重置成配置集合。即便用户在 TUI reload 后，移除的工具仍可能活跃；PiDeck 保存时仍提示新建/重启会话完成应用，不自动发送 `/reload` prompt、不新增 `reload_config` RPC。
+- 0.99.2 的 `/reload` 是增量激活，不等于把运行中工具集重置成配置集合。即便用户在 TUI reload 后，移除的工具仍可能活跃；TC-Pi 保存时仍提示新建/重启会话完成应用，不自动发送 `/reload` prompt、不新增 `reload_config` RPC。
 - MCP/codemode 文案同步 1.4：default codemode 的 MCP 工具不再内联于工具描述，inlineBudget 不能保证列出 MCP 全部工具；四个 exposure 选项中不再单列 codemode-deferred。
-- 保持现有安全门策略与默认工具不变。兼容账本已有的 powershell 受管范围缺口不因新增多选 UI 而自动解决；工具可以选择不代表已被 PiDeck 安全门覆盖，交付时不得作这种承诺。本轮不顺手重写命令安全策略。
+- 保持现有安全门策略与默认工具不变。兼容账本已有的 powershell 受管范围缺口不因新增多选 UI 而自动解决；工具可以选择不代表已被 TC-Pi 安全门覆盖，交付时不得作这种承诺。本轮不顺手重写命令安全策略。
 - 补全测试：未知工具、重复操作、显式空后开一个、最后一个关闭、混合裸名/修饰符、项目覆盖、1.3 四条实测、嵌套未知字段保留、MCP 自动激活说明不被 UI 误判。
 
 ## 10. 页面、权限与 IPC 接线
 
 - `ConfigModal.tsx` 继续按入口派生 scope；把 MCP 与工具小面板纳入项目 resourceOnly 导航。主配置页固定 global，项目弹窗固定 projectId；Chat 虚拟项目无项目资源入口。
-- `ExtensionsTab` 分清普通安装包/独立扩展、pi 内置、PiDeck 内置；包行总开关说明影响附带资源，partial 有明确展示；不新增另一套资源管理页面。
+- `ExtensionsTab` 分清普通安装包/独立扩展、pi 内置、TC-Pi 内置；包行总开关说明影响附带资源，partial 有明确展示；不新增另一套资源管理页面。
 - SkillsTab/PromptsTab/ExtensionsTab 统一从新的有效配置投影展示状态；项目页分本项目与继承全局。不能继续只看 disabledNames 或在列表中丢弃原生已禁用项。
 - 修改 `storeIpc.ts`、`projectResourceIpc.ts`、`systemIpc.ts` 的输入边界：scope、projectId、resourceId、布尔/三态、operationId 都从 unknown 收窄；不能只用 string 类型注解当运行时验证。
 - 包安装/卸载保留原生 CLI；来源切换、模型能力缓存、草稿命令补全 `useSessionComposerController` 必须失效/刷新。UI 刷新失败不能覆盖保存成功的文件，但要报告状态未刷新。
@@ -461,8 +461,8 @@
 | 显式 settings 路径停用→启用 | 来源仍可发现 |
 | JSON 损坏/并发编辑/写入失败 | 不覆盖原文件、不清旧记录、不显示成功 |
 | 迁移写 native 后进程崩溃 | 下次幂等完成/报告冲突，不重复叠加、不恢复已停用项 |
-| TUI 修改原生规则后刷新 PiDeck | UI 反映文件；旧 disabled 缓存不反写 |
-| 原生 builtin:mcp/codemode 任意关闭 | 正常启动不通过 -e 复活；PiDeck 其他扩展仍可用 |
+| TUI 修改原生规则后刷新 TC-Pi | UI 反映文件；旧 disabled 缓存不反写 |
+| 原生 builtin:mcp/codemode 任意关闭 | 正常启动不通过 -e 复活；TC-Pi 其他扩展仍可用 |
 | 项目 MCP 同名覆盖 | 整个定义来自项目；删除项目项恢复全局 |
 | 项目停用继承 MCP | 写有效传输+false，不拷凭据；恢复继承不启用半截定义 |
 | MCP 无效字段/旧 disabled/socket/SSE | 准确诊断，源数据不丢，不显示虚假的禁用/连接成功 |
@@ -474,7 +474,7 @@
 | 提醒在首轮之后返回/旧 Agent 重启后返回 | 新消息及时出现；旧 runtime 消息丢弃 |
 | defaultTools 清空后只选 codemode | 解析只含 codemode，不意外加回 read/bash/edit/write |
 | MCP autoEnableCodemode=false + 手动 codemode | 手动选择保留；子设置可编辑；不把“不自动开”画成扩展关闭 |
-| PiDeck 自带扩展关闭/项目覆盖 | 只影响桌面附加项；不向 pi 全局安装列表写入 PiDeck 包 |
+| TC-Pi 自带扩展关闭/项目覆盖 | 只影响桌面附加项；不向 pi 全局安装列表写入 TC-Pi 包 |
 | 0.99.2 默认 codemode 后台连接未完成 | 不因 CLI 检测未完成阻止发送首轮；不因 codemode 描述无 MCP 名称而提示服务不存在 |
 | 0.99.2 description/clientName/alias | 保存与导入保留 description；空白 clientName 拒绝；只展示四种 exposure，旧 alias 可读 |
 | `dev-radius` 与 `dev_radius`，`read-file` 与 `read_file` | server 命名空间冲突报错；原始 toolExposure 名称不改，RPC 带 hash 名不丢、不重算、不改历史消息 |
@@ -514,7 +514,7 @@
 | 全局扩展/技能/提示词启停 | 原生配置生效，可重开；TUI 同环境一致 | [ ] |
 | 项目本地与继承全局管理 | 固定 projectId、三态、无全局误写删 | [ ] |
 | 整包开关 | 附带资源一起关，恢复前态，更新后仍有效 | [ ] |
-| PiDeck 自带/热更新/内部适配器 | 桌面独立加载，顺序/依赖/保护不回退 | [ ] |
+| TC-Pi 自带/热更新/内部适配器 | 桌面独立加载，顺序/依赖/保护不回退 | [ ] |
 | 原生四扩展开关 | 全局和项目均有 UI，不被启动参数覆盖 | [ ] |
 | 启动恢复/trust/WSL/模型能力查询 | 同源、无全量白名单、诊断与拒绝信任保留 | [ ] |
 | 历史禁用选择 | 备份、可恢复、未解析不静默失效 | [ ] |
@@ -528,4 +528,4 @@
 
 ## 13. 可直接发给执行模型的任务
 
-> 请完整阅读 `docs/pi-0.99-mcp-codemode-plan.md`，从当前 dev 工作区接着实现 A0–V1，包含 1.4 节的 pi 0.99.2 增量与 7.4 节的 provider-auth CLI 限制。采用 pi 原生配置管理普通资源，支持固定全局/项目入口和整包启停；PiDeck 自带扩展仅供桌面；补齐 MCP/codemode 所有未完成项。先核对现有 diff 并保留并行工作，按阶段写针对性行为测试和执行验收，不用全量构建、不操作真实用户配置、不把历史失败过滤成通过。原生契约与本文有冲突时以当前实际 pi 行为和用户决定为准，先纠正受影响的计划/测试再继续，不用兼容补丁掩盖未知行为。完成后更新阶段状态、能力对照和兼容账本，报告通过项、失败项和未验证项。
+> 请完整阅读 `docs/pi-0.99-mcp-codemode-plan.md`，从当前 dev 工作区接着实现 A0–V1，包含 1.4 节的 pi 0.99.2 增量与 7.4 节的 provider-auth CLI 限制。采用 pi 原生配置管理普通资源，支持固定全局/项目入口和整包启停；TC-Pi 自带扩展仅供桌面；补齐 MCP/codemode 所有未完成项。先核对现有 diff 并保留并行工作，按阶段写针对性行为测试和执行验收，不用全量构建、不操作真实用户配置、不把历史失败过滤成通过。原生契约与本文有冲突时以当前实际 pi 行为和用户决定为准，先纠正受影响的计划/测试再继续，不用兼容补丁掩盖未知行为。完成后更新阶段状态、能力对照和兼容账本，报告通过项、失败项和未验证项。

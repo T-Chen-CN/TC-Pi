@@ -124,7 +124,7 @@ test("remaining renderer product copy is available in Chinese and English", () =
 	assert.equal(i18n.t("settings.dirtyTooltip"), "This field has been modified, not saved yet");
 	assert.equal(i18n.t("editor.unsavedMarker"), " · Unsaved");
 	assert.equal(i18n.t("timeline.loadMoreHistory", { count: 12 }), "Load more history messages (12)");
-	assert.equal(i18n.t("settings.wsl.apiUnavailable"), "The WSL API is not ready. Restart PiDeck and try again.");
+	assert.equal(i18n.t("settings.wsl.apiUnavailable"), "The WSL API is not ready. Restart TC-Pi and try again.");
 	assert.match(i18n.t("settings.wsl.piNotInstalled"), /@earendil-works\/pi-coding-agent/);
 	assert.equal(i18n.t("app.queuedDeliveryUnknown"), "The message may not have been delivered");
 	assert.equal(i18n.t("mermaid.renderFailed"), "Failed to render Mermaid diagram");

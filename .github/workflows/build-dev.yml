@@ -1,6 +1,6 @@
 name: Build Dev Packages
 
-# dev 通道（PiDeck Dev，双品牌包）手动构建链路：
+# dev 通道（TC-Pi Dev，双品牌包）手动构建链路：
 # - 仅 workflow_dispatch 手动触发（无 tag push 等自动触发器）：dev 通道发版节奏由人控制；
 # - 构建代码取 dispatch 所选分支 HEAD（tag 不必已存在；softprops 以本次 commit 建 tag）；
 # - 版本号 = 输入 tag 去 v 前缀，构建前 npm pkg set 写入 package.json，
@@ -60,28 +60,28 @@ jobs:
           - platform: windows
             os: windows-latest
             command: node scripts/dist-dev.js --win nsis portable zip
-            verify_globs: "PiDeck-Dev-*-setup.exe PiDeck-Dev-*-portable.exe PiDeck-Dev-*-win.zip latest*.yml"
+            verify_globs: "TC-Pi-Dev-*-setup.exe TC-Pi-Dev-*-portable.exe TC-Pi-Dev-*-win.zip latest*.yml"
             electron_mirror: https://npmmirror.com/mirrors/electron/
             electron_builder_binaries_mirror: https://npmmirror.com/mirrors/electron-builder-binaries/
           - platform: macos
             name: macOS x64
             os: macos-latest
             command: node scripts/dist-dev.js --mac dmg zip --x64
-            verify_globs: "PiDeck-Dev-*-x64.dmg PiDeck-Dev-*-x64.zip latest*.yml"
+            verify_globs: "TC-Pi-Dev-*-x64.dmg TC-Pi-Dev-*-x64.zip latest*.yml"
             electron_mirror: ""
             electron_builder_binaries_mirror: ""
           - platform: macos
             name: macOS arm64
             os: macos-latest
             command: node scripts/dist-dev.js --mac dmg zip --arm64
-            verify_globs: "PiDeck-Dev-*-arm64.dmg PiDeck-Dev-*-arm64.zip latest*.yml"
+            verify_globs: "TC-Pi-Dev-*-arm64.dmg TC-Pi-Dev-*-arm64.zip latest*.yml"
             electron_mirror: ""
             electron_builder_binaries_mirror: ""
           - platform: linux
             name: Linux x64
             os: ubuntu-latest
             command: node scripts/dist-dev.js --linux AppImage deb tar.gz --x64
-            verify_globs: "PiDeck-Dev-*-x64.AppImage PiDeck-Dev-*-x64.deb PiDeck-Dev-*-x64.tar.gz latest*.yml"
+            verify_globs: "TC-Pi-Dev-*-x64.AppImage TC-Pi-Dev-*-x64.deb TC-Pi-Dev-*-x64.tar.gz latest*.yml"
             electron_mirror: https://npmmirror.com/mirrors/electron/
             electron_builder_binaries_mirror: https://npmmirror.com/mirrors/electron-builder-binaries/
           # 与 release.yml 同款：arm64 用原生 runner（npm ci 按 arm64 编译 node-pty 等原生模块）；
@@ -90,7 +90,7 @@ jobs:
             name: Linux arm64
             os: ubuntu-24.04-arm
             command: node scripts/dist-dev.js --linux AppImage deb tar.gz --arm64
-            verify_globs: "PiDeck-Dev-*-arm64.AppImage PiDeck-Dev-*-arm64.deb PiDeck-Dev-*-arm64.tar.gz"
+            verify_globs: "TC-Pi-Dev-*-arm64.AppImage TC-Pi-Dev-*-arm64.deb TC-Pi-Dev-*-arm64.tar.gz"
             electron_mirror: https://npmmirror.com/mirrors/electron/
             electron_builder_binaries_mirror: https://npmmirror.com/mirrors/electron-builder-binaries/
             skip_yml: true
@@ -145,7 +145,7 @@ jobs:
             fi
           done
           echo "产物齐全："
-          ls release/PiDeck-Dev-* release/latest*.yml 2>/dev/null || true
+          ls release/TC-Pi-Dev-* release/latest*.yml 2>/dev/null || true
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -158,7 +158,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: true
           body: |
-            PiDeck Dev（开发通道）构建，非正式版。
+            TC-Pi Dev（开发通道）构建，非正式版。
 
             - 分支 HEAD：${{ github.sha }}
             - 与 stable 安装包可并存；userData 与 stable 共用（pi-desktop）。

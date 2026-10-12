@@ -1,7 +1,7 @@
-# PiDeck 宿主插件（Host Plugins）
+# TC-Pi 宿主插件（Host Plugins）
 
-> 第一阶段独立插件系统：不依赖 pi 进程，向 PiDeck 桌面壳（而非 pi RPC）注册 UI 面板与受限 API。
-> 设计动机：现有扩展点（pi 扩展 + GUI 桥）依赖 pi 进程且受 `ctx.ui` 降级限制；宿主插件让纯查看器/工具类扩展（如 pi-context）直接挂在 PiDeck 上。
+> 第一阶段独立插件系统：不依赖 pi 进程，向 TC-Pi 桌面壳（而非 pi RPC）注册 UI 面板与受限 API。
+> 设计动机：现有扩展点（pi 扩展 + GUI 桥）依赖 pi 进程且受 `ctx.ui` 降级限制；宿主插件让纯查看器/工具类扩展（如 pi-context）直接挂在 TC-Pi 上。
 
 ## 与既有机制的关系
 
@@ -9,7 +9,7 @@
 |------|------|------|
 | pi 扩展 + GUI 桥（`pi-deck-gui-bridge`） | pi 进程内 | 需要读会话流/拦截模型请求的扩展 |
 | 主题定制 | 渲染层 | 纯视觉 |
-| **宿主插件（本文档）** | PiDeck 桌面壳 | 只读会话 UI 工具、受控 HTTPS API / 已启动本地服务的前端 |
+| **宿主插件（本文档）** | TC-Pi 桌面壳 | 只读会话 UI 工具、受控 HTTPS API / 已启动本地服务的前端 |
 
 ## 包结构
 
@@ -63,7 +63,7 @@
 
 ## 工作台导航（`workbench.navigate` / `workbench.openExternal`）
 
-- `pideck.workbench.navigate(sessionId, entryId?)`：让 PiDeck 选中该会话并滚动到指定时间线条目（`entryId` 可省略，省略时落到底部）。
+- `pideck.workbench.navigate(sessionId, entryId?)`：让 TC-Pi 选中该会话并滚动到指定时间线条目（`entryId` 可省略，省略时落到底部）。
 - Broker 门禁与 `sessions.entries` 同源：目标会话必须属于当前项目，否则 `session-not-authorized`；导航事件不携带任何插件数据。
 - pi-context viewer 的「在浏览器中查看」按钮即走此链路：转换器给模型行补 `id`，桥接层 `host.locate` 反查快照行 → `navigate`。
 - `pideck.workbench.openExternal(url)`：只接受 https 且不带账号密码（其余一律 `invalid-request`），经主进程 sink 交给 `openExternalUrl`；不返回接口结果，也不授予网络权限。
@@ -72,7 +72,7 @@
 
 - 链路：专属 preload 的 `pideck.network.request(input)` → 同一个 sender-bound Broker → `HostPluginNetwork` → `hostPluginNetworkTransport`。页面的 CSP / webRequest 仍只允许自身资产，不开放 fetch / XHR / WebSocket。
 - HTTPS 精确匹配 `manifest.network.httpsOrigins`（无路径/查询/通配符）；DNS 所有结果必须是公网单播地址，私网/特殊地址/混合结果全部拒绝。Node socket 固定到已验证的 IP，原 URL 保留给 Host / SNI / TLS 证书校验，不做第二次 DNS 解析、不复用连接池。
-- 本地只允许单独声明的 `http://127.0.0.1:<明确端口>`（1–65535），不接受 localhost / IPv6 回环 / 局域网地址。服务必须已运行；PiDeck 不执行 BAT、不启动进程。
+- 本地只允许单独声明的 `http://127.0.0.1:<明确端口>`（1–65535），不接受 localhost / IPv6 回环 / 局域网地址。服务必须已运行；TC-Pi 不执行 BAT、不启动进程。
 - GET / POST、有界 UTF-8 text/JSON：POST ≤256 KiB、响应 ≤1 MiB、请求头 ≤32 个 / 16 KiB、响应头 ≤16 KiB；默认 15 秒总超时、最多 30 秒，覆盖 DNS 到全部响应。禁止 Cookie / 连接与分帧控制头，不共享宿主凭据；允许插件自己的 Authorization / API key。压缩与二进制响应拒绝。
 - 重定向最多 3 次，仅同 origin；每跳重新验证授权/DNS。301/302/303 的 POST 转 GET，307/308 保留；不跨 origin 转发凭据或正文。
 - Broker 的请求 AbortController 属于实例 binding；update / unbind / 禁用 / 指纹变化 / dispose 都同步撤销，ViewHost 在 guest 已销毁时也必须 unbind。取消 socket 不回滚服务已经执行的操作。
@@ -95,7 +95,7 @@
 
 - 格式：NDJSON 单文件（header 行 + 每文件一行 base64 + sha256），与目录包同一套预算（单文件 4MiB / 展开 16MiB / 100 文件 / 深度 8）；归档总体上限 24MiB。选自描述行格式而非 zip：无运行时解压依赖，预算与逐文件校验内建在解析器（`src/main/plugins/hostPluginArchive.ts`）。
 - 打包：`node scripts/pack-host-plugin.mjs <插件目录> [输出.pideck-plugin]`。
-- 安装：设置 → PiDeck 插件 →「从文件安装…」收 `.pideck-plugin` 归档，「从文件夹安装…」收已解压的目录包；两条路径都：路径只来自主进程对话框（渲染层不传路径）→ 拷/写到隐藏 temp 目录（`stageHostPluginFile` 逐级建目录，支持 `assets/app.html` 这类嵌套资产）→ 走 `readHostPluginPackage` 全量验证 → 原子换入，失败自动清理。目录来源额外跳过 `.git`/`node_modules` 整棵；路径形状不合法（空格/中文名等）或超限的文件被跳过而不是造成整包失败，其余文件照搬到落位目录。
+- 安装：设置 → TC-Pi 插件 →「从文件安装…」收 `.pideck-plugin` 归档，「从文件夹安装…」收已解压的目录包；两条路径都：路径只来自主进程对话框（渲染层不传路径）→ 拷/写到隐藏 temp 目录（`stageHostPluginFile` 逐级建目录，支持 `assets/app.html` 这类嵌套资产）→ 走 `readHostPluginPackage` 全量验证 → 原子换入，失败自动清理。目录来源额外跳过 `.git`/`node_modules` 整棵；路径形状不合法（空格/中文名等）或超限的文件被跳过而不是造成整包失败，其余文件照搬到落位目录。
 - 替换语义：启用中的插件拒绝替换（`plugin-in-use`，先禁用再装）；禁用状态重装同 id 允许，字节一致则指纹不变，内容变化则旧授权失效。
 
 ## pi-context 本地适配
@@ -103,7 +103,7 @@
 `scripts/convert-pi-context-host-plugin.mjs <pi-context 目录> <输出目录>` 把本地 pi-context 的 viewer 一次性转换为宿主插件：
 
 - 只转换无 import 的纯模型层与 viewer 静态资产；IO/导航/刷新生命周期改走 `resources/host-plugin-adapters/pi-context/` 的桥接层。
-- 输出必须在新目录（`wx` 独占创建，不覆盖既有包与授权身份），产物默认禁用，需在设置 → PiDeck 插件里手动启用。
+- 输出必须在新目录（`wx` 独占创建，不覆盖既有包与授权身份），产物默认禁用，需在设置 → TC-Pi 插件里手动启用。
 - 第三方代码不 vendoring、不自动启用；上游接缝变化（精确字符串匹配失败）时报错而不是生成不确定产物。
 - 转换后的 viewer 通过 `sessions.*` 获取数据，不依赖原 BAT / Web 服务，不需要网络权限。
 

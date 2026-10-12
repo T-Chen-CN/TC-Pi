@@ -1,11 +1,11 @@
 ---
-title: Usage Guide | PiDeck pi desktop tutorial
-description: "Full usage tutorial for PiDeck (the pi desktop client): from install to your first AI coding task — projects, sessions, mode switching, and Git workflow basics."
+title: Usage Guide | TC-Pi pi desktop tutorial
+description: "Full usage tutorial for TC-Pi (the pi desktop client): from install to your first AI coding task — projects, sessions, mode switching, and Git workflow basics."
 ---
 
 # Usage Guide
 
-This guide walks through the main features of PiDeck step by step.
+This guide walks through the main features of TC-Pi step by step.
 
 ## Workspace
 

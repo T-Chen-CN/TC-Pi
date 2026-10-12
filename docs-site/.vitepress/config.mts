@@ -11,7 +11,7 @@ export default defineConfig({
   base,
   cleanUrls: true,
   lastUpdated: true,
-  // 页面已在 frontmatter title 里带品牌与关键词（如「PiDeck - pi desktop 桌面工作台」），
+  // 页面已在 frontmatter title 里带品牌与关键词（如「TC-Pi - pi desktop 桌面工作台」），
   // 关闭默认的「| siteTitle」后缀拼接，避免 title 重复啰嗦、稀释搜索关键词权重。
   // 注意：titleTemplate 是 defineConfig 顶层字段，且关闭值是 false（VitePress 未处理 null）。
   titleTemplate: false,
@@ -28,9 +28,9 @@ export default defineConfig({
     root: {
       label: "中文",
       lang: "zh-CN",
-      title: "PiDeck - pi Agent 桌面工作台",
+      title: "TC-Pi - pi Agent 桌面工作台",
       description:
-        "PiDeck 是一款开源桌面工作台，用于在本地项目文件夹中管理多个 pi AI 编码助手。支持会话历史、Git 集成、内置终端和可视化配置管理。",
+        "TC-Pi 是一款开源桌面工作台，用于在本地项目文件夹中管理多个 pi AI 编码助手。支持会话历史、Git 集成、内置终端和可视化配置管理。",
       themeConfig: {
         nav: [
           { text: "首页", link: "/" },
@@ -102,9 +102,9 @@ export default defineConfig({
       label: "English",
       lang: "en",
       link: "/en/",
-      title: "PiDeck - pi Agent Desktop Workbench",
+      title: "TC-Pi - pi Agent Desktop Workbench",
       description:
-        "PiDeck is an open-source desktop workbench for managing multiple pi AI coding agents across local project folders. Features session history, Git integration, built-in terminal, and visual config management.",
+        "TC-Pi is an open-source desktop workbench for managing multiple pi AI coding agents across local project folders. Features session history, Git integration, built-in terminal, and visual config management.",
       themeConfig: {
         nav: [
           { text: "Home", link: "/en/" },
@@ -176,7 +176,7 @@ export default defineConfig({
   // ===== 共享主题配置 =====
   themeConfig: {
     logo: "/icon.svg",
-    siteTitle: "PiDeck",
+    siteTitle: "TC-Pi",
     // 当前维护与下载入口统一指向 TC-Pi，原作者署名保留在版权信息中。
     socialLinks: [
       { icon: "github", link: "https://github.com/T-Chen-CN/TC-Pi", ariaLabel: "GitHub 仓库" },
@@ -214,18 +214,18 @@ export default defineConfig({
   head: [
     ["link", { rel: "icon", href: `${base}icon.svg` }],
     ["link", { rel: "canonical", href: `${siteOrigin}/` }],
-    ["meta", { name: "keywords", content: "PiDeck, pi, pi-agent, ai-coding-agent, desktop, electron, rpc, local-ai, developer-tools, coding-assistant, workspace, session-management, git, terminal, windows, macos, linux, open-source" }],
+    ["meta", { name: "keywords", content: "TC-Pi, pi, pi-agent, ai-coding-agent, desktop, electron, rpc, local-ai, developer-tools, coding-assistant, workspace, session-management, git, terminal, windows, macos, linux, open-source" }],
     ["meta", { name: "author", content: "ayuayue" }],
     ["meta", { name: "robots", content: "index, follow" }],
-    ["meta", { property: "og:site_name", content: "PiDeck" }],
-    ["meta", { property: "og:title", content: "PiDeck - pi Agent Desktop Workbench" }],
+    ["meta", { property: "og:site_name", content: "TC-Pi" }],
+    ["meta", { property: "og:title", content: "TC-Pi - pi Agent Desktop Workbench" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:url", content: `${siteOrigin}/` }],
     ["meta", { property: "og:image", content: `${siteOrigin}/og-image.png` }],
-    ["meta", { property: "og:image:width", content: "1200" }],
-    ["meta", { property: "og:image:height", content: "630" }],
+    ["meta", { property: "og:image:width", content: "1731" }],
+    ["meta", { property: "og:image:height", content: "909" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
-    ["meta", { name: "twitter:title", content: "PiDeck - pi Agent Desktop Workbench" }],
+    ["meta", { name: "twitter:title", content: "TC-Pi - pi Agent Desktop Workbench" }],
     ["meta", { name: "twitter:description", content: "Manage multiple pi AI coding agents in local workspaces. Open-source desktop app with sessions, Git, terminal, and extensions." }],
     ["meta", { name: "twitter:image", content: `${siteOrigin}/og-image.png` }],
     // 搜索引擎站长平台验证位：GSC/Bing 验证码通过 CI 环境变量注入（pages.yml 的 env），
@@ -252,7 +252,7 @@ export default defineConfig({
       JSON.stringify({
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": "PiDeck",
+        "name": "TC-Pi",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "description": "Open-source desktop workbench for managing multiple pi AI coding agents across local project folders.",

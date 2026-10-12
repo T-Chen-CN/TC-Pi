@@ -7,19 +7,19 @@
 | | 路径 | 形态 |
 |---|---|---|
 | 终端 `pi` | `~/.pi/agent/bin/pi` | 官方安装器（`curl -fsSL https://pi.dev/install.sh \| sh`）的 managed 安装：启动器脚本 → 读 `~/.pi/agent/install/current-version` → exec `install/releases/<ver>/node_modules/.bin/pi`，并导出 `PI_MANAGED_INSTALL_ROOT` |
-| PiDeck 启动的 pi | `~/…/.nvm/versions/node/<ver>/bin/pi` | npm 全局包装 → `lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js` |
+| TC-Pi 启动的 pi | `~/…/.nvm/versions/node/<ver>/bin/pi` | npm 全局包装 → `lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js` |
 
 成因链（逐条验证过）：
 
 1. 官方安装器把启动器写到 `<agentDir>/bin/pi`，并且**只把 PATH 写进当前 shell 的配置文件**
    （bash：有 `~/.bashrc` 就写 `.bashrc`，否则写 `.profile`；见 `install.sh` 的 `shell_config_file` /
    `prompt_add_path_to_profile`）。只有**交互式** shell 会 source 它。
-2. GUI 启动的 PiDeck 继承的 PATH 来自桌面会话（`~/.profile` 链路），没有 `~/.pi/agent/bin`。
+2. GUI 启动的 TC-Pi 继承的 PATH 来自桌面会话（`~/.profile` 链路），没有 `~/.pi/agent/bin`。
 3. `PiLocator` 的登录 shell 探测是 `/bin/sh -lc`（**非交互**登录 shell，dash 读 `~/.profile`），
    同样读不到 `.bashrc`；而扫描目录里根本没有 `~/.pi/agent/bin`。
 4. 于是第一个命中的候选是别的副本（这台机器上是 nvm 里那份）。
 
-后果不只是「显示错了」：**终端 `pi update` 更新的是 managed 安装，PiDeck 的「更新 Pi」`pi update pi`
+后果不只是「显示错了」：**终端 `pi update` 更新的是 managed 安装，TC-Pi 的「更新 Pi」`pi update pi`
 更新的是 npm 那份**，两边会漂移；环境诊断里的「pi 版本/路径」也不是用户终端用的那个。
 更糟的是环境引导把这种情况判成「未安装」，推着用户又装第二份（引导安装写 `npm -g --prefix <userData>/pi-runtime/pi-global`），
 而安装器自己的日志早就警告过这种局面（`print_existing_global_pi_not_writable_message`）。
@@ -123,7 +123,7 @@
 
 ### 5）引导安装的便携副本（POSIX 三个既有缺陷，本次一并修掉）
 
-引导安装把 Node 与 pi 装在 PiDeck 自己的数据目录（`<userData>/pi-runtime/`），**不写系统环境**；
+引导安装把 Node 与 pi 装在 TC-Pi 自己的数据目录（`<userData>/pi-runtime/`），**不写系统环境**；
 代价是终端里默认敲 `pi` 找不到它（设计如此，不修）。但 Linux/macOS 上它之前根本用不起来，
 三个缺陷都是从「POSIX 比 Windows 多一层 `bin/`」衍生出来的：
 
@@ -150,7 +150,7 @@ PiLocator 会在裸 Node 沙箱里被加载，不能把便携 Node 安装器整�
 | RPC bash 的 `bash_execution_update` 流式事件 | 0.82.0 | [0.82.0 发布说明](https://pi.dev/changelog/releases/0.82.0) |
 | pi 自更新（`pi update --self`） | 0.70.3 | [0.70.3 发布说明](https://pi.dev/changelog/releases/0.70.3) |
 
-PiDeck 的设置页更新走主进程的 Node `execFile` + `PiLocator` 平台适配，不走会话 RPC bash。
+TC-Pi 的设置页更新走主进程的 Node `execFile` + `PiLocator` 平台适配，不走会话 RPC bash。
 改走会话 bash 会额外依赖活跃会话、影响会话历史，并不能消除底层包管理器或网络失败，因此不因缺少流式事件强制升级 pi。
 
 - **自更新**：pi ≥ 0.70.3 使用 `pi update --self`；低于门槛、门槛版本的预发布版或版本未知时，提示用原安装方式手动升级后重新检测，不猜测 npm/pnpm 命令、不另装第二份。
@@ -168,11 +168,11 @@ node --test tests/piLocatorInstallations.test.mjs tests/piInstallationOptions.te
 
 ## 后续可做（本次未做）
 
-- **便携 node 版本 / 启动用哪个 node**：当前 PiDeck 拉起 pi 时用的是 PATH 里的 node（或与 shim 同目录的 node）。
+- **便携 node 版本 / 启动用哪个 node**：当前 TC-Pi 拉起 pi 时用的是 PATH 里的 node（或与 shim 同目录的 node）。
   本机存在多个 node（nvm/mise/asdf/volta/brew/便携）时，尚未提供「用哪个 node 跑 pi」的选择。
-- 引导安装目前固定用 npm 装到 PiDeck 自己的数据目录（`<userData>/pi-runtime/pi-global`，不写系统环境、不用提权）。
+- 引导安装目前固定用 npm 装到 TC-Pi 自己的数据目录（`<userData>/pi-runtime/pi-global`，不写系统环境、不用提权）。
   若要让用户选择官方安装器那两种方式（curl / PowerShell 远程脚本），需单独决策：那会把「执行远端脚本」
   引进来，安全面与现在完全不同。
 - 若将来 pi 在 Windows 把 managed 安装转为默认（现为 `PI_EXPERIMENTAL=1` 才启用），
   Windows 侧的启动器名/落点要按官方安装器再确认一次（当前按 `<home>/.pi/agent/bin` 对称实现）。
-- 官方安装器的 PATH 写法定位于交互式 shell，属于上游行为；PiDeck 侧已用「扫目录 + 显式 shell 反查」绕过。
+- 官方安装器的 PATH 写法定位于交互式 shell，属于上游行为；TC-Pi 侧已用「扫目录 + 显式 shell 反查」绕过。

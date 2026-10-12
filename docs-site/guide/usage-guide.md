@@ -1,30 +1,30 @@
 ---
-title: 使用指南 | PiDeck pi desktop 新手教程
-description: PiDeck（pi 桌面客户端）完整使用教程：从安装到完成第一个 AI 编码任务，涵盖项目工作区、会话管理、模式切换与 Git 协作的全部基础操作。
+title: 使用指南 | TC-Pi pi desktop 新手教程
+description: TC-Pi（pi 桌面客户端）完整使用教程：从安装到完成第一个 AI 编码任务，涵盖项目工作区、会话管理、模式切换与 Git 协作的全部基础操作。
 ---
 
 # 使用指南
 
 > 如果你没用过 pi 或类似的 AI 编码助手，这份指南会从零开始带你走完从安装到完成第一个任务的完整流程。
 
-## 什么是 PiDeck？什么是 pi？
+## 什么是 TC-Pi？什么是 pi？
 
 **pi** 是一个命令行编码助手工具——你在终端输命令，它理解你的项目代码，能帮你写代码、改代码、解释代码。
 
-**PiDeck** 是一个桌面应用，相当于给 pi 配了一个图形界面。它让你不需要一直盯着终端，而是可以在一个窗口里：
+**TC-Pi** 是一个桌面应用，相当于给 pi 配了一个图形界面。它让你不需要一直盯着终端，而是可以在一个窗口里：
 
 - 同时管理多个项目的 pi 对话（像聊天软件一样）
 - 查看项目文件和 Git 分支
 - 在有需要的时候打开终端
 - 用可视化的方式配置 API 密钥和模型
 
-简单说：pi 是"干活的大脑"，PiDeck 是"干活的桌面"。
+简单说：pi 是"干活的大脑"，TC-Pi 是"干活的桌面"。
 
 ---
 
 ## 第一步：安装 pi
 
-PiDeck 本身只是一个桌面外壳，所有编码能力来自 pi，所以必须先安装 pi。
+TC-Pi 本身只是一个桌面外壳，所有编码能力来自 pi，所以必须先安装 pi。
 
 ### 什么是 pi？
 
@@ -40,31 +40,31 @@ pi --version
 
 如果能正确显示版本号，说明 pi 已经可用。
 
-> 💡 安装 pi 时，它通常会自动配置一个 API 密钥（例如 Anthropic 或 OpenAI 的密钥）。如果你已经配好了，PiDeck 可以直接使用这个配置。
+> 💡 安装 pi 时，它通常会自动配置一个 API 密钥（例如 Anthropic 或 OpenAI 的密钥）。如果你已经配好了，TC-Pi 可以直接使用这个配置。
 
 ---
 
-## 第二步：安装 PiDeck
+## 第二步：安装 TC-Pi
 
 ### 下载安装包
 
-访问 PiDeck 的 GitHub Releases 页面：
+访问 TC-Pi 的 GitHub Releases 页面：
 
-[https://github.com/ayuayue/PiDeck/releases](https://github.com/ayuayue/PiDeck/releases)
+[https://github.com/T-Chen-CN/TC-Pi/releases](https://github.com/T-Chen-CN/TC-Pi/releases)
 
 找到最新版本，根据你的操作系统选择：
 
 | 操作系统 | 推荐下载 |
 |---------|---------|
-| **Windows** | 安装版：`PiDeck-Setup-x.x.x.exe` / 便携版：`PiDeck-x.x.x.zip` |
-| **macOS** | `PiDeck-x.x.x-arm64.dmg`（Apple Silicon）或 `PiDeck-x.x.x-x64.dmg`（Intel）|
-| **Linux** | `PiDeck-x.x.x.AppImage` 或 `PiDeck-x.x.x.deb` |
+| **Windows** | 安装版：`TC-Pi-Setup-x.x.x.exe` / 便携版：`TC-Pi-x.x.x.zip` |
+| **macOS** | `TC-Pi-x.x.x-arm64.dmg`（Apple Silicon）或 `TC-Pi-x.x.x-x64.dmg`（Intel）|
+| **Linux** | `TC-Pi-x.x.x.AppImage` 或 `TC-Pi-x.x.x.deb` |
 
 下载后直接运行安装程序。
 
 ### 首次启动
 
-第一次打开 PiDeck 时，它会自动检测系统里有没有装 pi。如果检测成功，你会看到主界面。
+第一次打开 TC-Pi 时，它会自动检测系统里有没有装 pi。如果检测成功，你会看到主界面。
 
 如果检测失败：
 
@@ -77,7 +77,7 @@ pi --version
 
 ## 第三步：认识主界面
 
-打开 PiDeck 后，你会看到三个主要区域：
+打开 TC-Pi 后，你会看到三个主要区域：
 
 ```
 ┌──────────────┬──────────────────────────────────────┬──────────┐
@@ -135,7 +135,7 @@ pi --version
 ### 创建 Agent 会话
 
 1. 点击项目右侧的"启动 Agent"按钮
-2. PiDeck 会启动一个 pi 进程，加载你的项目
+2. TC-Pi 会启动一个 pi 进程，加载你的项目
 3. 几秒钟后，中间的聊天面板就准备好了
 
 ### 选择模型
@@ -187,7 +187,7 @@ pi 会开始思考，你会看到：
 ### 恢复历史会话
 
 1. 在左侧栏找到你要恢复的会话
-2. 点击它，PiDeck 会重新打开这个会话
+2. 点击它，TC-Pi 会重新打开这个会话
 3. 你可以查看历史消息，也可以继续发送新消息
 
 ### 关闭 Agent
@@ -223,7 +223,7 @@ Agent 关闭后，它会在左侧栏消失，重新变为可点击的历史会�
 
 ## 配置 API 密钥
 
-如果你需要在 PiDeck 里配置密钥（而不是用 pi 的已有配置）：
+如果你需要在 TC-Pi 里配置密钥（而不是用 pi 的已有配置）：
 
 1. 点击左下角齿轮 ⚙️
 2. 进入 **Auth** 页面
@@ -248,7 +248,7 @@ Agent 关闭后，它会在左侧栏消失，重新变为可点击的历史会�
 
 1. 确认 pi 已安装并在终端可以运行：`pi --version`
 2. 在设置里手动填写 pi 路径
-3. 重启 PiDeck
+3. 重启 TC-Pi
 
 ### 发送消息后没有响应
 
@@ -265,7 +265,7 @@ Agent 关闭后，它会在左侧栏消失，重新变为可点击的历史会�
 
 点击聊天面板上方的停止按钮（停止图标 ⏹），可以终止当前请求。
 
-### 如何更新 PiDeck？
+### 如何更新 TC-Pi？
 
 1. 设置 → 检查更新
 2. 如果有新版本，点击下载
@@ -276,7 +276,7 @@ Agent 关闭后，它会在左侧栏消失，重新变为可点击的历史会�
 ## 下一步
 
 - [功能操作手册](/guide/feature-reference) — 每个按钮、菜单、快捷键在哪、怎么用
-- [功能介绍](/guide/features) — 了解 PiDeck 的所有功能
+- [功能介绍](/guide/features) — 了解 TC-Pi 的所有功能
 - [配置与 Skills](/guide/settings) — 深入学习配置管理
 - [问题排查指南](/guide/troubleshooting) — 遇到问题时按症状查找处理路径
 - [更新日志](/changelog) — 查看各版本变化

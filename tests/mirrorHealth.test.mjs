@@ -171,13 +171,21 @@ files:
 files:
   - url: ../../etc/passwd
 `;
-	assert.equal(resolveProbeFileName(ymlEvil), "PiDeck-0.8.2-setup.exe");
+	assert.equal(resolveProbeFileName(ymlEvil), "TC-Pi-0.8.2-setup.exe");
 });
 
 test("resolveProbeFileName：无 url 列表时按 version 规范回退", () => {
 	const ymlSimple = `version: 0.9.0\nreleaseDate: 2026-09-03\n`;
-	assert.equal(resolveProbeFileName(ymlSimple), "PiDeck-0.9.0-setup.exe");
+	assert.equal(resolveProbeFileName(ymlSimple), "TC-Pi-0.9.0-setup.exe");
 
 	const ymlEmpty = ``;
-	assert.equal(resolveProbeFileName(ymlEmpty), "PiDeck-setup.exe");
+	assert.equal(resolveProbeFileName(ymlEmpty), "TC-Pi-setup.exe");
+});
+
+test("resolveProbeFileName：标准 files 列表读取 TC-Pi 名称，不从版本猜测", () => {
+	assert.equal(resolveProbeFileName("version: 0.9.1\nfiles:\n  - url: TC-Pi-0.9.1-win-x64-setup.exe\n"), "TC-Pi-0.9.1-win-x64-setup.exe");
+});
+
+test("resolveProbeFileName：改名后仍尊重历史 PiDeck 安装包 URL", () => {
+	assert.equal(resolveProbeFileName("version: 0.9.1\nfiles:\n  - url: PiDeck-0.9.1-win-x64-setup.exe\n"), "PiDeck-0.9.1-win-x64-setup.exe");
 });

@@ -99,7 +99,7 @@ export type PiAuthFlowSink = (update: PiAuthFlowUpdate) => void;
 const LAUNCH_FAILURE_HINT: Record<PiAuthHostLaunchFailureReason, string> = {
 	wsl: "pi 运行在 WSL 中，无法在应用内完成登录；请在 WSL 终端执行 pi 后输入 /login。",
 	"no-pi-entry": "找不到 pi 可加载的 JS 入口（可能是编译版单文件 pi）；请在终端执行 pi 后输入 /login。",
-	"helper-missing": "应用缺少认证助手文件 resources/pi-auth-host.mjs，请重新安装或更新 PiDeck。",
+	"helper-missing": "应用缺少认证助手文件 resources/pi-auth-host.mjs，请重新安装或更新 TC-Pi。",
 };
 
 /**

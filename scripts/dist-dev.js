@@ -1,12 +1,12 @@
 /**
- * dev 通道（PiDeck Dev）三平台打包入口。
+ * dev 通道（TC-Pi Dev）三平台打包入口。
  *
- * 与 stable（PiDeck）双品牌包并存、互不影响：
- * - productName: "PiDeck Dev" → 安装目录 / 快捷方式 / 开始菜单独立
+ * 与 stable（TC-Pi）双品牌包并存、互不影响：
+ * - productName: "TC-Pi Dev" → 安装目录 / 快捷方式 / 开始菜单独立
  * - appId: com.ayuayue.pi-desktop-dev → NSIS GUID（由 appId 派生）与通知
  *   AppUserModelID 独立，两通道安装包可并存
  * - 协议 scheme: pideck-dev:// → 注册表关联不与 stable 的 pideck:// 互相抢占
- * - 产物名固定 "PiDeck-Dev-…"（无空格，GitHub/AtomGit 资产 URL 对空格敏感）
+ * - 产物名固定 "TC-Pi-Dev-…"（无空格，GitHub/AtomGit 资产 URL 对空格敏感）
  *
  * userData 与 stable **共用** pi-desktop（主进程 index.ts 的刻意决策），
  * 双包切换不丢配置；并行运行依赖按版本互斥的单实例锁。
@@ -32,14 +32,14 @@ const root = path.resolve(__dirname, "..");
 // artifactName 显式含 ${arch}：mac/linux 多架构分 job 构建，模板无 ${arch} 时
 // x64/arm64 产物同名互相覆盖（stable 配置 win 模板不含 ${arch} 是因为 win 只发 x64）。
 const DEV_OVERRIDES = {
-	productName: "PiDeck Dev",
+	productName: "TC-Pi Dev",
 	appId: "com.ayuayue.pi-desktop-dev",
-	protocols: [{ name: "PiDeck Dev Agent Link", schemes: ["pideck-dev"] }],
-	win: { artifactName: "PiDeck-Dev-${version}-win.${ext}" },
-	nsis: { artifactName: "PiDeck-Dev-${version}-setup.${ext}" },
-	portable: { artifactName: "PiDeck-Dev-${version}-portable.${ext}" },
-	mac: { artifactName: "PiDeck-Dev-${version}-${arch}.${ext}" },
-	linux: { artifactName: "PiDeck-Dev-${version}-${arch}.${ext}" },
+	protocols: [{ name: "TC-Pi Dev Agent Link", schemes: ["pideck-dev"] }],
+	win: { artifactName: "TC-Pi-Dev-${version}-win.${ext}" },
+	nsis: { artifactName: "TC-Pi-Dev-${version}-setup.${ext}" },
+	portable: { artifactName: "TC-Pi-Dev-${version}-portable.${ext}" },
+	mac: { artifactName: "TC-Pi-Dev-${version}-${arch}.${ext}" },
+	linux: { artifactName: "TC-Pi-Dev-${version}-${arch}.${ext}" },
 };
 
 function buildDevConfig() {
@@ -82,7 +82,7 @@ function run(args) {
 		fs.rmSync(configPath, { force: true });
 	}
 
-	console.log(`\n[3/3] ✅ PiDeck Dev 打包完成！产物在 release/ 目录`);
+	console.log(`\n[3/3] ✅ TC-Pi Dev 打包完成！产物在 release/ 目录`);
 }
 
 module.exports = { run, buildDevConfig, DEV_OVERRIDES };

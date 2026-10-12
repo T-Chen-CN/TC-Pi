@@ -14,33 +14,33 @@ export type CustomThemeGuideLocale = "zh-CN" | "en-US";
 function promptIntro(locale: CustomThemeGuideLocale, themesDir: string): string {
 	if (locale === "en-US") {
 		return [
-			`# PiDeck Custom Theme Development Guide`,
+			`# TC-Pi Custom Theme Development Guide`,
 			``,
 			`This document doubles as an AI prompt: paste it to any AI assistant (e.g. a pi session), add one line like "make me a Tokyo-night theme", and it can produce a valid theme package for you.`,
 			``,
 			`## What a theme package is`,
 			``,
-			`A PiDeck theme is a single JSON file that overrides the app's semantic design tokens (backgrounds, text, borders, accent, chat bubbles, code blocks) for both light and dark modes. No CSS, no code execution — just token values. Invalid keys or non-color values are rejected.`,
+			`A TC-Pi theme is a single JSON file that overrides the app's semantic design tokens (backgrounds, text, borders, accent, chat bubbles, code blocks) for both light and dark modes. No CSS, no code execution — just token values. Invalid keys or non-color values are rejected.`,
 			``,
 			`## Quick start`,
 			``,
-			`1. PiDeck → Settings → Appearance → Custom Themes: click "New theme" to create an editable starter, or "Copy to new theme" from the built-in demo.`,
+			`1. TC-Pi → Settings → Appearance → Custom Themes: click "New theme" to create an editable starter, or "Copy to new theme" from the built-in demo.`,
 			`2. Edit the JSON (by hand, or let an AI write it using this guide).`,
 			`3. Save, then click "Apply" on the theme card, and save settings. Theme files live in: \`${themesDir}\``,
 		].join("\n");
 	}
 	return [
-		`# PiDeck 自定义主题开发指南`,
+		`# TC-Pi 自定义主题开发指南`,
 		``,
 		`这份文档本身就是提示词：整段发给任意 AI 助手（比如一个 pi 会话），再补一句「帮我做一个 XX 风格的主题」，AI 就能产出合法的主题包。`,
 		``,
 		`## 主题包是什么`,
 		``,
-		`PiDeck 主题 = 一个 JSON 文件，覆盖应用的语义设计 token（表面/文字/边框/主色/会话气泡/代码块），浅色与暗色各一套。不是 CSS、不执行代码，只有颜色值；白名单之外的键或非法颜色值都会被拒绝。`,
+		`TC-Pi 主题 = 一个 JSON 文件，覆盖应用的语义设计 token（表面/文字/边框/主色/会话气泡/代码块），浅色与暗色各一套。不是 CSS、不执行代码，只有颜色值；白名单之外的键或非法颜色值都会被拒绝。`,
 		``,
 		`## 快速开始`,
 		``,
-		`1. PiDeck → 设置 → 外观 → 自定义主题：点「新建主题」生成可编辑模板，或在内置示例上「复制为新主题」。`,
+		`1. TC-Pi → 设置 → 外观 → 自定义主题：点「新建主题」生成可编辑模板，或在内置示例上「复制为新主题」。`,
 		`2. 编辑 JSON（手改，或按本指南让 AI 生成）。`,
 		`3. 保存后在主题卡片上点「应用」，再保存设置即生效。主题文件存放目录：\`${themesDir}\``,
 	].join("\n");

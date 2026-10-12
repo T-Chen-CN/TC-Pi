@@ -473,7 +473,7 @@ export class WebServiceManager {
 		if (url.pathname === "/api/health") {
 			this.sendJson(response, {
 				ok: true,
-				service: "PiDeck",
+				service: "TC-Pi",
 				host,
 				port: this.getPort(server, port),
 			});
@@ -642,7 +642,7 @@ export class WebServiceManager {
 				const safeTitle = sessionId.replace(/[^\w.-]+/g, "_");
 				response.writeHead(200, {
 					"content-type": "text/html; charset=utf-8",
-					"content-disposition": `attachment; filename="pideck-session-${safeTitle}.html"`,
+					"content-disposition": `attachment; filename="TC-Pi-session-${safeTitle}.html"`,
 					"cache-control": "no-store",
 				});
 				response.end(html);
@@ -1049,7 +1049,7 @@ export class WebServiceManager {
 	<link rel="manifest" href="/manifest.webmanifest" />
 	<meta name="theme-color" content="#18181b" />
 	<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-	<title>PiDeck Web Service</title>
+	<title>TC-Pi Web Service</title>
 	<style>
 		:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 		body { margin: 0; background: #f4f6f8; color: #252a31; }
@@ -1103,7 +1103,7 @@ export class WebServiceManager {
 <body>
 	<div class="app">
 		<aside>
-			<h1>PiDeck</h1>
+			<h1>TC-Pi</h1>
 			<div id="projects-title" class="section-title"></div>
 			<div id="projects" class="list"></div>
 			<div id="sessions-title" class="section-title"></div>
