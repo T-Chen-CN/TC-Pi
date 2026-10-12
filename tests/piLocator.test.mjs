@@ -4,8 +4,7 @@ import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 
 /** vm 沙箱与宿主不同 realm，strict deepEqual 会比原型；统一转成宿主纯值再比。 */
 function eqDeep(actual, expected) {
@@ -22,9 +21,6 @@ const PI_LOCATOR_DIR = "src/main/pi";
  * 否则测试里 require 直接抛 MODULE_NOT_FOUND。
  */
 function loadTsFile(filePath, sandboxExtra = {}) {
-	const { outputText } = ts.transpileModule(readFileSync(filePath, "utf8"), {
-		compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-	});
 	const sandbox = {
 		exports: {},
 		require: (id) => {
@@ -40,18 +36,25 @@ function loadTsFile(filePath, sandboxExtra = {}) {
 		...sandboxExtra,
 	};
 	sandbox.global = sandbox;
-	vm.runInNewContext(outputText, sandbox, { filename: filePath });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [...readFileSync(filePath, "utf8").matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1])) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })(filePath);
+	})();
 	return sandbox.exports;
 }
 
 function loadPiLocatorModule(platform = process.platform, envOverrides = {}, homePath = tmpdir(), moduleOverrides = {}, sandboxExtra = {}) {
 	const filePath = join(PI_LOCATOR_DIR, "PiLocator.ts");
-	const { outputText } = ts.transpileModule(readFileSync(filePath, "utf8"), {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		Buffer,
 		TextDecoder,
@@ -86,9 +89,19 @@ function loadPiLocatorModule(platform = process.platform, envOverrides = {}, hom
 	// %APPDATA%\npm 候选目录，Windows 开发机上真实 npm 全局会提前命中（环境泄漏）。
 	if (platform !== "win32" && !("APPDATA" in envOverrides)) delete sandbox.process.env.APPDATA;
 	if (platform !== "win32" && !("LOCALAPPDATA" in envOverrides)) delete sandbox.process.env.LOCALAPPDATA;
-	vm.runInNewContext(outputText, sandbox, {
-		filename: "PiLocator.ts",
-	});
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [...readFileSync(filePath, "utf8").matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1])) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })(filePath);
+	})();
 	return sandbox.exports;
 }
 

@@ -13,8 +13,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 const syncRequire = createRequire(import.meta.url);
 
@@ -25,15 +24,6 @@ let lastRequestHeaders = null;
 
 function compile() {
 	const source = readFileSync(MODULE_PATH, "utf8");
-	const output = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-			esModuleInterop: true,
-		},
-		fileName: MODULE_PATH,
-	}).outputText;
-	const module = { exports: {} };
 	const localRequire = (specifier) => {
 		if (specifier.startsWith("node:")) return syncRequire(specifier);
 		// electron：只暴露 net.fetch，供 fetchProviderModels 使用
@@ -90,8 +80,9 @@ function compile() {
 		// 路径里要么已被擦除、要么被上面的桩/传入的 translate 覆盖。
 		return {};
 	};
-	vm.runInNewContext(output, { module, exports: module.exports, require: localRequire, console, setTimeout, clearTimeout, AbortController }, { filename: MODULE_PATH });
-	return module.exports;
+	// Preserve explicit boundary stubs, while new relative dependencies resolve from production paths.
+	const dependencies = [...source.matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1]).filter((name) => name !== "../storage/piPaths");
+	return loadTsCommonJs(MODULE_PATH, { stubs: Object.fromEntries(dependencies.map((name) => [name, localRequire(name)])) });
 }
 
 const { ConfigManager } = compile();

@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -277,7 +278,7 @@ export type PiCompactionOwnershipPaths = {
 
 export function resolvePiCompactionOwnershipPaths(agentHomeDir?: string): PiCompactionOwnershipPaths {
 	const home = agentHomeDir?.trim() || homedir();
-	const agentDir = join(home, ".pi", "agent");
+	const agentDir = join(getPiAgentDir(home));
 	return {
 		agentDir,
 		agentSettingsFile: join(agentDir, "settings.json"),

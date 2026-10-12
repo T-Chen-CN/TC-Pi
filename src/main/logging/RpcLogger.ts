@@ -53,9 +53,9 @@ function formatDate(value: Date) {
  */
 export class RpcLogger {
 	/** RPC 日志独立子目录，不和 app 日志混在一起 */
-	private readonly dir = join(app.getPath("userData"), "logs", "rpc");
+	private readonly dir = join(process.env.TC_PI_DATA_ROOT ?? app.getPath("userData"), "logs", "rpc");
 	/** 模型请求快照目录（完整请求体），与 rpc 目录平级 */
-	private readonly modelTraces = new ModelTraceStore(join(app.getPath("userData"), "logs", "model-traces"));
+	private readonly modelTraces = new ModelTraceStore(join(process.env.TC_PI_DATA_ROOT ?? app.getPath("userData"), "logs", "model-traces"));
 	private live: RpcLogEntry[] = [];
 	/** 最近写入的日期，用于触发跨日 gzip */
 	private lastWriteDate = "";

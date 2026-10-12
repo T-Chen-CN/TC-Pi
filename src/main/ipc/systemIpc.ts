@@ -39,6 +39,8 @@ import { runPiGlobalInstall } from "../pi/piGlobalInstall";
 import { resolvePiInstallGuard } from "../pi/piInstallGuard";
 import { PiMcpCli } from "../pi/piMcpCli";
 import { detectPiRuntimeNode, installPiRuntimeNode, piRuntimeNodeBinDir, probeNodeVersion } from "../pi/runtimeNodeInstall";
+import { getManagedRuntimeRoot } from "../storage/piPaths";
+import { installManagedPi, probeManagedNpm } from "../pi/managedPiInstall";
 import type { ProjectResourceManager } from "../projects/ProjectResourceManager";
 import type { SessionRuntimeCoordinator } from "../sessions/SessionRuntimeCoordinator";
 import { resolveConfigProxyTarget } from "../sessions/sessionProxyPolicy";
@@ -159,6 +161,8 @@ export type SystemIpcDeps = {
 	isProjectTrusted?: (projectId: string, projectRoot: string) => Promise<boolean>;
 	/** pi 环境引导：便携 Node 安装器（下载/解压 IO 由 index.ts 装配通用实现）；未装配 = 引导入口降级不可用。 */
 	piRuntimeNodeInstaller?: import("../pi/runtimeNodeInstall").RuntimeNodeInstallerDeps;
+	/** Pi authentication host owns one-time credential migration after a local runtime becomes available. */
+	preparePiCredentials?: () => Promise<void>;
 	/** 开发诊断采样（设置开关热启停） */
 	diagnosticsMonitor?: DiagnosticsMonitor;
 	/** 进程监控停止 agent：按 agentId 走完整会话停止链路（含 detach 推送），装配层注入 */
@@ -268,6 +272,7 @@ function isWslName(value: string): boolean {
  * 搜索目录，覆盖版本管理器动态目录。找不到/不可执行返回 undefined，不抛错。
  */
 async function probeSystemNodeVersion(piLocator: PiLocator): Promise<string | undefined> {
+	if (getManagedRuntimeRoot()) return undefined;
 	try {
 		if (process.platform === "win32") {
 			const { stdout } = await promisify(execFile)(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "node -v"], { env: piLocator.createProcessEnv(), timeout: 10_000, encoding: "utf8", windowsHide: true, shell: false });
@@ -282,6 +287,7 @@ async function probeSystemNodeVersion(piLocator: PiLocator): Promise<string | un
 
 /** 探测系统 npm 可用性（结构与 piCheckNpm 返回一致，供 pi 安装前置检查复用）。 */
 async function probeSystemNpmVersion(piLocator: PiLocator): Promise<NpmAvailabilityResult> {
+	if (getManagedRuntimeRoot()) return probeManagedNpm(piLocator, app.getPath("userData"));
 	try {
 		const run = async () => {
 			if (process.platform === "win32") {
@@ -799,6 +805,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 
 	ipcMain.handle(ipcChannels.piCheckNpm, async (): Promise<import("../../shared/types").NpmAvailabilityResult> => {
 		try {
+			if (getManagedRuntimeRoot()) return await probeManagedNpm(piLocator, app.getPath("userData"));
 			const { execFile } = await import("node:child_process");
 			const result = await new Promise<import("../../shared/types").NpmAvailabilityResult>((resolve) => {
 				const isWin = process.platform === "win32";
@@ -893,6 +900,7 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 				version: result.version,
 				error: result.error,
 			});
+			if (result.ok) await deps.preparePiCredentials?.();
 			return result;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -910,6 +918,12 @@ export function registerSystemIpc(deps: SystemIpcDeps): void {
 		// 边界校验：只认布尔；其他类型一律按 false（官方源）处理，不回退猜默认。
 		const mirrorArg = useMirror === true;
 		try {
+			if (getManagedRuntimeRoot()) {
+				const { launchCommand, launchChannel, launchFallbackReason, ...result } = await installManagedPi(piLocator, app.getPath("userData"), mirrorArg, deps.piRuntimeNodeInstaller?.download);
+				if (result.success) await deps.preparePiCredentials?.();
+				void appLogger.info("pi", "Installation-local Pi install completed", { success: result.success, launchCommand, launchChannel, launchFallbackReason });
+				return result;
+			}
 			// 硬约束（用户明确要求）：本机已经有 pi 就**不再装第二份**。
 			// 只在 UI 层不展示引导不够——检测总有覆盖不到的地方（自定义目录、别名、只在 GUI 看不见的 shell 里配的 PATH），
 			// 一旦漏判，用户点一下就会真的多出一份，之后终端与 PiDeck 各用各的、更新走两条路。

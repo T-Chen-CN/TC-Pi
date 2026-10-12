@@ -315,7 +315,7 @@ test("AgentManager gates model traces behind the same rpc-logging toggle", () =>
 
 test("RpcLogger keeps full request bodies outside the ring buffer", () => {
 	// 与 UI 桥同一 userData 根：logs/model-traces
-	assert.match(rpcLogger, /new ModelTraceStore\(join\(app\.getPath\("userData"\), "logs", "model-traces"\)\)/);
+	assert.match(rpcLogger, /new\s+ModelTraceStore\s*\(\s*join\s*\(\s*process\.env\.TC_PI_DATA_ROOT\s*\?\?\s*app\.getPath\s*\(\s*"userData"\s*\),\s*"logs",\s*"model-traces"\s*\)\s*\)/);
 	assert.match(rpcLogger, /async writeModelTrace\(agentId: string, request: ModelTraceRequestInput\): Promise<string>/);
 	assert.match(rpcLogger, /async readModelTrace\(agentId: string, traceId: string\): Promise<ModelTraceRecord \| null>/);
 	// 存储管理（设置页）与清空必须把快照一起算上，否则「清空日志」后磁盘仍占用

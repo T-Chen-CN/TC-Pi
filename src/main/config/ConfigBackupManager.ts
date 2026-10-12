@@ -21,6 +21,8 @@ export type ConfigBackupManagerDeps = {
 	getConfigDir: () => string;
 	/** PiDeck userData 目录（备份目录与 pideck settings.json 都挂在这里）。 */
 	getUserDataDir: () => string;
+	/** Installation-owned backup root; omitted by legacy callers and isolated tests. */
+	getBackupDir?: () => string;
 	/** 当前 PiDeck 版本（升级检测用）。 */
 	getAppVersion: () => string;
 	/** 错误上报（调用方注入 logger，模块自身不输出）。 */
@@ -81,7 +83,7 @@ export class ConfigBackupManager {
 
 	/** 备份目录：userData/config-backups/（跟随应用数据目录，清理/迁移跟着走）。 */
 	backupDir(): string {
-		return join(this.deps.getUserDataDir(), BACKUP_DIR_NAME);
+		return this.deps.getBackupDir?.() ?? join(this.deps.getUserDataDir(), BACKUP_DIR_NAME);
 	}
 
 	/**

@@ -1,5 +1,5 @@
 import { test as base, expect, _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync, copyFileSync, cpSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { armStartupOverlayDismissal } from "./startupOverlays";
@@ -87,12 +87,25 @@ export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | 
 			// 这里生成一个指向本仓库 mock-pi.cjs 的 shim；node 用当前进程的解释器绝对路径。
 			// 平台相关 shim：Windows 用 .cmd（cmd /c 路径语义）；macOS/Linux 生成可执行 .sh
 			// （PiLocator.createInvocation 在非 Windows 平台直接 spawn 命令路径，.cmd 无法执行）。
-			const shimName = process.platform === "win32" ? "mock-pi.cmd" : "mock-pi.sh";
-			const shimPath = join(userDataRoot, shimName);
-			const scriptPath = join(repoRoot, "e2e", "mock-pi.cjs");
-			const shimBody = mockPiShim(process.platform, process.execPath, scriptPath);
+			const profileDir = join(userDataRoot, "profile");
+			const runtimeRoot = join(profileDir, "runtimes");
+			const nodeDir = join(runtimeRoot, "node", ...(process.platform === "win32" ? [] : ["bin"]));
+			const piDir = join(runtimeRoot, "pi-global", ...(process.platform === "win32" ? [] : ["bin"]));
+			mkdirSync(nodeDir, { recursive: true });
+			mkdirSync(piDir, { recursive: true });
+			const nodePath = join(nodeDir, process.platform === "win32" ? "node.exe" : "node");
+			copyFileSync(process.execPath, nodePath);
+			const shimPath = join(piDir, process.platform === "win32" ? "pi.cmd" : "pi");
+			const scriptPath = join(piDir, "mock-pi.cjs");
+			copyFileSync(join(repoRoot, "e2e", "mock-pi.cjs"), scriptPath);
+			const shimBody = mockPiShim(process.platform, nodePath, scriptPath);
 			writeFileSync(shimPath, shimBody);
 			if (process.platform !== "win32") chmodSync(shimPath, 0o755);
+			// Real Git integration tests also run against a private snapshot, never an application fallback.
+			if (process.platform === "win32") {
+				const source = [process.env.TC_PI_E2E_GIT_ROOT, "C:\\Program Files\\Git", "C:\\Program Files (x86)\\Git"].find((root) => root && existsSync(join(root, "cmd", "git.exe")));
+				if (source) cpSync(source, join(runtimeRoot, "git"), { recursive: true, verbatimSymlinks: true });
+			}
 			// 预置设置：customPiPath 指向 shim；piEnvironmentChecked=true 跳过启动
 			// 环境检测弹窗（否则会盖住欢迎页按钮造成点击竞态）。其余字段缺省。
 			// 注意：main/index.ts 在 isDevBuild（未打包）时会覆盖 userData 为
@@ -141,7 +154,7 @@ export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | 
 			// ~/.pi/agent/trust.json（Windows homedir() 读 USERPROFILE，见下 env 隔离）。
 			// 预写 trust.json 信任临时目录根，findNearestTrustEntry 沿父目录链继承 → 所有 seed 项目
 			// （mkdtempSync 在 tmpdir 下）直接放行，弹框根本不出现，也不污染真实 ~/.pi/agent。
-			const trustDir = join(userDataRoot, ".pi", "agent");
+			const trustDir = join(profileDir, "pi");
 			mkdirSync(trustDir, { recursive: true });
 			writeFileSync(join(trustDir, "trust.json"), JSON.stringify({ [tmpdir()]: true }));
 
@@ -162,6 +175,7 @@ export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | 
 				// PIDECK_E2E：主进程 isE2E 开关，窗口 showInactive 不抢焦点、不最大化（见 main/index.ts）
 				PIDECK_E2E: "1",
 				PIDECK_MOCK_SESSION_IN_PROJECT: mockSessionInProject ? "1" : "0",
+				PIDECK_MOCK_REPO_ROOT: repoRoot,
 				// 主进程按 PIDECK_E2E_USER_DATA_DIR 覆写 userData（与 fixtures.ts 同源）。
 				// 缺了它 app.setPath("userData") 仍指向真实开发目录：seedProjects / seedSettings /
 				// seedSessionFiles 全写进临时目录但应用不读，表现为「种子项目凭空消失」
@@ -171,7 +185,7 @@ export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | 
 			};
 			delete env.ELECTRON_RENDERER_URL;
 			const app = await electron.launch({
-				args: [join(repoRoot, "out", "main", "index.js"), `--user-data-dir=${join(userDataRoot, "profile")}`, ...launchArgs],
+				args: [repoRoot, `--user-data-dir=${join(userDataRoot, "profile")}`, ...launchArgs],
 				env,
 			});
 			await use(app);

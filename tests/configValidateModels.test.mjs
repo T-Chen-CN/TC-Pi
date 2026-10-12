@@ -12,8 +12,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 const syncRequire = createRequire(import.meta.url);
@@ -24,15 +22,6 @@ let lastWrittenJson = null;
 
 function compile() {
 	const source = readFileSync(MODULE_PATH, "utf8");
-	const output = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-			esModuleInterop: true,
-		},
-		fileName: MODULE_PATH,
-	}).outputText;
-	const module = { exports: {} };
 	const localRequire = (specifier) => {
 		if (specifier.startsWith("node:")) {
 			// fs/promises 用替身：合法数据不真写盘，但记录写入文本供断言。
@@ -73,8 +62,9 @@ function compile() {
 		// validateModels 路径不依赖其余模块（parse/usage/catalog 等），返回空对象即可。
 		return {};
 	};
-	vm.runInNewContext(output, { module, exports: module.exports, require: localRequire, console }, { filename: MODULE_PATH });
-	return module.exports;
+	// Preserve explicit boundary stubs, while new relative dependencies resolve from production paths.
+	const dependencies = [...source.matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1]).filter((name) => name !== "../storage/piPaths");
+	return loadTsCommonJs(MODULE_PATH, { stubs: Object.fromEntries(dependencies.map((name) => [name, localRequire(name)])) });
 }
 
 const { ConfigManager } = compile();
@@ -86,11 +76,6 @@ const { ConfigManager } = compile();
  */
 function recompileWithFetchProbe(onFetch) {
 	const source = readFileSync(MODULE_PATH, "utf8");
-	const output = ts.transpileModule(source, {
-		compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-		fileName: MODULE_PATH,
-	}).outputText;
-	const module = { exports: {} };
 	const localRequire = (specifier) => {
 		if (specifier.startsWith("node:")) return syncRequire(specifier);
 		if (specifier === "electron") {
@@ -109,8 +94,9 @@ function recompileWithFetchProbe(onFetch) {
 		if (specifier.includes("mainProcessCopy")) return { mainProcessT: (_locale, key) => key };
 		return {};
 	};
-	vm.runInNewContext(output, { module, exports: module.exports, require: localRequire, console, setTimeout, clearTimeout, AbortController, URL }, { filename: MODULE_PATH });
-	return module.exports;
+	// Preserve explicit boundary stubs, while new relative dependencies resolve from production paths.
+	const dependencies = [...source.matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1]).filter((name) => name !== "../storage/piPaths");
+	return loadTsCommonJs(MODULE_PATH, { stubs: Object.fromEntries(dependencies.map((name) => [name, localRequire(name)])) });
 }
 const manager = new ConfigManager(undefined, (key) => key);
 

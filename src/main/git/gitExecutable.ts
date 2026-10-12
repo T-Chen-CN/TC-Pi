@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
+import { join } from "node:path";
 // 类型契约在 shared/types/git.ts（主进程与渲染层共用）。import type 会被 Node
 // type stripping 直接剥离、不产生运行时依赖，故本模块仍可被 tests/*.test.mjs 直接加载。
 import type { GitExecutableInfo, GitExecutableProbe, GitSystemProbe } from "../../shared/types/git";
@@ -70,6 +71,7 @@ export function gitPathCandidates(platform: NodeJS.Platform = process.platform, 
  * 决定实际 spawn 的命令（纯函数）：配置非空即用配置，否则回落字面量 "git" 走 PATH。
  */
 export function resolveGitExecutable(configuredPath?: string | null): string {
+	if (process.env.TC_PI_RUNTIME_ROOT && process.platform === "win32") return join(process.env.TC_PI_RUNTIME_ROOT, "git", "cmd", "git.exe");
 	const trimmed = typeof configuredPath === "string" ? configuredPath.trim() : "";
 	return trimmed || "git";
 }
@@ -144,7 +146,7 @@ export async function detectSystemGit(): Promise<GitSystemProbe | null> {
  * @param configuredPath 用户配置的路径；空串/非法值表示未配置（走自动解析）。
  */
 export async function detectGitExecutable(configuredPath?: string | null): Promise<GitExecutableInfo> {
-	const system = await detectSystemGit();
+	const system = process.env.TC_PI_RUNTIME_ROOT && process.platform === "win32" ? null : await detectSystemGit();
 	const executable = resolveGitExecutable(configuredPath);
 
 	if (executable !== "git") {

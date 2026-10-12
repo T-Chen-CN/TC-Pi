@@ -53,17 +53,15 @@ test("非 Windows 忽略 PORTABLE_EXECUTABLE_DIR", () => {
 	assert.equal(isPortablePackagedEnv({ PORTABLE_EXECUTABLE_DIR: "/tmp/phids" }, "linux"), false);
 });
 
-test("主进程正式版先跑 userData 更名迁移，再走 resolveAppUserDataDir 判定，启动失败有 catch", () => {
+test("主进程在读取偏好前初始化安装目录，迁移失败有明确错误且不回退", () => {
 	const src = readFileSync("src/main/index.ts", "utf8");
-	assert.match(src, /from "\.\/portableUserData"/);
-	// 契约：改名必须发生在 setPath 之前，且迁移结果参与共用目录落点
-	assert.match(src, /runUserDataNameMigration\(\{/);
-	assert.match(src, /portableOrExplicit:\s*isPortablePackagedEnv\(\)/);
-	assert.match(src, /recordUserDataNameMigrationNotice\(userDataNameMigrationResult\)/);
-	assert.match(src, /fallbackSharedDir:\s*userDataNameMigrationResult\?\.userDataPath\s*\?\?\s*fallbackSharedDataDir/);
-	// 契约：打包态（含 dev 通道安装包）与便携版都经 resolveAppUserDataDir 判定
-	assert.match(src, /resolveAppUserDataDir\(\{\s*explicitDir:\s*gatedExplicitUserDataDir,/);
-	assert.match(src, /isPackaged:\s*app\.isPackaged,/);
+	assert.match(src, /from\s*"\.\/storage\/installationBootstrap"/);
+	assert.ok(src.indexOf("initializeInstallationStorage(") < src.indexOf("const bootPreferences = readBootPreferences()"));
+	const bootstrap = readFileSync("src/main/storage/installationBootstrap.ts", "utf8");
+	assert.match(bootstrap, /migrateInstallationStorage\s*\(/);
+	assert.match(bootstrap, /app\.setPath\s*\(\s*"userData",\s*paths\.desktop\s*\)/);
+	assert.match(bootstrap, /showErrorBox\s*\(/);
+	assert.match(bootstrap, /app\.exit\s*\(\s*1\s*\)/);
 	assert.match(src, /registerIpc\(\);[\s\S]*?(?:\/\/[^\n]*\n\s*)*configBackupManager\?\.ensureInitialBackups\(\);\s*await createWindow\(\);/s);
 	assert.match(src, /Application startup failed/);
 	assert.match(src, /showErrorBox/);

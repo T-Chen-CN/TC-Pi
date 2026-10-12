@@ -45,6 +45,22 @@ function cleanup(ctx) {
 	rmSync(ctx.root, { recursive: true, force: true });
 }
 
+test("installation-provided backup root owns newly created configuration snapshots", () => {
+	const root = mkdtempSync(join(tmpdir(), "tc-pi-backup-root-"));
+	const backupRoot = join(root, "data", "backups");
+	const ctx = setup({ getBackupDir: () => backupRoot });
+	try {
+		assert.equal(ctx.manager.backupDir(), backupRoot);
+		const result = ctx.manager.create("manual");
+		assert.equal(result.ok, true);
+		assert.ok(existsSync(join(backupRoot, result.id)));
+		assert.equal(existsSync(join(ctx.userData, "config-backups")), false);
+	} finally {
+		cleanup(ctx);
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
 test("create 生成备份文件并记录元数据（files 含 pi/* 与 pideck/* 命名空间）", () => {
 	const ctx = setup();
 	try {

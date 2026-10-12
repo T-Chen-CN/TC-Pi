@@ -1,12 +1,13 @@
 import * as pty from "node-pty";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { sep } from "node:path";
+import { join, sep } from "node:path";
 import { ipcChannels } from "../../shared/ipc";
 import type { TerminalShell, TerminalTab, TerminalTarget } from "../../shared/types";
 import { toWindowsHostPath, toWslLinuxPath } from "../wsl/WslPaths";
 import { getWslExe } from "../wsl/wslExe";
 import { createTerminalDataBatcher, type TerminalDataBatcher } from "./terminalDataBatching";
+import { managedWslEnvironment } from "../storage/piPaths";
 
 // 简单日志，不依赖 appLogger 以避免循环引用
 const log = (msg: string) => {
@@ -63,7 +64,7 @@ export function getTerminalShellCandidates(platform: NodeJS.Platform, env: NodeJ
 			{ shell: "cmd", command: "cmd.exe", args: [] },
 		];
 		// 检测 Git Bash（常见安装路径）
-		const gitBashPaths = ["C:\\Program Files\\Git\\bin\\bash.exe", "C:\\Program Files (x86)\\Git\\bin\\bash.exe"];
+		const gitBashPaths = env.TC_PI_RUNTIME_ROOT ? [join(env.TC_PI_RUNTIME_ROOT, "git", "bin", "bash.exe")] : ["C:\\Program Files\\Git\\bin\\bash.exe", "C:\\Program Files (x86)\\Git\\bin\\bash.exe"];
 		for (const p of gitBashPaths) {
 			if (existsSync(p)) {
 				candidates.push({ shell: "git-bash", command: p, args: ["--login", "-i"] });
@@ -329,7 +330,7 @@ export class TerminalSessionManager {
 				// macOS GUI 应用（Electron）不继承登录 shell 的环境变量，
 				// LANG/LC_CTYPE 可能为空或 C，导致 shell 内 UTF-8 输出乱码。
 				// 显式注入 UTF-8 locale，让 shell 知道应以 UTF-8 解释字节流。
-				const env = { ...process.env };
+				let env = { ...process.env };
 				if (!env.LANG) env.LANG = "en_US.UTF-8";
 				if (!env.LC_ALL) env.LC_ALL = "en_US.UTF-8";
 				const wsl = candidate.shell === "wsl" ? this.getSettings() : undefined;
@@ -337,6 +338,7 @@ export class TerminalSessionManager {
 				let spawnCwd = cwd;
 				// WSL 终端：--cd 用 Linux 路径，PTY 的 cwd 仍必须是 Windows 主机路径。
 				if (wsl?.wslEnabled && wsl.wslDistro && wsl.wslUser) {
+					env = managedWslEnvironment(env, wsl.wslDistro);
 					try {
 						args = [...args, "--cd", toWslLinuxPath(cwd, { distro: wsl.wslDistro })];
 						spawnCwd = toWindowsHostPath(cwd, { distro: wsl.wslDistro });

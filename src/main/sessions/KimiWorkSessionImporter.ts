@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, rm, utimes } from "node:fs/promises";
@@ -44,7 +45,7 @@ export function locateKimiWorkSqlWasm(file: string): string {
  * - 数据目录可被用户自定义（daimon-storage.json），探测链见 kimiWorkSource。
  */
 export class KimiWorkSessionImporter {
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(
 		private readonly translate: SessionImportCopy = defaultSessionImportCopy,

@@ -1,3 +1,4 @@
+import { getGlobalAgentsSkillsDir, getPiAgentDir } from "../storage/piPaths";
 import { app, shell } from "electron";
 import { existsSync, type Dirent } from "node:fs";
 import { cp, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -99,14 +100,14 @@ export class SkillManager {
 		return [
 			{
 				id: "pi-global",
-				label: "~/.pi/agent/skills",
-				path: join(home, ".pi", "agent", "skills"),
+				label: process.env.TC_PI_DATA_ROOT ? join(getPiAgentDir(home), "skills") : "~/.pi/agent/skills",
+				path: join(getPiAgentDir(home), "skills"),
 				rootMarkdownEnabled: true,
 			},
 			{
 				id: "agents-global",
-				label: "~/.agents/skills",
-				path: join(home, ".agents", "skills"),
+				label: process.env.TC_PI_DATA_ROOT ? getGlobalAgentsSkillsDir(home) : "~/.agents/skills",
+				path: getGlobalAgentsSkillsDir(home),
 				rootMarkdownEnabled: false,
 			},
 		];

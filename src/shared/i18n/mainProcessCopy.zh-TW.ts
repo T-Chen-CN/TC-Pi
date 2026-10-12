@@ -6,6 +6,8 @@
 import type { MainProcessTranslationKey } from "./mainProcessCopy";
 
 export const mainProcessZhTW: Record<MainProcessTranslationKey, string> = {
+	"mainStorage.startupTitle": "TC-Pi 本機執行環境初始化失敗",
+	"mainStorage.startupFailed": "無法在安裝目錄初始化或遷移執行資料：{path}。請檢查目錄寫入權限和磁碟空間；保留舊資料，軟體不會回退到其他資料目錄。",
 	"diagnostic.historyLoadFailed": "歷史會話載入失敗，可繼續使用當前 Agent 或重新開啟會話重試。",
 	"diagnostic.compactReconnected": "會話壓縮完成，Agent 已自動重連",
 	"diagnostic.compactionFailed": "會話壓縮失敗，上下文可能已接近上限；可稍後手動重試壓縮，或重啟會話。",

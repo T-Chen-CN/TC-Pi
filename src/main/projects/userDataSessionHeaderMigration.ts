@@ -7,7 +7,7 @@ const MAX_HEADER_BYTES = 64 * 1024;
 const COPY_CHUNK_BYTES = 256 * 1024;
 
 /** 只修复旧根内已不存在、且新根内确有对应目录的 cwd。 */
-function relocatedCwd(cwd: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform): string | null {
+function relocatedCwd(cwd: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform, sourceIsCopy: boolean): string | null {
 	const paths = platform === "win32" ? win32 : posix;
 	if (!paths.isAbsolute(cwd)) return null;
 	const normalized = paths.normalize(cwd).replace(/\\/g, "/");
@@ -17,7 +17,9 @@ function relocatedCwd(cwd: string, oldRoot: string, newRoot: string, platform: N
 	const prefix = insensitive ? root.toLowerCase() : root;
 	if (candidate !== prefix && !candidate.startsWith(`${prefix}/`)) return null;
 	const next = join(newRoot, normalized.slice(root.length));
+	if (next === cwd) return null;
 	try {
+		if (sourceIsCopy) throw Object.assign(new Error("Copied profile"), { code: "ENOENT" });
 		statSync(cwd);
 		return null;
 	} catch (error) {
@@ -65,7 +67,7 @@ function unchanged(before: Stats, after: Stats): boolean {
 }
 
 /** 仅重写首行的 cwd；正文按固定大小 Buffer 复制，成功落盘后才原子替换原文件。 */
-function repairSessionHeader(filePath: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform): void {
+function repairSessionHeader(filePath: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform, sourceIsCopy: boolean, parentMappings: ReadonlyArray<readonly [string, string]>): void {
 	let source: number | undefined;
 	let target: number | undefined;
 	let temporary: string | undefined;
@@ -78,13 +80,14 @@ function repairSessionHeader(filePath: string, oldRoot: string, newRoot: string,
 		if (!first) return;
 		const header: unknown = JSON.parse(first.text);
 		if (!header || typeof header !== "object" || !("type" in header) || header.type !== "session" || !("cwd" in header) || typeof header.cwd !== "string") return;
-		const cwd = relocatedCwd(header.cwd, oldRoot, newRoot, platform);
-		if (!cwd) return;
+		const cwd = relocatedCwd(header.cwd, oldRoot, newRoot, platform, sourceIsCopy);
+		const parentSession = "parentSession" in header && typeof header.parentSession === "string" ? relocateParentSession(header.parentSession, parentMappings, platform) : undefined;
+		if (!cwd && !parentSession) return;
 
 		const tempPath = `${filePath}.${randomUUID()}.tmp`;
 		target = openSync(tempPath, "wx", initial.mode);
 		temporary = tempPath;
-		writeAll(target, Buffer.from(JSON.stringify({ ...header, cwd }), "utf8"));
+		writeAll(target, Buffer.from(JSON.stringify({ ...header, ...(cwd ? { cwd } : {}), ...(parentSession ? { parentSession } : {}) }), "utf8"));
 		const buffer = Buffer.allocUnsafe(COPY_CHUNK_BYTES);
 		let position = first.bodyOffset;
 		while (position < initial.size) {
@@ -109,12 +112,12 @@ function repairSessionHeader(filePath: string, oldRoot: string, newRoot: string,
 }
 
 /** 修复指定 encoded 目录中的原生 JSONL；坏文件/被占用文件不阻断启动，下次仍可重试。 */
-export function repairUserDataSessionHeaders(sessionDir: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform): void {
+export function repairUserDataSessionHeaders(sessionDir: string, oldRoot: string, newRoot: string, platform: NodeJS.Platform, sourceIsCopy = false, parentMappings: ReadonlyArray<readonly [string, string]> = []): void {
 	try {
 		for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
 			if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
 			try {
-				repairSessionHeader(join(sessionDir, entry.name), oldRoot, newRoot, platform);
+				repairSessionHeader(join(sessionDir, entry.name), oldRoot, newRoot, platform, sourceIsCopy, parentMappings);
 			} catch {
 				// ready 前尚无日志器；原文件不受失败影响，保留旧 cwd 作为下次修复判据。
 			}
@@ -122,4 +125,17 @@ export function repairUserDataSessionHeaders(sessionDir: string, oldRoot: string
 	} catch {
 		// 无会话目录或暂时不可读，不影响 userData 迁移。
 	}
+}
+
+/** Parent references are header metadata too; rewrite only absolute installation-owned paths. */
+function relocateParentSession(value: string, mappings: ReadonlyArray<readonly [string, string]>, platform: NodeJS.Platform): string | undefined {
+	const path = platform === "win32" ? win32 : posix;
+	if (!path.isAbsolute(value)) return undefined;
+	for (const [from, to] of mappings) {
+		const relative = path.relative(from, value);
+		if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) continue;
+		const next = path.join(to, relative);
+		if (next !== value) return next;
+	}
+	return undefined;
 }

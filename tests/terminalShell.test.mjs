@@ -1,3 +1,4 @@
+import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -37,6 +38,7 @@ function loadTerminalSessionManagerModule() {
 	const sandbox = {
 		exports: {},
 		require: (name) => {
+			if (name === "../storage/piPaths") return loadTsCommonJs("src/main/storage/piPaths.ts");
 			if (name === "node-pty") return {};
 			if (name === "node:crypto") return { randomUUID: () => "id" };
 			if (name === "../../shared/ipc") return { ipcChannels: {} };
@@ -123,6 +125,7 @@ function loadWithPty() {
 		exports: {},
 		process: { platform: "win32", env: {} },
 		require: (name) => {
+			if (name === "../storage/piPaths") return loadTsCommonJs("src/main/storage/piPaths.ts");
 			if (name === "node-pty") return ptyStub;
 			if (name === "node:crypto") return { randomUUID: () => `id-${spawns.length}` };
 			if (name === "../../shared/ipc") return { ipcChannels: {} };

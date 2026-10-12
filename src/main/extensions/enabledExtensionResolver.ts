@@ -7,6 +7,7 @@ import { applyPatterns, readSettingsObject, readStringArray, resolveFromBase, sp
 import { readProjectResourceOverrides } from "../projects/projectResourceOverrides";
 import { resolveConfiguredPackageResources } from "../packageResourceResolver";
 import { discoverExtensionEntries } from "./extensionDiscovery";
+import { getPiAgentDir } from "../storage/piPaths";
 
 const CONFIG_DIR_NAME = ".pi";
 
@@ -42,7 +43,7 @@ export function resolveLoadableExtensionPaths(options: EnabledExtensionResolverO
 	const inheritedDisabled = includeProjectResources ? readProjectResourceOverrides(cwd).disabledGlobalExtensions : [];
 	const projectDisabled = includeProjectResources ? readProjectDisabledExtensionSources(projectBaseDir) : [];
 
-	const agentDir = join(options.agentHomeDir?.trim() || homedir(), CONFIG_DIR_NAME, "agent");
+	const agentDir = getPiAgentDir(options.agentHomeDir?.trim() || homedir());
 	const effectiveDisabled: DisabledExtensionEntry[] = [...disabled, ...inheritedDisabled.map<DisabledExtensionEntry>((source) => ({ scope: "user", source })), ...projectDisabled.map<DisabledExtensionEntry>((source) => ({ scope: "project", source }))];
 	const disabledKeys = new Set(effectiveDisabled.map((entry) => `${entry.scope}:${entry.source.trim()}`));
 	const isEnabled = (scope: DisabledExtensionEntry["scope"], source: string) => !disabledKeys.has(`${scope}:${source.trim()}`);

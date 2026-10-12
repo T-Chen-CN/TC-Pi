@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -42,7 +43,7 @@ type ParsedOpenCodeSession = {
 
 export class OpenCodeSessionImporter {
 	private readonly openCodeDb = join(app.getPath("home"), ".local", "share", "opencode", "opencode.db");
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

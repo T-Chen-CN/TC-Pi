@@ -65,7 +65,7 @@ export class ProjectTrustGate {
 		) {
 			return true;
 		}
-		const userAgentsSkillsDir = join(this.host.getWslEnvironment()?.windowsHome ?? homedir(), ".agents", "skills");
+		const userAgentsSkillsDir = process.env.TC_PI_DATA_ROOT ? join(process.env.TC_PI_DATA_ROOT, "pi", "agents-skills") : join(this.host.getWslEnvironment()?.windowsHome ?? homedir(), ".agents", "skills");
 		let currentDir = hostCwd;
 		while (true) {
 			const agentsSkillsDir = join(currentDir, ".agents", "skills");

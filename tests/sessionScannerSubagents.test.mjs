@@ -4,19 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 
 const require = createRequire(import.meta.url);
 
 function loadTranspiledModule(filePath, overrides = new Map()) {
 	const source = readFileSync(filePath, "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		clearTimeout,
 		exports: {},
@@ -25,54 +19,66 @@ function loadTranspiledModule(filePath, overrides = new Map()) {
 		setTimeout,
 		setImmediate: typeof setImmediate === "function" ? setImmediate : (fn) => setTimeout(fn, 0),
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: filePath });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [...readFileSync(filePath, "utf8").matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1])) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })(filePath);
+	})();
 	return sandbox.exports;
 }
 
 function loadCodexMetaModule() {
 	const source = readFileSync("src/shared/codexSessionMeta.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = { exports: {} };
-	vm.runInNewContext(outputText, sandbox, { filename: "codexSessionMeta.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of []) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/shared/codexSessionMeta.ts");
+	})();
 	return sandbox.exports;
 }
 
 function loadMessageContentModule() {
-	const compilerOptions = {
-		module: ts.ModuleKind.CommonJS,
-		target: ts.ScriptTarget.ES2022,
-	};
-	const docActions = { exports: {} };
-	vm.runInNewContext(ts.transpileModule(readFileSync("src/main/compatibility/hostInstructions.ts", "utf8"), { compilerOptions }).outputText, docActions, { filename: "docActions.ts" });
-	const messageContent = {
-		exports: {},
-		require: (id) => {
-			if (id === "../compatibility/hostInstructions") return docActions.exports;
-			throw new Error(`Unexpected messageContent import: ${id}`);
-		},
-	};
-	vm.runInNewContext(ts.transpileModule(readFileSync("src/main/pi/messageContent.ts", "utf8"), { compilerOptions }).outputText, messageContent, { filename: "messageContent.ts" });
-	return messageContent.exports;
+	return createTsSandbox()("src/main/pi/messageContent.ts");
 }
 
 function loadWslPathsModule() {
 	const source = readFileSync("src/main/wsl/WslPaths.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		exports: {},
 		require,
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: "WslPaths.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of ["node:path/posix"]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/wsl/WslPaths.ts");
+	})();
 	return sandbox.exports;
 }
 
@@ -80,12 +86,7 @@ function loadFsRetryModule() {
 	// fsRetry 只依赖 node:fs/promises，随 sessionSummaryCache 一起编译注入，
 	// 让真实实现（含 EPERM 退避重试）在测试中同样生效
 	const source = readFileSync("src/main/utils/fsRetry.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		clearTimeout,
 		exports: {},
@@ -93,18 +94,25 @@ function loadFsRetryModule() {
 		require,
 		setTimeout,
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: "fsRetry.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of ["node:fs/promises"]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/utils/fsRetry.ts");
+	})();
 	return sandbox.exports;
 }
 
 function loadSessionSummaryCacheModule(homePath) {
 	const source = readFileSync("src/main/sessions/sessionSummaryCache.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const fsRetry = loadFsRetryModule();
 	const sandbox = {
 		clearTimeout: () => undefined,
@@ -124,36 +132,50 @@ function loadSessionSummaryCacheModule(homePath) {
 		},
 		setTimeout: () => ({ unref: () => undefined }),
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: "sessionSummaryCache.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of ["electron", "node:fs/promises", "node:path", "../utils/fsRetry"]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/sessions/sessionSummaryCache.ts");
+	})();
 	return sandbox.exports;
 }
 
 function loadSessionNameLineModule() {
 	const source = readFileSync("src/main/sessions/sessionNameLine.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		exports: {},
 		process,
 		require,
 		setTimeout,
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: "sessionNameLine.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of []) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/sessions/sessionNameLine.ts");
+	})();
 	return sandbox.exports;
 }
 
 function loadSessionScanner(homePath, fsOverrides = {}) {
 	const source = readFileSync("src/main/sessions/SessionScanner.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const codexMeta = loadCodexMetaModule();
 	const messageContent = loadMessageContentModule();
 	const sessionSummaryCache = loadSessionSummaryCacheModule(homePath);
@@ -189,7 +211,38 @@ function loadSessionScanner(homePath, fsOverrides = {}) {
 			return require(id);
 		},
 	};
-	vm.runInNewContext(outputText, sandbox, { filename: "SessionScanner.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [
+			"../storage/piPaths",
+			"node:child_process",
+			"node:crypto",
+			"electron",
+			"node:fs",
+			"node:fs/promises",
+			"node:path",
+			"node:path/posix",
+			"../../shared/codexSessionMeta",
+			"../../shared/sessionIdentity",
+			"../pi/messageContent",
+			"../pi/sessionEntryIds",
+			"../../shared/expandedRefBlocks",
+			"../wsl/WslPaths",
+			"../logging/sharedLogger",
+			"./sessionNameLine",
+			"./sessionSummaryCache",
+			"./jsonlLineStream",
+		]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/sessions/SessionScanner.ts");
+	})();
 	return sandbox.exports;
 }
 

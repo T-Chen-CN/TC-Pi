@@ -1,3 +1,4 @@
+import { getPiAgentDir, getWslAgentDir } from "../storage/piPaths";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { app, shell } from "electron";
@@ -154,7 +155,7 @@ function hasLegacySessionNameLine(text: string): boolean {
 }
 
 export class SessionScanner {
-	private readonly root = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly root = join(getPiAgentDir(app.getPath("home")), "sessions");
 	private readonly codexRoot = join(app.getPath("home"), ".codex", "sessions");
 	/** WSL 配置由主进程统一解析；内部保留 home 字段以维持扫描代码的单一 Linux 路径语义。 */
 	private wslConfig: { distro: string; user: string; home: string } | null = null;
@@ -257,6 +258,7 @@ export class SessionScanner {
 
 	/** WSL 中 pi 默认 session 目录（基于动态获取的 home） */
 	private get wslSessionsDir(): string {
+		if (process.env.TC_PI_DATA_ROOT) return toWslLinuxPath(join(getWslAgentDir(this.wslConfig!.distro), "sessions"), { distro: this.wslConfig!.distro });
 		return `${this.wslConfig!.home}/.pi/agent/sessions`;
 	}
 
@@ -628,7 +630,11 @@ export class SessionScanner {
 		const projectSettingsPath = join(this.toHostReadablePath(hostProjectPath), ".pi", "settings.json");
 		const projectRaw = await this.readSessionDirSettingLocal(projectSettingsPath);
 
-		const globalRaw = this.wslConfig ? await this.readSessionDirSettingWsl(`${this.wslConfig.home}/.pi/agent/settings.json`) : await this.readSessionDirSettingLocal(join(app.getPath("home"), ".pi", "agent", "settings.json"));
+		const globalRaw = this.wslConfig
+			? process.env.TC_PI_DATA_ROOT
+				? await this.readSessionDirSettingLocal(join(getWslAgentDir(this.wslConfig.distro), "settings.json"))
+				: await this.readSessionDirSettingWsl(`${this.wslConfig.home}/.pi/agent/settings.json`)
+			: await this.readSessionDirSettingLocal(join(getPiAgentDir(app.getPath("home")), "settings.json"));
 
 		const raw = projectRaw ?? globalRaw;
 		if (!raw) return undefined;
@@ -2207,6 +2213,8 @@ export class SessionScanner {
 
 	private inferProjectPathFromFile(filePath: string) {
 		const normalized = filePath.replace(/\\/g, "/");
+		const runtimeMarker = `${this.defaultSessionsRoot.replace(/\\/g, "/")}/`;
+		if (normalized.toLowerCase().startsWith(runtimeMarker.toLowerCase())) return this.decodeSessionDir(normalized.slice(runtimeMarker.length).split("/")[0]);
 		// 默认布局：~/.pi/agent/sessions/<encoded-cwd>/...
 		const marker = "/.pi/agent/sessions/";
 		const index = normalized.toLowerCase().indexOf(marker);

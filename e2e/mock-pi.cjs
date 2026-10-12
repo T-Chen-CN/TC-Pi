@@ -408,9 +408,10 @@ const SUBAGENT_FG_ENTRY_ID = "fg-e2e-262";
 let subagentReplay = null;
 
 function createSubagentReplay() {
-	const ts = require("typescript");
 	const { createRequire } = require("node:module");
-	const bridgePath = path.join(__dirname, "..", "resources", "extensions", "pi-deck-subagents.ts");
+	const repoRoot = process.env.PIDECK_MOCK_REPO_ROOT || path.join(__dirname, "..");
+	const ts = createRequire(path.join(repoRoot, "package.json"))("typescript");
+	const bridgePath = path.join(repoRoot, "resources", "extensions", "pi-deck-subagents.ts");
 	const source = fs.readFileSync(bridgePath, "utf8");
 	const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
 	const bridgeModule = {};

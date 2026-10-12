@@ -175,7 +175,8 @@ test("inline workspaces and session picker preserve the file tree and home overv
 	const isolatedHome = await app.evaluate(() => process.env.USERPROFILE ?? process.env.HOME);
 	expect(isolatedHome).toContain("pideck-mockpi-");
 	if (!isolatedHome) throw new Error("isolated profile missing");
-	const agentDir = join(isolatedHome, ".pi", "agent");
+	const agentDir = await window.evaluate(() => window.piDesktop!.config.getConfigDir());
+	expect(agentDir).toContain("pideck-mockpi-");
 	const usage = buildAggregatedView(intermediateFromRecords([{ ts: Date.now(), sid: ids[0], cwd: alpha, model: "layout-provider/layout-model", input: 100, output: 50, cacheRead: 0, cacheWrite: 0, totalTokens: 150, cost: 1.25, costKnown: true }]), new Date());
 	await app.evaluate(
 		({ ipcMain }, payload) => {

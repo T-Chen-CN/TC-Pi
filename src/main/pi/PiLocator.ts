@@ -1,3 +1,4 @@
+import { getManagedRuntimeRoot, getPiAgentDir, managedWslEnvironment } from "../storage/piPaths";
 import { execFile } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
 import { delimiter, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -7,7 +8,7 @@ import type { MainProcessTranslationKey } from "../../shared/i18n/mainProcessCop
 import { compareVersions } from "../utils/versionCompare";
 // 只依赖纯路径模块（零 Electron / 零副作用）：PiLocator 会在裸 Node 沙箱里被加载，
 
-import { piRuntimeNodeBinDir, piRuntimePiBinDir } from "./piRuntimePaths";
+import { piRuntimeNodeBinDir, piRuntimeNodeExePath, piRuntimePiBinDir } from "./piRuntimePaths";
 import { WSL_PI_NEGATIVE_CACHE_TTL_MS, WSL_PI_PROBE_TIMEOUT_MS, buildWslCommandMarker, buildWslPiExecArgs, buildWslPiProbeScript, isWslInteropPath, parseWslCommandMarker, parseWslPiProbeOutput, type WslPiProbeResult } from "../wsl/wslPiProbe";
 import { decodeWslOutput } from "../wsl/wslExe";
 import { buildPiProxyEnvPatch, PIDECK_PI_PROXY_SCOPE } from "../sessions/sessionProxyPolicy";
@@ -232,6 +233,14 @@ export class PiLocator {
 	 * this is the user's manually specified path from settings.
 	 */
 	resolveCommand(customPath?: string, wslEnabled?: boolean, wslDistro?: string, wslUser?: string) {
+		const managedRoot = getManagedRuntimeRoot();
+		if (managedRoot && !wslEnabled) {
+			// Installation-owned Pi is mandatory; stale global settings cannot select a second runtime.
+			const prefix = piRuntimePiBinDir(app.getPath("userData"));
+			const managed = join(managedRoot, "pi", "bin");
+			const names = process.platform === "win32" ? ["pi.cmd", "pi.exe", "pi"] : ["pi", "pi.js"];
+			return [prefix, managed].flatMap((dir) => names.map((name) => join(dir, name))).find(existsSync) ?? join(prefix, names[0]);
+		}
 		const normalizedCustomPath = this.normalizeCustomPath(customPath);
 		// wsl:// 是显式运行目标，优先保留；普通本地路径则不能覆盖已启用的 WSL 模式，
 		// 否则设置页残留的 Windows pi.cmd 会把 Agent 静默切回宿主机。
@@ -312,6 +321,14 @@ export class PiLocator {
 	 * 来源标签只用于「检测到多个安装」时的展示与排序（见 listInstallations）。
 	 */
 	private searchDirEntries(): Array<{ dir: string; source: PiInstallationSource }> {
+		const managedRoot = getManagedRuntimeRoot();
+		if (managedRoot)
+			return [
+				{ dir: piRuntimeNodeBinDir(app.getPath("userData")), source: "portable" },
+				{ dir: piRuntimePiBinDir(app.getPath("userData")), source: "portable" },
+				{ dir: join(managedRoot, "pi", "bin"), source: "portable" },
+				{ dir: join(managedRoot, "git", process.platform === "win32" ? "cmd" : "bin"), source: "portable" },
+			];
 		const home = app.getPath("home");
 		const appData = process.env.APPDATA ?? join(home, "AppData", "Roaming");
 		const localAppData = process.env.LOCALAPPDATA ?? join(home, "AppData", "Local");
@@ -375,7 +392,7 @@ export class PiLocator {
 			// 避免静默改掉已有用户实际启动的 pi（换装走设置页/安装列表让用户自己选）。
 			// 来源不在这里标 managed：只有 managed-install.json 校验通过才算官方安装
 			// （见 classifyInstallationSource），残留/半删的目录不应被宣称成官方安装。
-			plain(join(home, ".pi", "agent", "bin")),
+			plain(join(getPiAgentDir(home), "bin")),
 			// macOS GUI 启动（Dock/Finder）经常拿不到终端里的 Homebrew PATH。
 			// Apple Silicon 默认 /opt/homebrew，Intel 常见 /usr/local；两者都扫一遍，
 			// 避免 M4 上 pi 装在 brew 里却被桌面端判定“未安装/启动失败”。
@@ -407,10 +424,10 @@ export class PiLocator {
 				PATH: pathValue,
 				...(process.platform === "win32" ? { Path: pathValue } : {}),
 			});
-			return this.applyPiProxyEnv(base, settings);
+			return this.applyPiProxyEnv(managedWslEnvironment(base, wsl.distro), settings);
 		}
 		const searchDirs = pathPrefix ? [pathPrefix, ...this.getSearchDirs().filter((dir) => dir !== pathPrefix)] : this.getSearchDirs();
-		const pathValue = searchDirs.join(delimiter);
+		const pathValue = [...searchDirs, ...(getManagedRuntimeRoot() ? [process.env.PATH ?? process.env.Path ?? ""] : [])].join(delimiter);
 		const env = this.sanitizePiChildEnv({
 			...process.env,
 			PATH: pathValue,
@@ -487,7 +504,7 @@ export class PiLocator {
 		// 关联执行；统一改用 node 启动，兼容用户通过 alias "node /path/pi.js" 方式安装
 		// pi 的场景（#169）。仅对实际指向 .js 文件的路径生效，不误拦裸命令名 "pi"。
 		if (/\.(?:m?js|cjs)$/i.test(command) && existsSync(command)) {
-			const nodeBin = process.platform === "win32" ? "node.exe" : "node";
+			const nodeBin = getManagedRuntimeRoot() ? piRuntimeNodeExePath(app.getPath("userData")) : process.platform === "win32" ? "node.exe" : "node";
 			return {
 				command: nodeBin,
 				args: [command, ...args],
@@ -516,7 +533,7 @@ export class PiLocator {
 			return {
 				// 与垫片自身的 `IF EXIST "%dp0%\node.exe"` 分支等价：优先用与 pi 同目录的 node，
 				// 避免 PATH 里另一个 node 版本被误用。
-				command: existsSync(siblingNode) ? siblingNode : "node.exe",
+				command: getManagedRuntimeRoot() ? piRuntimeNodeExePath(app.getPath("userData")) : existsSync(siblingNode) ? siblingNode : "node.exe",
 				args: [shimEntry.entry, ...args],
 				shell: false,
 				pathPrefix: this.getCommandBinDir(command),
@@ -678,10 +695,10 @@ export class PiLocator {
 		// 两种情况才真的去问 shell：用户显式点「从终端再找一次」，或目录扫描一份都没找到
 		// （最后兜底：官方安装器的 PATH 只写进 shell rc，扫描可能真的看不见它）。
 		const scanned = this.candidateInstalls();
-		const shellPath = await this.probeLoginShellPi({ force: options.forceShellProbe, allowProbe: options.forceShellProbe === true || scanned.length === 0 });
+		const shellPath = getManagedRuntimeRoot() ? undefined : await this.probeLoginShellPi({ force: options.forceShellProbe, allowProbe: options.forceShellProbe === true || scanned.length === 0 });
 		// 用户路径 = 当前使用的那条（customPiPath）+ 设置里保存的备选池（piCustomPaths）；
 		// 去重后再进候选，避免同一个路径既当 active 又当备选而出现两行。
-		const userPaths = [...new Set([this.normalizeCustomPath(customPath), ...(options.customPaths ?? []).map((path) => String(path ?? "").trim())])].filter((path) => Boolean(path) && !path.startsWith("wsl://"));
+		const userPaths = getManagedRuntimeRoot() ? [] : [...new Set([this.normalizeCustomPath(customPath), ...(options.customPaths ?? []).map((path) => String(path ?? "").trim())])].filter((path) => Boolean(path) && !path.startsWith("wsl://"));
 		const cacheKey = `${userPaths.join("\u0000")}\u0000${shellPath ?? ""}`;
 		const cached = installationListCache;
 		if (cached && cached.key === cacheKey && !options.forceShellProbe && Date.now() - cached.at < INSTALLATION_LIST_TTL_MS) return cached.value;
@@ -1356,6 +1373,7 @@ export class PiLocator {
 
 	/** 异步预热登录 shell PATH（win32 恒空）。结果（含失败负缓存 ""）进程级缓存。 */
 	async warmLoginShellPath(): Promise<string> {
+		if (getManagedRuntimeRoot()) return "";
 		if (process.platform === "win32") {
 			// Windows 检测链路不依赖 PowerShell/登录 shell：Explorer 启动的 Electron
 			// 已拿到系统合并 PATH，其他包管理器路径由 getSearchDirs 与手动输入兜底。

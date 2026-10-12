@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app, dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { homedir } from "node:os";
 import { cp, readFile, rename as fsRename, rm, stat, writeFile } from "node:fs/promises";
@@ -33,7 +34,7 @@ export type FilesIpcDeps = {
 };
 
 export function registerFilesIpc({ fileSystemService, projectStore, settingsStore, appLogger, getMainWindow, openExternalUrl, getPiConfigDir }: FilesIpcDeps): void {
-	const piConfigFiles = new PiConfigFilesService(getPiConfigDir ?? (() => join(homedir(), ".pi", "agent")), fileSystemService);
+	const piConfigFiles = new PiConfigFilesService(getPiConfigDir ?? (() => join(getPiAgentDir(homedir()))), fileSystemService);
 	type FileReadBoundary = ProjectFileReadBoundary & { piConfig?: true };
 	// Windows Node / Electron 边界不能直接消费 WSL Linux 路径：统一走 WslPaths 转成当前发行版的主机 UNC。
 	// 已经是普通 Windows/非 WSL 网络盘的输入保持不变，避免误伤非 WSL 路径。

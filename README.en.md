@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-Install and configure pi CLI separately. pi owns model requests, tool execution, and native session file reading/writing.
+Install and configure the private Node/Pi runtime from the application after first launch. pi owns model requests, tool execution, and native session file reading/writing.
 
 ```sh
 npm run typecheck
@@ -73,9 +73,15 @@ src/main owns desktop capabilities and processes, src/preload exposes the minima
 
 ## Downloads and updates
 
-Download the current version from [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest). On Windows, use `setup.exe` for installation or `portable.exe` / `win.zip` for portable use. Install and configure pi CLI separately before use.
+Download the current version from [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest). On Windows, use `setup.exe` for installation or `portable.exe` / `win.zip` for portable use. Install Node/Pi and configure model authentication in the application; preparing dependencies requires network access.
 
 Application and built-in content updates come from TC-Pi. Installed Windows builds support in-app update downloads and installation; portable builds are updated manually through Releases. Upstream installers do not contain this fork's changes.
+
+## Installation storage
+
+Windows builds store configuration, Pi credentials and history, browser data, caches, and logs under the installation's `data/`, with private Node, Pi, Git, and voice runtimes under `runtimes/`. Choose a directory writable by the current user; an unwritable directory stops startup with an error instead of falling back to AppData. Development builds use `.tc-pi-dev/` inside the project.
+
+First launch copies legacy configuration and history while retaining the originals; credentials are migrated by the Pi SDK. Upgrades and ordinary uninstallation preserve `data/` and `runtimes/`. Close the application before moving the entire directory; external projects and hard-coded script paths are not relocated. macOS and Linux have path-policy tests only, without full package validation; WSL requires signing in again from its terminal. See the [storage migration notes](docs/install-directory-runtime-plan.md).
 
 ## License
 

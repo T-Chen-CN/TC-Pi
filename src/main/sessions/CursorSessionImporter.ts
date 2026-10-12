@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, rm, utimes } from "node:fs/promises";
@@ -15,7 +16,7 @@ import { createBufferedLineSink, mapWithConcurrency, readJsonlObjects, renameWit
  */
 export class CursorSessionImporter {
 	private readonly cursorRoot = join(app.getPath("home"), ".cursor", "projects");
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, rm, utimes } from "node:fs/promises";
@@ -19,7 +20,7 @@ import { createBufferedLineSink, mapWithConcurrency, renameWithRetry, SESSION_SC
  */
 export class KimiSessionImporter {
 	private readonly kimiRoot = join(app.getPath("home"), ".kimi-code");
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

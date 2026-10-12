@@ -28,7 +28,7 @@ function normalizeDetail(detail: unknown) {
  * 也避免记录到项目目录导致用户代码仓库被污染。
  */
 export class AppLogger {
-	private readonly dir = join(app.getPath("userData"), "logs");
+	private readonly dir = process.env.TC_PI_DATA_ROOT ? join(process.env.TC_PI_DATA_ROOT, "logs") : join(app.getPath("userData"), "logs");
 	private writeQueue: Promise<void> = Promise.resolve();
 	/** 历史日志文件行缓存：查询只重读指纹变化的文件（当天 append 文件），避免每次进设置日志 tab 全量读盘 */
 	private readonly lineCache = new LogLineCache({ readFile: (p) => readFile(p, "utf8"), readFileTail: (p, bytes) => readTextBounded(p, bytes, "tail"), stat }, 32, MAX_FILE_LINES);

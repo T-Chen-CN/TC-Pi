@@ -31,6 +31,7 @@ export function mcpDocsUrl(): string {
 
 /** `~/.pi/agent` → 用户 home；WSL 场景传入 windowsHome 映射后的 configDir。 */
 export function homeFromPiAgentDir(configDir: string): string {
+	if (!/[\\/]\.pi[\\/]agent[\\/]*$/i.test(configDir)) return homedir();
 	const trimmed = configDir.replace(/[\\/]+$/, "");
 	const piDir = trimmed.replace(/[\\/]+agent$/i, "");
 	const home = piDir.replace(/[\\/]+\.pi$/i, "");

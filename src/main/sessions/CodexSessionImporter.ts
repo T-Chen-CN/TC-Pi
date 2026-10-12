@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readdir, rm, stat } from "node:fs/promises";
@@ -128,7 +129,7 @@ type ParsedCodexSession = {
 export class CodexSessionImporter {
 	private readonly codexRoot = join(app.getPath("home"), ".codex", "sessions");
 	private readonly codexHome = join(app.getPath("home"), ".codex");
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

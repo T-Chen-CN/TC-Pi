@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { getManagedRuntimeRoot } from "../storage/piPaths";
 
 /**
  * 引导安装（便携副本）在 PiDeck 数据目录里的路径约定——**唯一来源**。
@@ -20,7 +21,7 @@ import { dirname, join } from "node:path";
 
 /** `<userData>/pi-runtime` 根目录。 */
 export function piRuntimeRootDir(userDataPath: string): string {
-	return join(userDataPath, "pi-runtime");
+	return getManagedRuntimeRoot() ?? join(userDataPath, "pi-runtime");
 }
 
 /** 便携 Node 发行包解压根目录（`<root>/node`）。 */

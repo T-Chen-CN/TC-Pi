@@ -31,6 +31,7 @@
  */
 
 import { createInterface } from "node:readline";
+import { migratePiCredentials } from "./pi-auth-migration.mjs";
 
 const PROTOCOL_VERSION = 1;
 
@@ -332,6 +333,7 @@ async function main() {
 		// 不传任何覆盖项：让 pi 自己按它的配置目录解析 auth.json，保证登录结果
 		// 与后续 pi 进程读到的是同一份凭据（宿主只负责传入同一套环境变量）。
 		runtime = await ModelRuntime.create({});
+		await migratePiCredentials(runtime);
 	} catch (error) {
 		fatal("runtime-create", error instanceof Error ? error.message : String(error));
 		return;

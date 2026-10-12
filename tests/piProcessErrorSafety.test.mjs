@@ -5,19 +5,9 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 
 const require = createRequire(import.meta.url);
-
-function transpile(filePath) {
-	return ts.transpileModule(readFileSync(filePath, "utf8"), {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	}).outputText;
-}
 
 function createChildProcess() {
 	const child = new EventEmitter();
@@ -33,7 +23,19 @@ function loadPiProcess(spawnImpl) {
 	// 新增拆分出的内部依赖时需要在此同步登记，否则 require 会落到真实文件系统解析失败。
 	const loadSandboxed = (filePath, name) => {
 		const sandbox = { exports: {}, require };
-		vm.runInNewContext(transpile(filePath), sandbox, { filename: name });
+		(() => {
+			const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+			const stubs = {};
+			for (const specifier of [...readFileSync(filePath, "utf8").matchAll(/from\s*["']([^"']+)["']/g)].map((match) => match[1])) {
+				if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+				try {
+					if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+				} catch (error) {
+					if (error?.code !== "MODULE_NOT_FOUND") throw error;
+				}
+			}
+			sandbox.exports = createTsSandbox({ globals, stubs })(filePath);
+		})();
 		return sandbox.exports;
 	};
 	const paths = loadSandboxed("src/main/wsl/WslPaths.ts", "WslPaths.ts");
@@ -89,9 +91,36 @@ function loadPiProcess(spawnImpl) {
 			return require(id);
 		},
 	};
-	vm.runInNewContext(transpile("src/main/pi/PiProcess.ts"), sandbox, {
-		filename: "PiProcess.ts",
-	});
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [
+			"../storage/piPaths",
+			"node:child_process",
+			"node:events",
+			"node:fs",
+			"node:os",
+			"node:path",
+			"../extensions/builtInExtensions",
+			"../extensions/extensionVersionGate",
+			"../git/gitProcess",
+			"../logging/sharedLogger",
+			"../sessions/sessionProxyPolicy",
+			"../wsl/WslPaths",
+			"./piExtensionFilter",
+			"./PiLocator",
+			"./PiRpcClient",
+			"./piSpawnFailure",
+		]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/pi/PiProcess.ts");
+	})();
 	return sandbox.exports;
 }
 

@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "./storage/piPaths";
 import { is } from "@electron-toolkit/utils";
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, protocol, safeStorage, screen, session, shell, Tray } from "electron";
 import { spawn } from "node:child_process";
@@ -38,7 +39,7 @@ import { DEFAULT_DEV_USER_DATA_NAME, isSharedDevBranch, readDevGitBranch, resolv
 import { clearDevRendererCache, KEEP_DEV_HTTP_CACHE_ENV } from "./devRendererCache";
 import { registerChannelSwitchIpc } from "./ipc/channelSwitchIpc";
 import { registerDataEnvIpc } from "./ipc/dataEnvIpc";
-import { isPortablePackagedEnv, resolveAppUserDataDir, resolveChannelDevDataDir, resolvePackagedUserDataDir } from "./portableUserData";
+
 import { ChannelSwitchService } from "./update/ChannelSwitchService";
 import { resolveUpdateChannel } from "./update/channelIdentity";
 import { APP_DEEP_LINK_SCHEME } from "./utils/deepLinkScheme";
@@ -60,18 +61,16 @@ import { PiModelCapabilityCache, watchPiConfigDirectory } from "./pi/PiModelCapa
 import { PiProcess } from "./pi/PiProcess";
 import { getBridgeServer, stopBridgeServer } from "./pi/bridge/BridgeServer";
 import { ProjectStore } from "./projects/ProjectStore";
-import { recordUserDataNameMigrationNotice, runUserDataNameMigration, type UserDataNameMigration } from "./projects/userDataNameMigration";
+import { resolveInstallPaths } from "./storage/installPaths";
+import { initializeInstallationStorage } from "./storage/installationBootstrap";
 
 // 构建标记：npm run dist:*:dev 打包时由 vite define 注入 true（构建期替换，非运行时环境变量）。
 declare const __PIDECK_DEV_BUILD__: boolean;
 
-// 应用名控制系统菜单等显示文字；userData 随后仍按历史目录显式设置，改品牌不搬用户数据。
+// 应用名控制系统菜单等显示文字；存储路径由安装目录初始化器单独决定。
 app.setName(app.isPackaged && __PIDECK_DEV_BUILD__ ? APP_DEV_DISPLAY_NAME : APP_DISPLAY_NAME);
 
-// dev 构建（PiDeck Dev 安装包）只影响通知归属（AUMID）与 deep link scheme（pideck-dev://），
-// userData 与正式版**共用** pi-desktop——双通道共用数据目录是刻意决策（2026-09）：
-// 用户在 stable / dev 安装包之间切换不丢 settings / 会话 / 扩展配置。
-// 未打包的 npm run dev 仍隔离到 pi-desktop-dev(±分支后缀)，避免开发调试误写坏真实数据。
+// 打包态各安装目录拥有自己的 data/runtimes；未打包态按分支隔离到项目 .tc-pi-dev。
 const isDevBuild = !app.isPackaged || __PIDECK_DEV_BUILD__;
 
 // E2E（Playwright 驱动）静默运行：窗口显示但不抢焦点、不最大化铺满屏，
@@ -82,54 +81,22 @@ const isE2E = process.env.PIDECK_E2E === "1";
 // 日志对比 sinceModuleLoadMs / processUptimeMs 两个口径即可观测启动回归。
 const bootAnchorMs = Date.now();
 
-// userData 决策（三分支判定在 portableUserData.resolveAppUserDataDir，单测覆盖）：
-// - 未打包 npm run dev：功能分支再按 git 分支名拆目录（pi-desktop-dev-<branch>），
-
-// - 打包态（stable 与 dev 通道安装包）：共用历史 %APPDATA%/pi-desktop（便携版 exe 同级 data/）。
-// 必须在读取 settings / 版本单实例锁之前设置。
-let userDataNameMigrationResult: UserDataNameMigration | null = null;
+// 在偏好读取和单实例锁之前设置路径，旧 AppData 只作为一次性复制迁移来源。
 const isolateDevByGitBranch = !app.isPackaged;
 const devGitBranch = isolateDevByGitBranch ? readDevGitBranch() : undefined;
 const devUserDataDirName = isolateDevByGitBranch ? resolveDevUserDataDirName(devGitBranch) : DEFAULT_DEV_USER_DATA_NAME;
 const explicitUserDataDir = (isE2E ? process.env.PIDECK_E2E_USER_DATA_DIR?.trim() : undefined) || app.commandLine.getSwitchValue("user-data-dir") || process.argv.find((arg) => arg.startsWith("--user-data-dir="))?.slice("--user-data-dir=".length);
-// 显式目录仅在 dev 态或 E2E 下生效：生产发行物不受外部参数影响，数据目录保持稳定
-// （否则 e2e 会读到本机真实开发数据，settings/projects 全部污染测试断言）。
 const gatedExplicitUserDataDir = explicitUserDataDir && (isDevBuild || isE2E) ? explicitUserDataDir : undefined;
-// —— 数据环境决策（规格 §6 启动序列：ready 前只读不写，保持 setPath 时序）——
-// 只有 dev 通道读决策指针：stable 恒走共用目录，不碰 dev 独立目录。
-// 决策指针与独立数据目录同处（规格 §6）：读到 null = dev 首启未决策，本会话临时落共用目录运行。
 const updateChannel = resolveUpdateChannel();
-const channelDevDataDir = updateChannel === "dev" ? resolveChannelDevDataDir({ appDataDir: app.getPath("appData"), portableExeDir: process.env.PORTABLE_EXECUTABLE_DIR }) : "";
+const installationPaths = resolveInstallPaths({ isPackaged: app.isPackaged, exePath: app.getPath("exe"), appPath: app.getAppPath(), portableDir: process.env.PORTABLE_EXECUTABLE_DIR, appImage: process.env.APPIMAGE, devProfile: devUserDataDirName, explicitDesktop: gatedExplicitUserDataDir });
+const fallbackSharedDataDir = installationPaths.desktop;
+const channelDevDataDir = join(installationPaths.data, "desktop-channel-dev");
 const devDataMode: DataEnvMode | null = updateChannel === "dev" ? (readDataEnvDecision(channelDevDataDir)?.dataMode ?? null) : null;
-// 共用数据目录：既是 setPath 的 shared 分支，也是数据导入的源目录（与 fallbackSharedDir 同源，规格 §6 单向正式→dev）。
-// 安装版历史根已由 %APPDATA%/pi-desktop 更名为 %APPDATA%/PiDeck：老用户首启在这里做一次性迁移
-// （整目录改名 + 持久化绝对路径改写 + pi 会话 encoded 目录改名），迁移失败自动回退旧目录、下次启动重试。
-// Windows 便携 exe 落到 PORTABLE_EXECUTABLE_DIR/data，与安装版隔离（否则同版本单实例锁让第二次启动静默退出）。
-// 迁移只接管「打包且非显式目录」这条路径；未打包调试态有自己的 -dev 目录，不参与更名。
-const packagedAppDataDir = app.getPath("appData");
-const fallbackSharedDataDir = resolvePackagedUserDataDir({ appData: packagedAppDataDir });
-if (app.isPackaged && !gatedExplicitUserDataDir) {
-	// 必须在通道决策分流之前迁移：迁移结果本身决定共用目录的最终落点
-	// （改名成功 → PiDeck，失败 → 留在旧根，两者都喂给 resolveAppUserDataDir）。
-	userDataNameMigrationResult = runUserDataNameMigration({
-		appDataDir: packagedAppDataDir,
-		homeDir: app.getPath("home"),
-		portableOrExplicit: isPortablePackagedEnv(),
-	});
-	recordUserDataNameMigrationNotice(userDataNameMigrationResult);
-}
-app.setPath(
-	"userData",
-	resolveAppUserDataDir({
-		explicitDir: gatedExplicitUserDataDir,
-		unpackagedDevDir: join(app.getPath("appData"), devUserDataDirName),
-		isPackaged: app.isPackaged,
-		channel: updateChannel,
-		devDataMode,
-		channelDevDataDir,
-		fallbackSharedDir: userDataNameMigrationResult?.userDataPath ?? fallbackSharedDataDir,
-	}),
-);
+initializeInstallationStorage(devDataMode === "channel-dev" ? { ...installationPaths, desktop: channelDevDataDir } : installationPaths, {
+	desktopSources: app.isPackaged ? [join(app.getPath("appData"), "PiDeck"), join(app.getPath("appData"), "pi-desktop")] : [join(app.getPath("appData"), devUserDataDirName), join(app.getPath("appData"), DEFAULT_DEV_USER_DATA_NAME)],
+	piSource: join(app.getPath("home"), ".pi", "agent"),
+	skipMigration: Boolean(gatedExplicitUserDataDir) || isE2E,
+});
 
 // 强制 XWayland 在部分 GNOME/Wayland 环境会导致主窗口不可见）。
 // ozone 平台一经启动不可更改，整个生命周期统一使用启动时快照。
@@ -275,6 +242,7 @@ import { PiAiCatalogUpdater } from "./pi/PiAiCatalogUpdater";
 import { PiLocator } from "./pi/PiLocator";
 import { testPiProxy } from "./pi/PiProxyTester";
 import { PiAuthService } from "./pi/auth/PiAuthService";
+import { prepareInstallationGit } from "./pi/managedGitInstall";
 import { resolvePiAuthHostLaunch } from "./pi/auth/piAuthHostLaunch";
 import { EnhancePromptService, PI_ENHANCE_HOST_FILENAME } from "./pi/enhance/EnhancePromptService";
 import { fetchModelList, refreshModelCatalogIfStale, refreshModelList } from "./pi/modelListCache";
@@ -843,7 +811,7 @@ function refreshTrayContextMenu(): void {
 					void shell.openPath(app.getPath("userData"));
 				},
 				openLogsDir: () => {
-					void shell.openPath(join(app.getPath("userData"), "logs"));
+					void shell.openPath(installationPaths.logs);
 				},
 				restart: restartApp,
 				quit: () => {
@@ -1853,7 +1821,7 @@ function registerIpc() {
 		log: (domain, message, details) => void appLogger.info(domain, message, details),
 	});
 
-	const whisperRuntimeRoot = join(app.getPath("userData"), "voice-runtime");
+	const whisperRuntimeRoot = installationPaths.voice;
 	const whisperRuntimeManager = new WhisperRuntimeManager({
 		platform: process.platform,
 		arch: process.arch,
@@ -2115,6 +2083,9 @@ function registerIpc() {
 				void appLogger.info(scope, message, detail);
 			}),
 			extract: createTarExtractor((scope, message, detail) => void appLogger.warn(scope, message, detail)),
+		},
+		preparePiCredentials: async () => {
+			await piAuthService?.prepareInstallationCredentials();
 		},
 		diagnosticsMonitor: diagnosticsMonitor ?? undefined,
 		// 进程监控停止 agent：按 agentId 走完整会话停止链路（含 detach 推送）
@@ -2420,26 +2391,22 @@ app
 		});
 		// userData 更名迁移（pi-desktop → PiDeck）在 setPath 前同步执行，当时还没有日志器；
 		// 结果在此补记，失败/回退路径必须可从日志诊断。
-		if (userDataNameMigrationResult?.kind === "migrated") {
-			void appLogger.info("migration", "userData directory renamed to PiDeck", {
-				from: userDataNameMigrationResult.oldPath,
-				to: userDataNameMigrationResult.userDataPath,
-				sessionDirs: userDataNameMigrationResult.migratedSessionDirs.length,
-			});
-		} else if (userDataNameMigrationResult?.kind === "failed") {
-			void appLogger.warn("migration", "userData rename failed; continuing on legacy dir, retry next launch", {
-				reason: userDataNameMigrationResult.reason,
-			});
-		}
 		rpcLogger = new RpcLogger();
 		// 用量统计：pi-tracker 的 <agentDir>/analytics/usage.jsonl
 
 		usageStatsService = new UsageStatsService({
-			agentDir: join(app.getPath("home"), ".pi", "agent"),
+			agentDir: join(getPiAgentDir(app.getPath("home"))),
 			logger: {
 				info: (message) => void appLogger?.info("usage-stats", message),
 				warn: (message) => void appLogger?.warn("usage-stats", message),
 			},
+		});
+		await prepareInstallationGit({
+			runtimeRoot: installationPaths.runtimes,
+			tempRoot: installationPaths.temp,
+			enabled: !isE2E,
+			download: createNetDownloader((scope, message, detail) => void appLogger.info(scope, message, detail)),
+			onError: (message) => void appLogger.warn("git", "Private Git preparation failed", { message }),
 		});
 		gitService = new GitService();
 		gitRefsWatcher = new GitRefsWatcher({ logger: appLogger });
@@ -2473,6 +2440,8 @@ app
 		});
 		// C12：退出清理登记（before-quit 统一 runAll）——登录子进程必须随之回收。
 		quitCleanup.register("pi-auth", () => piAuthService?.dispose());
+		// Complete migration through Pi before any RPC runtime reads authentication state.
+		await piAuthService.prepareInstallationCredentials();
 		// 提示词增强助手（见 AGENTS.md「提示词增强例外通道」）：常驻单进程，复用认证
 		// 同一套 pi 入口解析；用户改自定义 pi 路径后下次增强生效（resolveLaunch 现求值）。
 		enhancePromptService = new EnhancePromptService({
@@ -2500,6 +2469,7 @@ app
 		// 之后备份/恢复都由用户在设置页手动触发）。
 		// 依赖注入生效目录与 userData，WSL 切换后跟随 configManager.getConfigDir()。
 		configBackupManager = new ConfigBackupManager({
+			getBackupDir: () => installationPaths.backups,
 			getConfigDir: () => configManager.getConfigDir(),
 			getUserDataDir: () => app.getPath("userData"),
 			getAppVersion: () => app.getVersion(),
@@ -3650,7 +3620,7 @@ app
  */
 async function removeStalePiDeckExtension(extensionName: string, homeDir?: string): Promise<void> {
 	const home = homeDir ?? app.getPath("home");
-	const targetPath = join(home, ".pi", "agent", "extensions", extensionName);
+	const targetPath = join(getPiAgentDir(home), "extensions", extensionName);
 	await rm(targetPath, { force: true });
 	appLogger?.info("extension", "Removed legacy/stale extension", { path: targetPath });
 }
@@ -3727,12 +3697,12 @@ async function ensureAllPiSettingsDefaults(): Promise<void> {
 	}
 
 	// Windows 本地
-	const winDir = join(app.getPath("home"), ".pi", "agent");
+	const winDir = join(getPiAgentDir(app.getPath("home")));
 	await ensurePiSettingsDefaults(winDir, piVersion).catch(() => {});
 
 	// WSL（如果已配置）
 	if (s.wslEnabled && s.wslDistro && s.wslUser) {
-		const wslDir = join(`\\\\wsl$\\${s.wslDistro}\\home\\${s.wslUser}`, ".pi", "agent");
+		const wslDir = getPiAgentDir(`\\\\wsl$\\${s.wslDistro}\\home\\${s.wslUser}`);
 		await ensurePiSettingsDefaults(wslDir, piVersion).catch(() => {});
 	}
 }

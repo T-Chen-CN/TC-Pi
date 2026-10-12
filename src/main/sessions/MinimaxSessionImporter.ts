@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, rm, utimes } from "node:fs/promises";
@@ -29,7 +30,7 @@ async function* readMinimaxMessageRecords(filePath: string): AsyncGenerator<Mini
  */
 export class MinimaxSessionImporter {
 	private readonly minimaxRoot = minimaxSessionsRoot(app.getPath("home"));
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 	/** sqlite 索引（标题）：首访问时读一次并缓存；失败降级为空 Map，不影响导入 */
 	private sqliteIndex?: Promise<Map<string, MinimaxSqliteEntry>>;
 

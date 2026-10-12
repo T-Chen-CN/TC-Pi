@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-应用还需要安装并配置 pi CLI。模型调用、工具执行和原生会话文件读写由 pi 负责。
+首次启动后，在应用内安装并配置私有 Node/Pi 运行时。模型调用、工具执行和原生会话文件读写由 pi 负责。
 
 ```sh
 npm run typecheck
@@ -73,9 +73,15 @@ src/main 管理桌面能力与进程，src/preload 暴露最小 API，src/render
 
 ## 下载与更新
 
-从 [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest) 下载当前版本。Windows 安装版使用 `setup.exe`，便携版使用 `portable.exe` 或 `win.zip`。首次使用仍需安装并配置 pi CLI。
+从 [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest) 下载当前版本。Windows 安装版使用 `setup.exe`，便携版使用 `portable.exe` 或 `win.zip`。首次使用在应用内安装 Node/Pi 并配置模型授权；依赖准备需要网络。
 
 应用与内置内容从 TC-Pi 获取更新。Windows 安装版支持应用内下载和安装更新，便携版通过 Releases 手动更新。原作者的上游安装包不包含此分支的修改。
+
+## 安装目录与数据
+
+Windows 版将配置、Pi 授权与历史、浏览器数据、缓存、日志放在安装目录的 `data/`，私有 Node、Pi、Git 与语音运行时放在 `runtimes/`。请选择当前用户可写的目录；目录不可写时应用会提示并停止，不回退 AppData。开发版使用项目内 `.tc-pi-dev/`。
+
+首次启动复制旧配置与历史，保留原件；授权由 Pi SDK 迁移。覆盖升级及普通卸载保留 `data/` 和 `runtimes/`。关闭程序后可以整体移动目录；外部项目和脚本中的硬编码路径不会自动移动。macOS、Linux 仅验证了路径策略，尚未完成整包验收；WSL 需在对应终端重新登录。详见 [存储迁移说明](docs/install-directory-runtime-plan.md)。
 
 ## License
 

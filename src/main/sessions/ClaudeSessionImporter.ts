@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readdir, rm, utimes } from "node:fs/promises";
@@ -57,7 +58,7 @@ export class ClaudeSessionImporter {
 	/** 源 transcript 不带可辨识模型时的占位标签（model_change 行 / assistant provider）。 */
 	protected defaultProvider = "anthropic";
 	protected defaultModelId = "claude-sonnet-4";
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

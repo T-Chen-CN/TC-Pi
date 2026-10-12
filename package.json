@@ -188,6 +188,10 @@
         "to": "pi-auth-host.mjs"
       },
       {
+        "from": "resources/pi-auth-migration.mjs",
+        "to": "pi-auth-migration.mjs"
+      },
+      {
         "from": "resources/pi-enhance-host.mjs",
         "to": "pi-enhance-host.mjs"
       },
@@ -214,6 +218,10 @@
     },
     "nsis": {
       "oneClick": false,
+	  "perMachine": false,
+	  "allowElevation": false,
+	  "deleteAppDataOnUninstall": false,
+	  "include": "build/install-directory-storage.nsh",
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,

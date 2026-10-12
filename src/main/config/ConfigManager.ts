@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import type { Session } from "electron";
 import { net, session } from "electron";
 import { randomUUID } from "node:crypto";
@@ -27,9 +28,6 @@ import { buildDeclarativeUsageProbeTemplate, USAGE_PROBE_CATEGORY_BY_TEMPLATE_ID
 import { usageProbeRequest } from "./usageProbeTransport";
 import type { UsageProbeSettingsLoadResult, UserUsageProbe } from "./userUsageProbes";
 import { loadUsageProbeProviderConfigs, loadUsageProbeSettings, loadUserUsageProbes, loadUserUsageProbesDetailed } from "./userUsageProbes";
-
-/** pi 全局配置目录：~/.pi/agent/ */
-const PI_AGENT_DIR = join(homedir(), ".pi", "agent");
 
 // ── models.json 结构 ──────────────────────────────────
 // { providers: { [providerName]: { baseUrl, api, apiKey, models: [...] } } }
@@ -193,12 +191,12 @@ export class ConfigManager {
 		configDir?: string,
 		private readonly translate: ConfigCopy = (key, params) => mainProcessT("zh-CN", key, params),
 	) {
-		this.configDir = configDir ?? PI_AGENT_DIR;
+		this.configDir = configDir ?? getPiAgentDir();
 	}
 
 	/** 将配置目录切换到统一解析出的 WSL HOME；null 恢复 Windows home。 */
 	configureWsl(environment: WslEnvironment | null) {
-		this.configDir = environment ? join(environment.windowsHome, ".pi", "agent") : PI_AGENT_DIR;
+		this.configDir = environment ? join(getPiAgentDir(environment.windowsHome)) : getPiAgentDir();
 	}
 
 	/** 当前 pi 全局配置目录（WSL 环境为 windowsHome 映射），供渲染层展示源文件实际编辑位置。 */

@@ -34,14 +34,13 @@ test("electron-vite renderer 用同一套端口解析，避免和主进程 userD
 	assert.match(src, /port:\s*resolveDevVitePort\(readDevGitBranch\(\)\)/);
 });
 
-test("主进程未打包时按分支解析 userData；打包态（含 dev 通道安装包）走共用正式目录", () => {
+test("主进程按安装目录解析存储，未打包调试态使用独立分支目录", () => {
 	const src = readFileSync("src/main/index.ts", "utf8");
 	assert.match(src, /from "\.\/devIsolation"/);
 	assert.match(src, /const isolateDevByGitBranch = !app\.isPackaged/);
 	assert.match(src, /resolveDevUserDataDirName\(devGitBranch\)/);
-	// 契约：分支目录名只影响未打包调试态；打包态（stable 与 dev 通道安装包）经
-	// resolveAppUserDataDir 共用正式目录（见 portableUserData.test.mjs）。
-	assert.match(src, /unpackagedDevDir:\s*join\(app\.getPath\("appData"\), devUserDataDirName\)/);
+	assert.match(src, /resolveInstallPaths\s*\(\s*\{[^}]*devProfile:\s*devUserDataDirName/);
+	assert.match(src, /initializeInstallationStorage\s*\(/);
 });
 
 test("readDevGitBranch 优先读环境变量，否则走 git", () => {

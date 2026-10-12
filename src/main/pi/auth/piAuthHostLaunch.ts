@@ -158,6 +158,7 @@ function pickPiEntryCandidate(invocation: PiCommandInvocation, piCommand: string
 function resolveNodeExe(invocation: PiCommandInvocation, userDataPath: string): string {
 	if (invocation.windowsLaunch?.channel === "node-direct" && !isBareCommand(invocation.command)) return invocation.command;
 	const portableNode = piRuntimeNodeExePath(userDataPath);
+	if (process.env.TC_PI_RUNTIME_ROOT) return portableNode;
 	if (existsSync(portableNode)) return portableNode;
 	return process.platform === "win32" ? "node.exe" : "node";
 }

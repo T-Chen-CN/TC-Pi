@@ -2,6 +2,8 @@ import { isTraditionalChineseLanguageTag } from "../types/settings";
 import { mainProcessZhTW } from "./mainProcessCopy.zh-TW";
 
 export const mainProcessZhCN = {
+	"mainStorage.startupTitle": "TC-Pi 本地运行环境初始化失败",
+	"mainStorage.startupFailed": "无法在安装目录初始化或迁移运行数据：{path}。请检查目录写权限和磁盘空间；旧数据保留，软件不会回退到其他数据目录。",
 	"diagnostic.historyLoadFailed": "历史会话加载失败，可继续使用当前 Agent 或重新打开会话重试。",
 	"diagnostic.compactReconnected": "会话压缩完成，Agent 已自动重连",
 	"diagnostic.compactionFailed": "会话压缩失败，上下文可能已接近上限；可稍后手动重试压缩，或重启会话。",
@@ -253,6 +255,8 @@ export const mainProcessZhCN = {
 export type MainProcessTranslationKey = keyof typeof mainProcessZhCN;
 
 export const mainProcessEnUS: Record<MainProcessTranslationKey, string> = {
+	"mainStorage.startupTitle": "TC-Pi local runtime initialization failed",
+	"mainStorage.startupFailed": "Cannot initialize or migrate runtime data in the installation directory: {path}. Check write permissions and disk space. Existing data is retained; TC-Pi will not switch to another data directory.",
 	"diagnostic.historyLoadFailed": "Failed to load session history. You can keep using this Agent or reopen the session to retry.",
 	"diagnostic.compactReconnected": "Session compacted and the Agent reconnected automatically",
 	"diagnostic.compactionFailed": "Session compaction failed and the context may be near its limit. Retry compaction later or restart the session.",

@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "./storage/piPaths";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -91,7 +92,7 @@ function nativeResourceEnabled(options: { entries: readonly string[]; baseEntrie
 
 export function discoverSkills(options: ResourceDiscoveryOptions): DiscoveredSkillResource[] {
 	const home = options.agentHomeDir?.trim() || homedir();
-	const agentDir = join(home, ".pi", "agent");
+	const agentDir = join(getPiAgentDir(home));
 	const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
 	const projectBaseDir = join(cwd, ".pi");
 	const includeProjectResources = options.includeProjectResources !== false;
@@ -198,7 +199,7 @@ export function discoverSkills(options: ResourceDiscoveryOptions): DiscoveredSki
 
 export function discoverPrompts(options: ResourceDiscoveryOptions): DiscoveredPromptResource[] {
 	const home = options.agentHomeDir?.trim() || homedir();
-	const agentDir = join(home, ".pi", "agent");
+	const agentDir = join(getPiAgentDir(home));
 	const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
 	const projectBaseDir = join(cwd, ".pi");
 	const includeProjectResources = options.includeProjectResources !== false;
@@ -279,7 +280,7 @@ export function discoverPrompts(options: ResourceDiscoveryOptions): DiscoveredPr
 
 export function discoverExtensions(options: ResourceDiscoveryOptions): DiscoveredExtensionResource[] {
 	const home = options.agentHomeDir?.trim() || homedir();
-	const agentDir = join(home, ".pi", "agent");
+	const agentDir = join(getPiAgentDir(home));
 	const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
 	const projectBaseDir = join(cwd, ".pi");
 	const includeProjectResources = options.includeProjectResources !== false;

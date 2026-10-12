@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { shell } from "electron";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -41,7 +42,7 @@ export class PromptManager {
 		home?: string,
 		private readonly translate: PromptCopy = () => "Prompt operation failed.",
 	) {
-		this.promptsDir = join(home ?? homedir(), ".pi", "agent", "prompts");
+		this.promptsDir = join(getPiAgentDir(home ?? homedir()), "prompts");
 	}
 
 	/** 注入 PiDeck 设置读写：旧禁用列表的兼容通道（原生服务未装配时使用；迁移后为空）。 */
@@ -169,7 +170,7 @@ export class PromptManager {
 	/** 将 prompt 目录切换到统一解析出的 WSL HOME；null 恢复 Windows home。 */
 	configureWsl(environment: WslEnvironment | null) {
 		this.wslEnvironment = environment;
-		this.promptsDir = join(environment?.windowsHome ?? homedir(), ".pi", "agent", "prompts");
+		this.promptsDir = join(getPiAgentDir(environment?.windowsHome ?? homedir()), "prompts");
 	}
 
 	private async globalBoundary(): Promise<ProjectFileReadBoundary> {

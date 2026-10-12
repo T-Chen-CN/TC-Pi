@@ -12,7 +12,7 @@
  */
 
 import { app } from "electron";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AutoUpdaterLike, AutoUpdaterEventHandlers } from "./autoUpdaterTypes";
 import { UPDATE_REPO_OWNER, UPDATE_REPO } from "./releaseRepo";
@@ -113,9 +113,36 @@ export function createRealAutoUpdater(options?: { feedUrl?: string; isAutoDownlo
 	// 延迟 require：模块顶层 import electron-updater 会在纯 Node 测试进程崩。
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	// eslint-disable-next-line @typescript-eslint/no-var-requires
-	const { autoUpdater } = require("electron-updater") as {
-		autoUpdater: import("electron-updater").AppUpdater;
+	const updaterModule: typeof import("electron-updater") = require("electron-updater");
+	const localCache = process.env.TC_PI_DATA_ROOT;
+	const adapter: import("electron-updater/out/AppAdapter").AppAdapter = {
+		get version() {
+			return app.getVersion();
+		},
+		get name() {
+			return app.getName();
+		},
+		get isPackaged() {
+			return app.isPackaged;
+		},
+		get appUpdateConfigPath() {
+			return resolveDefaultAppUpdateConfigPath(app.isPackaged, process.resourcesPath, app.getAppPath());
+		},
+		get userDataPath() {
+			return app.getPath("userData");
+		},
+		get baseCachePath() {
+			return join(localCache ?? app.getPath("userData"), "cache", "updates");
+		},
+		whenReady: () => app.whenReady(),
+		relaunch: () => app.relaunch(),
+		quit: () => app.quit(),
+		onQuit: (handler) => {
+			// The updater's quit callback lives until application exit and removes itself after firing.
+			app.once("quit", (_event, code) => handler(code));
+		},
 	};
+	const autoUpdater = localCache ? createInstallationUpdater(updaterModule, adapter) : updaterModule.autoUpdater;
 
 	// 1. 挂载兜底配置（必须在 setFeedURL 之前，避免 updateConfigPath setter 将 clientPromise 置空）
 	const defaultAppUpdateConfigPath = resolveDefaultAppUpdateConfigPath(app.isPackaged, process.resourcesPath, app.getAppPath());
@@ -243,4 +270,16 @@ export function createRealAutoUpdater(options?: { feedUrl?: string; isAutoDownlo
 			};
 		},
 	};
+}
+
+/** Preserve electron-updater's package-type selection while supplying an installation-owned cache. */
+function createInstallationUpdater(module: typeof import("electron-updater"), adapter: import("electron-updater/out/AppAdapter").AppAdapter): import("electron-updater").AppUpdater {
+	if (process.platform === "win32") return new module.NsisUpdater(undefined, adapter);
+	if (process.platform === "darwin") return new module.MacUpdater(undefined, adapter);
+	const identity = join(process.resourcesPath, "package-type");
+	const type = existsSync(identity) ? readFileSync(identity, "utf8").trim() : "";
+	if (type === "deb") return new module.DebUpdater(undefined, adapter);
+	if (type === "rpm") return new module.RpmUpdater(undefined, adapter);
+	if (type === "pacman") return new module.PacmanUpdater(undefined, adapter);
+	return new module.AppImageUpdater(undefined, adapter);
 }

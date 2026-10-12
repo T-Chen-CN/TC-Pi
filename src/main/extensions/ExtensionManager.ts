@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { execFile } from "node:child_process";
 import { clearTimeout, setTimeout } from "node:timers";
 import { readFile, rm, writeFile } from "node:fs/promises";
@@ -289,7 +290,7 @@ export class ExtensionManager {
 	 * 以及 package.json 的 pi.extensions 声明；同一目录声明多个入口仍只显示一行。
 	 */
 	private async scanLocalExtensions(): Promise<PiExtensionSummary[]> {
-		const extensionsDir = join(this.homeDir, ".pi", "agent", "extensions");
+		const extensionsDir = join(getPiAgentDir(this.homeDir), "extensions");
 		const roots = new Map<string, string>();
 		for (const entryPath of discoverExtensionEntries(extensionsDir)) {
 			const relativePath = relative(extensionsDir, entryPath);
@@ -326,7 +327,7 @@ export class ExtensionManager {
 	 * 只允许删除 extensions 目录下的单层 basename，防止路径穿越。
 	 */
 	private async removeLocalExtension(source: string): Promise<void> {
-		const extensionsDir = join(this.homeDir, ".pi", "agent", "extensions");
+		const extensionsDir = join(getPiAgentDir(this.homeDir), "extensions");
 		const trimmed = source.trim();
 		const name = basename(trimmed);
 		// source 必须等于 basename（如 orca-agent-status.ts），拒绝 ../ 或绝对路径穿越。
@@ -345,7 +346,7 @@ export class ExtensionManager {
 	 */
 	private async clearDisabledEntry(source: string, scope: PiExtensionSummary["scope"] = "user"): Promise<void> {
 		try {
-			const settingsPath = join(this.homeDir, ".pi", "agent", "settings.json");
+			const settingsPath = join(getPiAgentDir(this.homeDir), "settings.json");
 			const raw = await readFile(settingsPath, "utf8");
 			const settings = JSON.parse(raw) as { disabledExtensions?: string[] };
 			const disabled = settings.disabledExtensions ?? [];
@@ -373,7 +374,7 @@ export class ExtensionManager {
 	 * force: 文件本就不存在时静默成功（幂等，适合启动残留清理）。
 	 */
 	async removeBuiltInFile(source: string): Promise<void> {
-		const extensionsDir = join(this.homeDir, ".pi", "agent", "extensions");
+		const extensionsDir = join(getPiAgentDir(this.homeDir), "extensions");
 		const trimmed = source.trim();
 		const name = basename(trimmed);
 		if (!name || name !== trimmed || !isBuiltInExtensionName(name)) {
@@ -604,7 +605,7 @@ export class ExtensionManager {
 	private async runNpmPrefixUpdate(prefixDir: string, version: string, packageName?: string): Promise<string> {
 		// 复用 pi settings.json 的 npmCommand（与包资源安装同源）：裸 npm 在 GUI PATH 里找不到时，
 		// 用户配置的包装命令在这里同样生效（#318/#263）。
-		const configured = readConfiguredNpmCommand(join(this.homeDir, ".pi", "agent", "settings.json"));
+		const configured = readConfiguredNpmCommand(join(getPiAgentDir(this.homeDir), "settings.json"));
 		return this.runPackageInstall(configured[0], [...configured.slice(1), "install", "-g", `${packageName ?? PI_PACKAGE_NAME}@${version}`, "--prefix", prefixDir], 300_000);
 	}
 
@@ -697,7 +698,7 @@ export class ExtensionManager {
 	private npmViewVersion(packageName: string) {
 		// 复用 pi settings.json 的 npmCommand（与包资源安装同源）：裸 npm 在 GUI PATH 里找不到时
 		// （fnm/nvm XDG 布局等），用户配置的包装命令在这里同样生效（#318/#263 遗留）。
-		const configured = readConfiguredNpmCommand(join(this.homeDir, ".pi", "agent", "settings.json"));
+		const configured = readConfiguredNpmCommand(join(getPiAgentDir(this.homeDir), "settings.json"));
 		const invocation = this.locator.createInvocation(configured[0], [...configured.slice(1), "view", packageName, "version"]);
 		return new Promise<string>((resolve, reject) => {
 			execFile(

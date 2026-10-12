@@ -20,23 +20,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 const require = createRequire(import.meta.url);
 const { PiRpcClient } = loadTsCommonJs("src/main/pi/PiRpcClient.ts");
 const { describeSpawnFailure } = loadTsCommonJs("src/main/pi/piSpawnFailure.ts");
 const { decideExtensionFallback, describeExtensionFallbackSkip } = loadTsCommonJs("src/main/pi/extensionStartupFallback.ts");
-
-function transpile(filePath) {
-	return ts.transpileModule(readFileSync(filePath, "utf8"), {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	}).outputText;
-}
 
 /** spawn 失败形态的子进程：pid 永远是 undefined（Node 判定「从未起来」的依据）。 */
 function createFailedSpawnChild() {
@@ -52,7 +42,19 @@ function createFailedSpawnChild() {
 function loadPiProcess(child) {
 	const counters = { unpark: 0 };
 	const wslPathsSandbox = { exports: {}, require };
-	vm.runInNewContext(transpile("src/main/wsl/WslPaths.ts"), wslPathsSandbox, { filename: "WslPaths.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = wslPathsSandbox;
+		const stubs = {};
+		for (const specifier of ["node:path/posix"]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		wslPathsSandbox.exports = createTsSandbox({ globals, stubs })("src/main/wsl/WslPaths.ts");
+	})();
 
 	const sandbox = {
 		Buffer,
@@ -95,7 +97,36 @@ function loadPiProcess(child) {
 			return require(id);
 		},
 	};
-	vm.runInNewContext(transpile("src/main/pi/PiProcess.ts"), sandbox, { filename: "PiProcess.ts" });
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of [
+			"../storage/piPaths",
+			"node:child_process",
+			"node:events",
+			"node:fs",
+			"node:os",
+			"node:path",
+			"../extensions/builtInExtensions",
+			"../extensions/extensionVersionGate",
+			"../git/gitProcess",
+			"../logging/sharedLogger",
+			"../sessions/sessionProxyPolicy",
+			"../wsl/WslPaths",
+			"./piExtensionFilter",
+			"./PiLocator",
+			"./PiRpcClient",
+			"./piSpawnFailure",
+		]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/pi/PiProcess.ts");
+	})();
 	return { PiProcess: sandbox.exports.PiProcess, counters };
 }
 

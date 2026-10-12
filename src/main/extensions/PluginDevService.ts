@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { getPiAgentDir } from "../storage/piPaths";
 import { getAppLogger } from "../logging/sharedLogger";
 import { buildPluginDevGuideMarkdown, DEMO_PLUGIN_FILENAME, PLUGIN_DEV_GUIDE_FILENAME, type PluginDevGuidePaths } from "../../shared/pluginDevGuide";
 import type { GuideLocale } from "../../shared/pluginDevCatalog";
@@ -37,7 +38,7 @@ export class PluginDevService {
 
 	/** 用户级扩展目录：demo/指南/用户自写插件的统一落点。 */
 	userExtensionsDir(): string {
-		return join(this.getHomeDir(), ".pi", "agent", "extensions");
+		return join(getPiAgentDir(this.getHomeDir()), "extensions");
 	}
 
 	status(): PluginDevStatus {

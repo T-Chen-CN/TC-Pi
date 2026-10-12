@@ -28,7 +28,7 @@ export type PiSelfUpdateChannel =
 /** bun 布局特征：全局 bin（`~/.bun/bin`）或其包目录（`…/install/global/node_modules`，软链解析后）。 */
 const BUN_PATH_PATTERN = /[\\/]\.bun[\\/]|[\\/]install[\\/]global[\\/]node_modules[\\/]/;
 /** 旧引导前缀布局：`<prefix>/pi.cmd`（Windows）或 `<prefix>/bin/pi`（POSIX），层级见 piRuntimePaths。 */
-const PORTABLE_PREFIX_PATTERN = /^(.*?[\\/]pi-runtime[\\/]pi-global)(?:[\\/].*)?$/i;
+const PORTABLE_PREFIX_PATTERN = /^(.*?[\\/](?:pi-runtime|runtimes)[\\/]pi-global)(?:[\\/].*)?$/i;
 
 export function resolvePiSelfUpdateChannel(command: string, platform: NodeJS.Platform = process.platform): PiSelfUpdateChannel {
 	// 裸命令名（所有候选都未命中时的兜底形态）与 wsl:// 标记无从分类；WSL 内是 Linux

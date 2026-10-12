@@ -17,6 +17,8 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { PiAuthErrorKind, PiAuthFlowUpdate, PiAuthLoginRequest, PiAuthLoginResult, PiAuthLogoutResult, PiAuthProviderOption, PiAuthProviderList } from "../../../shared/types/piAuth";
 import type { AppLogger } from "../../logging/AppLogger";
 import type { PiAuthHostLaunch, PiAuthHostLaunchFailureReason } from "./piAuthHostLaunch";
@@ -289,6 +291,16 @@ export class PiAuthService {
 
 	get busy(): boolean {
 		return this.exclusiveSession !== undefined;
+	}
+
+	/** Run the Pi-owned credential migration before other runtimes start, when local Node/Pi are ready. */
+	async prepareInstallationCredentials(): Promise<void> {
+		if (!process.env.TC_PI_LEGACY_AGENT_DIR) return;
+		if (process.env.PI_CODING_AGENT_DIR && existsSync(join(process.env.PI_CODING_AGENT_DIR, "credentials-migrated.json"))) return;
+		const launch = this.resolveLaunch();
+		if (!launch.ok || !existsSync(launch.nodeExe)) return;
+		const result = await this.listProviders();
+		if (!result.ok) this.logger?.warn(`Credential migration deferred: ${result.errorKind}`);
 	}
 
 	/**

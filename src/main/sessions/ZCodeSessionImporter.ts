@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app } from "electron";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -31,7 +32,7 @@ const MAX_SOURCE_DB_BYTES = 512 * 1024 * 1024;
 export class ZCodeSessionImporter {
 	private readonly zcodeDb = join(app.getPath("home"), ".zcode", "cli", "db", "db.sqlite");
 	private readonly zcodeArtifactsRoot = join(app.getPath("home"), ".zcode", "cli", "artifacts");
-	private readonly piRoot = join(app.getPath("home"), ".pi", "agent", "sessions");
+	private readonly piRoot = join(getPiAgentDir(app.getPath("home")), "sessions");
 
 	constructor(private readonly translate: SessionImportCopy = defaultSessionImportCopy) {}
 

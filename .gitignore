@@ -84,6 +84,7 @@ nul
 test-results/
 playwright-report/
 .tmp/
+.tc-pi-dev/
 .beui-inspect
 beui-todo-list.tmp.json
 

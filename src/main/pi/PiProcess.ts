@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, statSync } from "node:fs";
@@ -213,7 +214,7 @@ export class PiProcess extends EventEmitter {
 	private parkIncompatibleExtensions(includeProjectResources: boolean): string[] {
 		if (this.settings?.piRpcNoExtensions) return [];
 		const home = this.options.agentHomeDir?.trim() || homedir();
-		const dirs = [join(home, ".pi", "agent", "extensions")];
+		const dirs = [join(getPiAgentDir(home), "extensions")];
 		if (includeProjectResources) dirs.push(join(this.cwd, ".pi", "extensions"));
 		const parked: ParkedExtension[] = [];
 		for (const dir of dirs) {

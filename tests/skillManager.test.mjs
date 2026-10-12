@@ -5,8 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { createTsSandbox } from "./helpers/createTsSandbox.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -14,12 +13,7 @@ class SymlinkUnavailableError extends Error {}
 
 function loadSkillManagerModule() {
 	const source = readFileSync("src/main/skills/SkillManager.ts", "utf8");
-	const { outputText } = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-	});
+
 	const sandbox = {
 		exports: {},
 		process,
@@ -38,9 +32,19 @@ function loadSkillManagerModule() {
 		},
 	};
 	sandbox.global = sandbox;
-	vm.runInNewContext(outputText, sandbox, {
-		filename: "SkillManager.ts",
-	});
+	(() => {
+		const { exports: ignoredExports, require: boundaryRequire, global: ignoredGlobal, ...globals } = sandbox;
+		const stubs = {};
+		for (const specifier of ["../storage/piPaths", "electron", "node:fs", "node:fs/promises", "node:path", "node:os", "node:crypto", "../fs/trash"]) {
+			if (specifier === "../storage/piPaths" || specifier === "./piRuntimePaths") continue;
+			try {
+				if (boundaryRequire) stubs[specifier] = boundaryRequire(specifier);
+			} catch (error) {
+				if (error?.code !== "MODULE_NOT_FOUND") throw error;
+			}
+		}
+		sandbox.exports = createTsSandbox({ globals, stubs })("src/main/skills/SkillManager.ts");
+	})();
 	return sandbox.exports;
 }
 

@@ -1,3 +1,4 @@
+import { getPiAgentDir } from "../storage/piPaths";
 import { app, BrowserWindow, Menu } from "electron";
 import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
@@ -41,7 +42,7 @@ function desktopSettingsPath() {
 
 /** pi agent 的 settings.json 路径（~/.pi/agent/settings.json） */
 function piAgentSettingsPath() {
-	return join(app.getPath("home"), ".pi", "agent", "settings.json");
+	return join(getPiAgentDir(app.getPath("home")), "settings.json");
 }
 
 /** 同步读取桌面 settings.json（app.ready 前可用）。文件缺失时返回空对象。 */
