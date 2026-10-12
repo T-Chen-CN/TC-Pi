@@ -10,6 +10,17 @@ description: TC-Pi 每个版本的发布记录：新功能、问题修复与体�
 - [中文 CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md)
 - [English CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md)
 
+## v0.9.3
+
+发布时间：2026-10-13
+
+- 🚀 **完整迁移校验与自动清理**
+- 🚀 **迁移结果弹窗**
+- ✨ **兼容 v0.9.2 已迁移安装**
+- ✨ **清理中断恢复**
+- ✨ **Pi 运行时验证**
+- ✨ **授权迁移校验**
+
 ## v0.9.2
 
 发布时间：2026-10-13

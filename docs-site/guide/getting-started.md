@@ -16,11 +16,11 @@ TC-Pi 是一个用于管理多个 [pi](https://pi.dev) 编码 Agent 会话的桌
 
 ## 下载安装
 
-Windows 安装版与便携版发布在 GitHub Releases；v0.9.2 已完成 Windows 整包验证，macOS、Linux 本次仅验证路径策略：
+Windows 安装版与便携版发布在 GitHub Releases；v0.9.3 已完成 Windows 整包验证，macOS、Linux 本次仅验证路径策略：
 
 [打开 GitHub Releases](https://github.com/T-Chen-CN/TC-Pi/releases)
 
-安装后首次启动时，TC-Pi 会复制旧配置与历史并保留原件；缺少 Node/Pi 时通过环境安装入口准备。Windows Git/Bash 使用校验 SHA256 的私有 PortableGit。
+安装后首次启动时，TC-Pi 会复制旧配置与历史，通过完整校验后自动清理应用专属旧副本；共享配置、冲突或未验证文件保留，弹窗说明迁移与清理结果；缺少 Node/Pi 时通过环境安装入口准备。Windows Git/Bash 使用校验 SHA256 的私有 PortableGit。
 
 配置、Pi 授权与会话、浏览器数据、缓存和日志存入安装目录的 `data/`；运行时存入 `runtimes/`。覆盖升级和普通卸载保留二者。安装目录不可写时会停止启动，请安装到可写目录。关闭程序后可整体移动目录，外部项目与脚本硬编码路径不自动迁移。WSL 使用独立配置范围，需要在对应终端重新登录。
 

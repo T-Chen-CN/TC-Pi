@@ -1,3 +1,19 @@
+## v0.9.3 - 2026-10-13
+
+### 🚀 Features
+- **Verified migration and automatic cleanup** — Checks file inventories, SHA256, relocated configuration and session references, and private Node/Pi/Git runtimes before deleting application-owned legacy copies. Shared Pi settings and credentials remain in their original locations.
+- **Migration result dialog** — Shows what was migrated and cleaned, what was migrated but retained, and what could not be verified, including source and destination paths and retention reasons. A detailed result is saved in installation-local data.
+
+### ✨ Improvements
+- **Existing v0.9.2 installations** — Adds an audit to previous migrations without overwriting current edits. Conflicts, changed files, unavailable runtimes, active legacy applications, and failed credential verification retain the originals.
+- **Interrupted cleanup recovery** — Persists verification evidence and cleanup progress atomically, retries safely on a later startup, and avoids repeatedly displaying the same completed result.
+
+### 🐛 Fixes
+- **Pi runtime verification** — Handles interleaved RPC progress events and requires successful execution of the private Git probe through Pi's own Bash tool. Verification uses no model requests.
+- **Credential migration verification** — Pi SDK reads credentials back after migration, upgrades older migration markers, and preserves deliberate logouts without exposing credential contents in migration reports.
+
+Windows x64 installer, portable executable, and ZIP are validated for this release.
+
 ## v0.9.2 - 2026-10-13
 
 ### 🚀 Features
