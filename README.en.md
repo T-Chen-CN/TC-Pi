@@ -78,7 +78,7 @@ Application and built-in content updates come from TC-Pi. Installed Windows buil
 
 Windows builds store configuration, Pi credentials and history, browser data, caches, and logs under the installation's `data/`, with private Node, Pi, Git, and voice runtimes under `runtimes/`. Choose a directory writable by the current user; an unwritable directory stops startup with an error instead of falling back to AppData. Development builds use `.tc-pi-dev/` inside the project.
 
-First launch copies legacy configuration and history while retaining the originals; credentials are migrated by the Pi SDK. Upgrades and ordinary uninstallation preserve `data/` and `runtimes/`. Close the application before moving the entire directory; external projects and hard-coded script paths are not relocated. macOS and Linux have path-policy tests only, without full package validation; WSL requires signing in again from its terminal. See the [storage migration notes](docs/install-directory-runtime-plan.md).
+First launch copies legacy configuration and history; Pi SDK migrates and verifies credentials by reading them back. After content, path, and private-runtime checks pass, application-owned legacy copies are removed automatically. Shared settings, conflicts, and unverified files are retained, with each result explained in a dialog. Upgrades and ordinary uninstallation preserve `data/` and `runtimes/`. Close the application before moving the entire directory; external projects and hard-coded script paths are not relocated. macOS and Linux have path-policy tests only, without full package validation; WSL requires signing in again from its terminal. See the [storage migration notes](docs/install-directory-runtime-plan.md).
 
 ## License
 

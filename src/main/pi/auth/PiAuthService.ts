@@ -17,7 +17,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PiAuthErrorKind, PiAuthFlowUpdate, PiAuthLoginRequest, PiAuthLoginResult, PiAuthLogoutResult, PiAuthProviderOption, PiAuthProviderList } from "../../../shared/types/piAuth";
 import type { AppLogger } from "../../logging/AppLogger";
@@ -296,7 +296,14 @@ export class PiAuthService {
 	/** Run the Pi-owned credential migration before other runtimes start, when local Node/Pi are ready. */
 	async prepareInstallationCredentials(): Promise<void> {
 		if (!process.env.TC_PI_LEGACY_AGENT_DIR) return;
-		if (process.env.PI_CODING_AGENT_DIR && existsSync(join(process.env.PI_CODING_AGENT_DIR, "credentials-migrated.json"))) return;
+		if (process.env.PI_CODING_AGENT_DIR && existsSync(join(process.env.PI_CODING_AGENT_DIR, "credentials-migrated.json"))) {
+			try {
+				const marker: unknown = JSON.parse(readFileSync(join(process.env.PI_CODING_AGENT_DIR, "credentials-migrated.json"), "utf8"));
+				if (marker && typeof marker === "object" && "version" in marker && marker.version === 2 && "verified" in marker && marker.verified === true) return;
+			} catch {
+				/* The Pi host owns repairing or rejecting malformed credential evidence. */
+			}
+		}
 		const launch = this.resolveLaunch();
 		if (!launch.ok || !existsSync(launch.nodeExe)) return;
 		const result = await this.listProviders();

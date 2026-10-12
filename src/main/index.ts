@@ -63,6 +63,8 @@ import { getBridgeServer, stopBridgeServer } from "./pi/bridge/BridgeServer";
 import { ProjectStore } from "./projects/ProjectStore";
 import { resolveInstallPaths } from "./storage/installPaths";
 import { initializeInstallationStorage } from "./storage/installationBootstrap";
+import { MigrationCompletionController } from "./storage/MigrationCompletionController";
+import { probeMigrationRuntime } from "./storage/migrationRuntimeProbe";
 
 // 构建标记：npm run dist:*:dev 打包时由 vite define 注入 true（构建期替换，非运行时环境变量）。
 declare const __PIDECK_DEV_BUILD__: boolean;
@@ -92,11 +94,12 @@ const installationPaths = resolveInstallPaths({ isPackaged: app.isPackaged, exeP
 const fallbackSharedDataDir = installationPaths.desktop;
 const channelDevDataDir = join(installationPaths.data, "desktop-channel-dev");
 const devDataMode: DataEnvMode | null = updateChannel === "dev" ? (readDataEnvDecision(channelDevDataDir)?.dataMode ?? null) : null;
-initializeInstallationStorage(devDataMode === "channel-dev" ? { ...installationPaths, desktop: channelDevDataDir } : installationPaths, {
+const migrationSources = {
 	desktopSources: app.isPackaged ? [join(app.getPath("appData"), "PiDeck"), join(app.getPath("appData"), "pi-desktop")] : [join(app.getPath("appData"), devUserDataDirName), join(app.getPath("appData"), DEFAULT_DEV_USER_DATA_NAME)],
 	piSource: join(app.getPath("home"), ".pi", "agent"),
 	skipMigration: Boolean(gatedExplicitUserDataDir) || isE2E,
-});
+};
+initializeInstallationStorage(devDataMode === "channel-dev" ? { ...installationPaths, desktop: channelDevDataDir } : installationPaths, migrationSources);
 
 // 强制 XWayland 在部分 GNOME/Wayland 环境会导致主窗口不可见）。
 // ozone 平台一经启动不可更改，整个生命周期统一使用启动时快照。
@@ -397,6 +400,7 @@ let usageStatsService: UsageStatsService | null = null;
  * 应用内登录必须绕过 RPC 直调 pi 的认证 API，见 AGENTS.md「认证例外通道」。
  */
 let piAuthService: PiAuthService | null = null;
+let migrationCompletion: MigrationCompletionController | null = null;
 /** 提示词增强服务（输入框增强按钮的后端）：常驻助手进程复用用户那套 pi 的 ModelRuntime。 */
 let enhancePromptService: EnhancePromptService | null = null;
 /** 粘贴文件启动清理（registerIpc 阶段赋值；whenReady 后 fire-and-forget 执行） */
@@ -2086,6 +2090,7 @@ function registerIpc() {
 		},
 		preparePiCredentials: async () => {
 			await piAuthService?.prepareInstallationCredentials();
+			await migrationCompletion?.run();
 		},
 		diagnosticsMonitor: diagnosticsMonitor ?? undefined,
 		// 进程监控停止 agent：按 agentId 走完整会话停止链路（含 detach 推送）
@@ -2442,6 +2447,17 @@ app
 		quitCleanup.register("pi-auth", () => piAuthService?.dispose());
 		// Complete migration through Pi before any RPC runtime reads authentication state.
 		await piAuthService.prepareInstallationCredentials();
+		const migrationLocator = piLocator;
+		migrationCompletion = new MigrationCompletionController({
+			paths: devDataMode === "channel-dev" ? { ...installationPaths, desktop: channelDevDataDir } : installationPaths,
+			sources: migrationSources,
+			probe: (signal) => probeMigrationRuntime(installationPaths, resolvePiAuthHostLaunch({ settings: settingsStore.get(), locator: migrationLocator, userDataPath: app.getPath("userData"), appPath: app.getAppPath(), resourcesPath: process.resourcesPath, isPackaged: app.isPackaged }), signal),
+			window: () => mainWindow,
+			copy: mainCopy,
+			warn: () => void appLogger.warn("migration", "Migration verification or cleanup did not complete; legacy data retained"),
+		});
+		quitCleanup.register("migration-verification", () => migrationCompletion?.dispose());
+		await migrationCompletion.run();
 		// 提示词增强助手（见 AGENTS.md「提示词增强例外通道」）：常驻单进程，复用认证
 		// 同一套 pi 入口解析；用户改自定义 pi 路径后下次增强生效（resolveLaunch 现求值）。
 		enhancePromptService = new EnhancePromptService({
@@ -3426,6 +3442,7 @@ app
 		// 之后不再自动备份。同步快，不挡首帧；失败仅记录，不阻断启动。
 		configBackupManager?.ensureInitialBackups();
 		await createWindow();
+		void migrationCompletion?.notify().catch(() => void appLogger.warn("migration", "Migration result dialog could not be shown"));
 		// Quick tasks should not wait for unrelated WSL/proxy startup probes. The controller
 		// retains validated intent until the renderer subscribes or requests its snapshot.
 		const coldStartTarget = extractFocusTargetFromArgv(process.argv);

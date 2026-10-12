@@ -78,7 +78,7 @@ src/main 管理桌面能力与进程，src/preload 暴露最小 API，src/render
 
 Windows 版将配置、Pi 授权与历史、浏览器数据、缓存、日志放在安装目录的 `data/`，私有 Node、Pi、Git 与语音运行时放在 `runtimes/`。请选择当前用户可写的目录；目录不可写时应用会提示并停止，不回退 AppData。开发版使用项目内 `.tc-pi-dev/`。
 
-首次启动复制旧配置与历史，保留原件；授权由 Pi SDK 迁移。覆盖升级及普通卸载保留 `data/` 和 `runtimes/`。关闭程序后可以整体移动目录；外部项目和脚本中的硬编码路径不会自动移动。macOS、Linux 仅验证了路径策略，尚未完成整包验收；WSL 需在对应终端重新登录。详见 [存储迁移说明](docs/install-directory-runtime-plan.md)。
+首次启动复制旧配置与历史，授权由 Pi SDK 迁移并读回校验。完整性、路径与私有运行时验证通过后，自动清理应用专属旧副本；共享配置、冲突或未验证的文件保留，弹窗说明每项结果。覆盖升级及普通卸载保留 `data/` 和 `runtimes/`。关闭程序后可以整体移动目录；外部项目和脚本中的硬编码路径不会自动移动。macOS、Linux 仅验证了路径策略，尚未完成整包验收；WSL 需在对应终端重新登录。详见 [存储迁移说明](docs/install-directory-runtime-plan.md)。
 
 ## License
 

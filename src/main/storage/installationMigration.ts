@@ -1,40 +1,13 @@
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, readdirSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32, posix } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { relocateInstallationSessions } from "./sessionRelocation";
 import type { InstallPaths } from "./installPaths";
-import { canonicalizeSessionPath } from "../../shared/sessionIdentity";
+import { relocateStorageMetadata } from "./storageRelocation";
+import { collectMigrationCopies, migrationRootMappings } from "./migrationPlan";
+import { createMigrationAudit, migrationAuditPath, relocateMigrationAudit, writeMigrationAudit } from "./migrationAudit";
+export { relocateStorageValue } from "./storageRelocation";
 
 const MAX_CONFIG_BYTES = 16 * 1024 * 1024;
-const DESKTOP_DIRECTORIES = new Set(["chat-workspace", "external-sessions", "drafts", "custom-themes", "sounds", "backgrounds", "host-plugins", "builtin-extensions", "skills-overlay", "prompts-overlay"]);
-const BROWSER_NAMES = new Set(["Network", "Partitions", "Local Storage", "Session Storage", "IndexedDB", "Preferences", "Local State", "SharedStorage", "Shared Dictionary", "blob_storage"]);
-const PI_DIRECTORIES = new Set(["sessions", "prompts", "skills", "extensions", "themes", "agents", "npm", "pi-subagents", "backups", "missions", "analytics", "agents-skills"]);
-
-/** Change installation-owned path prefixes only; external project paths are deliberately retained. */
-export function relocateStorageValue(value: unknown, mappings: ReadonlyArray<readonly [string, string]>): unknown {
-	if (typeof value === "string") {
-		if (/^[!+-](?:[A-Za-z]:[/\\]|[/\\])/.test(value)) return value[0] + relocateStorageValue(value.slice(1), mappings);
-		for (const [from, to] of mappings) {
-			const candidate = value.replace(/\\/g, "/");
-			const prefix = from.replace(/\\/g, "/");
-			const windows = /^[A-Za-z]:\//.test(prefix) || prefix.startsWith("//");
-			const a = windows || process.platform === "darwin" ? candidate.toLowerCase() : candidate;
-			const b = windows || process.platform === "darwin" ? prefix.toLowerCase() : prefix;
-			if (a === b || a.startsWith(b + "/")) return (windows ? win32 : posix).join(to, candidate.slice(prefix.length));
-		}
-		return value;
-	}
-	if (Array.isArray(value)) return value.map((item) => relocateStorageValue(item, mappings));
-	if (value && typeof value === "object") {
-		const result = Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === "id" ? item : relocateStorageValue(item, mappings)]));
-		// Stable identities stay unchanged; catalog deduplication keys must follow relocated files.
-		if ("filePath" in value && typeof value.filePath === "string" && typeof result.filePath === "string" && "originKey" in value && typeof value.originKey === "string") {
-			const environment = "environment" in value && value.environment === "wsl" ? "wsl" : "native";
-			result.originKey = value.originKey.replace(canonicalizeSessionPath(value.filePath, environment), canonicalizeSessionPath(result.filePath, environment));
-		}
-		return result;
-	}
-	return value;
-}
 
 /** Copy without clobbering newer destination data or following untrusted directory links. */
 function copyMissing(source: string, target: string): void {
@@ -70,16 +43,7 @@ function validateRuntimeLinks(root: string, path: string): void {
 function rewriteConfig(path: string, mappings: ReadonlyArray<readonly [string, string]>): void {
 	if (!existsSync(path) || lstatSync(path).size > MAX_CONFIG_BYTES) return;
 	const before = readFileSync(path, "utf8");
-	let value = relocateStorageValue(JSON.parse(before), mappings);
-	// Pi trust decisions are keyed by path, unlike session catalogs keyed by stable identities.
-	if (basename(path) === "trust.json" && value && typeof value === "object" && !Array.isArray(value)) {
-		value = Object.fromEntries(
-			Object.entries(value).map(([key, decision]) => {
-				const relocated = relocateStorageValue(key, mappings);
-				return [typeof relocated === "string" ? relocated : key, decision];
-			}),
-		);
-	}
+	const value = relocateStorageMetadata(JSON.parse(before), basename(path), mappings);
 	const after = `${JSON.stringify(value, null, 2)}\n`;
 	if (after !== before) writeFileSync(path, after, "utf8");
 }
@@ -113,47 +77,32 @@ export function migrateInstallationStorage(paths: InstallPaths, input: { desktop
 			mappings.unshift(...relocateInstallationSessions(paths.piSessions, mappings));
 			rewriteDesktopMetadata(paths.desktop, mappings);
 			for (const name of ["settings.json", "models.json", "trust.json"]) rewriteConfig(join(paths.piAgent, name), mappings);
+			relocateMigrationAudit(paths, metadata.root, mappings);
 			writeFileSync(marker, JSON.stringify({ ...metadata, root: paths.root }, null, 2));
+		}
+		// v0.9.2 copied without evidence; reconstruct conservatively, never overwrite current data.
+		if (!existsSync(migrationAuditPath(paths))) {
+			const desktopSource = metadata && typeof metadata === "object" && "desktopSource" in metadata && typeof metadata.desktopSource === "string" && input.desktopSources.includes(metadata.desktopSource) ? metadata.desktopSource : undefined;
+			const mappings = migrationRootMappings(paths, desktopSource, input.piSource);
+			const sessionMappings = relocateInstallationSessions(paths.piSessions, mappings);
+			for (const [from, to] of sessionMappings) mappings.unshift([from.replace(paths.piAgent, input.piSource), to]);
+			const audit = createMigrationAudit(paths, collectMigrationCopies(paths, desktopSource, input.piSource), [...sessionMappings, ...mappings]);
+			writeMigrationAudit(paths, audit);
 		}
 		return { alreadyComplete: true };
 	}
 	const desktopSource = input.desktopSources.find((source) => existsSync(join(source, "settings.json")) || existsSync(join(source, "session-catalog.json")));
-	const mappings: Array<readonly [string, string]> = [
-		[join(dirname(dirname(input.piSource)), ".agents", "skills"), paths.agentsSkills],
-		[join(input.piSource, "install"), join(paths.runtimes, "pi", "install")],
-		[join(input.piSource, "bin"), join(paths.runtimes, "pi", "bin")],
-		[join(input.piSource, "win-git-bash"), join(paths.runtimes, "git")],
-		[input.piSource, paths.piAgent],
-	];
-	if (desktopSource) {
-		mappings.push([desktopSource, paths.desktop]);
-		for (const entry of readdirSync(desktopSource)) {
-			if (DESKTOP_DIRECTORIES.has(entry) || /\.json(?:\.bak)?$/.test(entry)) {
-				if (/^(?:announcements-cache|usage-stats-cache|tokendance-models)\./.test(entry)) continue;
-				copyMissing(join(desktopSource, entry), join(paths.desktop, entry));
-			} else if (BROWSER_NAMES.has(entry)) copyMissing(join(desktopSource, entry), join(paths.browser, entry));
-		}
-		copyRuntime(join(desktopSource, "voice-runtime"), paths.voice);
-		copyMissing(join(desktopSource, "logs"), paths.logs);
-		copyMissing(join(desktopSource, "config-backups"), paths.backups);
-		copyRuntime(join(desktopSource, "pi-runtime", "node"), join(paths.runtimes, "node"));
-		copyRuntime(join(desktopSource, "pi-runtime", "pi-global"), join(paths.runtimes, "pi-global"));
-	}
-	if (existsSync(input.piSource)) {
-		for (const entry of readdirSync(input.piSource)) {
-			// Credentials are migrated later, only inside the Pi authentication host.
-			if (/^auth(?:\.|$)/i.test(entry)) continue;
-			if (PI_DIRECTORIES.has(entry) || /\.(?:json|md)$/.test(entry)) copyMissing(join(input.piSource, entry), join(paths.piAgent, entry));
-		}
-		copyRuntime(join(input.piSource, "install"), join(paths.runtimes, "pi", "install"));
-		copyRuntime(join(input.piSource, "bin"), join(paths.runtimes, "pi", "bin"));
-		copyRuntime(join(input.piSource, "win-git-bash"), join(paths.runtimes, "git"));
-		copyMissing(join(dirname(dirname(input.piSource)), ".agents", "skills"), paths.agentsSkills);
-		copyMissing(join(dirname(dirname(input.piSource)), ".gitconfig"), join(paths.data, "gitconfig"));
-		copyMissing(join(dirname(dirname(input.piSource)), ".npmrc"), join(paths.data, "npmrc"));
+	const mappings = migrationRootMappings(paths, desktopSource, input.piSource);
+	const copies = collectMigrationCopies(paths, desktopSource, input.piSource);
+	const audit = createMigrationAudit(paths, copies, mappings);
+	for (const copy of copies) {
+		if (copy.runtime) copyRuntime(copy.source, copy.destination);
+		else copyMissing(copy.source, copy.destination);
 	}
 	const sessionMappings = relocateInstallationSessions(paths.piSessions, mappings);
 	for (const [from, to] of sessionMappings) mappings.unshift([from.replace(paths.piAgent, input.piSource), to]);
+	audit.mappings.unshift(...sessionMappings);
+	writeMigrationAudit(paths, audit);
 	rewriteDesktopMetadata(paths.desktop, mappings);
 	for (const entry of ["settings.json", "models.json", "trust.json"]) rewriteConfig(join(paths.piAgent, entry), mappings);
 	const pending = `${marker}.tmp`;

@@ -29,16 +29,7 @@ function writeOwnedSettings(file: string, paths: InstallPaths, platform: NodeJS.
 	const raw = readFileSync(file, "utf8");
 	const value: unknown = JSON.parse(raw.replace(/^\uFEFF/, ""));
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid Pi settings");
-	const node = join(paths.runtimes, "node", platform === "win32" ? "node.exe" : "bin/node");
-	const npm = join(paths.runtimes, "node", platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "lib/node_modules/npm/bin/npm-cli.js");
-	const skills = "skills" in value && Array.isArray(value.skills) ? value.skills : [];
-	// Pi still discovers ~/.agents independently of agentDir. Its native rules prevent loading
-	// the shared copy and include the installation's copy without replacing Pi's resource loader.
-	const sharedSkills = join(process.env.HOME || homedir(), ".agents", "skills")
-		.split("\\")
-		.join("/");
-	const ownedSkills = paths.agentsSkills.split("\\").join("/");
-	const next = { ...value, npmCommand: [node, npm], skills: [...new Set([...skills, ownedSkills, `-${sharedSkills}/**`])], ...(platform === "win32" ? { shellPath: join(paths.runtimes, "git", "bin", "bash.exe") } : {}) };
+	const next = createInstallationPiSettings(value, paths, platform);
 	const encoded = JSON.stringify(next, null, 2) + "\n";
 	if (encoded === raw) return;
 	const temporary = `${file}.${randomUUID()}.tmp`;
@@ -48,4 +39,18 @@ function writeOwnedSettings(file: string, paths: InstallPaths, platform: NodeJS.
 	} finally {
 		if (existsSync(temporary)) unlinkSync(temporary);
 	}
+}
+
+/** Share the generated-key policy with migration verification; other settings retain their values. */
+export function createInstallationPiSettings(value: object, paths: InstallPaths, platform: NodeJS.Platform = process.platform): object {
+	const node = join(paths.runtimes, "node", platform === "win32" ? "node.exe" : "bin/node");
+	const npm = join(paths.runtimes, "node", platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "lib/node_modules/npm/bin/npm-cli.js");
+	const skills = "skills" in value && Array.isArray(value.skills) ? value.skills : [];
+	// Pi still discovers ~/.agents independently of agentDir. Its native rules prevent loading
+	// the shared copy and include the installation's copy without replacing Pi's resource loader.
+	const sharedSkills = join(process.env.HOME || homedir(), ".agents", "skills")
+		.split("\\")
+		.join("/");
+	const ownedSkills = paths.agentsSkills.split("\\").join("/");
+	return { ...value, npmCommand: [node, npm], skills: [...new Set([...skills, ownedSkills, `-${sharedSkills}/**`])], ...(platform === "win32" ? { shellPath: join(paths.runtimes, "git", "bin", "bash.exe") } : {}) };
 }
