@@ -5,17 +5,12 @@
 基于 [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck) 的本地二次开发版本。TC-Pi 是 Electron 桌面工作台，通过 stdio JSON-RPC 管理 pi Agent，提供工作区、会话、文件与开发工具管理。
 当前维护仓库：[T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi)。应用更新从本仓库的 [Releases](https://github.com/T-Chen-CN/TC-Pi/releases) 获取。
 
-[![Version](https://img.shields.io/badge/version-0.9.3-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.9.4-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
 
-> **最新版本 v0.9.3**（2026-10-13）
+> **最新版本 v0.9.4**（2026-10-13）
 
-### v0.9.3 更新亮点
-- 🚀 **完整迁移校验与自动清理**
-- 🚀 **迁移结果弹窗**
-- ✨ **兼容 v0.9.2 已迁移安装**
-- ✨ **清理中断恢复**
-- ✨ **Pi 运行时验证**
-- ✨ **授权迁移校验**
+### v0.9.4 更新亮点
+- ✨ **Windows 安装器按需提权**
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

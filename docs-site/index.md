@@ -49,11 +49,11 @@ features:
     details: 可视化编辑 Models、Auth、Settings，全局和项目级 Skills 与 Extension 管理，斜线命令和模板快速插入。
   - icon: 🌐
     title: 跨平台下载
-    details: Windows 安装包通过 GitHub Releases 发布；源码开发支持 Windows、macOS、Linux。v0.9.3 在 Windows 完成整包验收。
+    details: Windows 安装包通过 GitHub Releases 发布；源码开发支持 Windows、macOS、Linux。v0.9.4 在 Windows 完成整包验收。
 ---
 
 ::: info
-TC-Pi v0.9.3 将运行环境与应用数据集中到安装目录，配置、授权与历史位于 `data/`，私有运行时位于 `runtimes/`，覆盖升级保留这两个目录。迁移经过完整校验后自动清理应用专属旧副本，共享或未验证文件保留，弹窗说明结果。下载与更新使用 TC-Pi Releases，功能以 [当前功能手册](/guide/feature-reference) 为准。
+TC-Pi v0.9.4 将运行环境与应用数据集中到安装目录，配置、授权与历史位于 `data/`，私有运行时位于 `runtimes/`，覆盖升级保留这两个目录。Windows 安装器可按需申请管理员权限，支持选择当前用户或所有用户安装。迁移经过完整校验后自动清理应用专属旧副本，共享或未验证文件保留，弹窗说明结果。下载与更新使用 TC-Pi Releases，功能以 [当前功能手册](/guide/feature-reference) 为准。
 :::
 
 
@@ -62,7 +62,7 @@ TC-Pi v0.9.3 将运行环境与应用数据集中到安装目录，配置、授�
   <figcaption>工作区、会话、文件抽屉、Git 分支和工具调用集中在同一个桌面窗口中。</figcaption>
 </figure>
 
-<p class="version-badge"><a href="/changelog">v0.9.3</a> 已发布 · <a href="/guide/getting-started#下载安装">下载安装</a> · <a href="/changelog">查看更新日志</a></p>
+<p class="version-badge"><a href="/changelog">v0.9.4</a> 已发布 · <a href="/guide/getting-started#下载安装">下载安装</a> · <a href="/changelog">查看更新日志</a></p>
 
 ## 面向本地开发的桌面控制台
 

@@ -10,6 +10,12 @@ description: TC-Pi 每个版本的发布记录：新功能、问题修复与体�
 - [中文 CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md)
 - [English CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md)
 
+## v0.9.4
+
+发布时间：2026-10-13
+
+- ✨ **Windows 安装器按需提权**
+
 ## v0.9.3
 
 发布时间：2026-10-13

@@ -1,3 +1,10 @@
+## v0.9.4 - 2026-10-13
+
+### 🐛 Fixes
+- **Windows installer elevation** — The “Anyone who uses this computer (all users)” option can now be selected when launching the installer normally. Continuing with that option requests administrator permission through Windows UAC; current-user installation remains available.
+
+Windows x64 installer, portable executable, and ZIP are provided. Installation-local storage and upgrade data preservation continue to apply.
+
 ## v0.9.3 - 2026-10-13
 
 ### 🚀 Features
