@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 function fixture() {
-	const root = mkdtempSync(join(tmpdir(), "tc-pi-config-ipc-"));
+	// 与生产服务的 canonical root 一致，避免 CI 用户目录的 8.3 短路径造成误报。
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "tc-pi-config-ipc-")));
 	mkdirSync(join(root, "prompts"));
 	writeFileSync(join(root, "settings.json"), "{}");
 	writeFileSync(join(root, "auth.json"), "pi-managed fixture");

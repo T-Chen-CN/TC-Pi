@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSync } from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +10,8 @@ const { PiConfigFilesService } = loadTsCommonJs("src/main/files/PiConfigFilesSer
 const { FileSystemService } = loadTsCommonJs("src/main/fs/FileSystemService.ts");
 
 function fixture() {
-	const root = mkdtempSync(join(tmpdir(), "tc-pi-config-tree-"));
+	// Windows CI 的 tmpdir 可包含 RUNNER~1 短路径；访问服务按真实路径返回，夹具也使用同一坐标系。
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "tc-pi-config-tree-")));
 	for (const dir of ["prompts", "skills", "agents", "sessions", "install"]) mkdirSync(join(root, dir));
 	for (const [name, value] of [
 		["settings.json", "{}"],
