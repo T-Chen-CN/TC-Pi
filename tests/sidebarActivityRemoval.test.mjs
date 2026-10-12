@@ -14,9 +14,11 @@ test("removed activity views and usage-history storage have no modules or update
 
 test("home retains catalog-based recent sessions and active runtime navigation", () => {
 	const home = read("components/home/HomeOverview.tsx");
-	assert.match(home, /workspaceSessions\(Object\.values\(records\)\)/);
-	assert.match(home, /sessions\.slice\(0,\s*12\)/);
-	assert.match(home, /open\(session\.projectId,\s*session\.id\)/);
-	assert.match(home, /pendingRequests\[session\.id\]/);
-	assert.doesNotMatch(home, /recent-session-atoms|collectRecentActivityRows|growRecentVisible|canCollapseRecent/);
+	const model = read("components/home/homeWorkModel.ts");
+	// 首页策略迁入纯模型后，仍以 catalog 为来源、限定最近十二条并走稳定会话导航。
+	assert.match(home, /buildHomeWork\(\{\s*projects,\s*sessions:\s*Object\.values\(records\)/);
+	assert.match(model, /recentSessions:\s*sessions\.slice\(0,\s*12\)/);
+	assert.match(home, /actions\.sessions\.open\(session\.projectId,\s*session\.id\)/);
+	assert.match(model, /input\.pendingRequests\[session\.id\]/);
+	assert.doesNotMatch(home + model, /recent-session-atoms|collectRecentActivityRows|growRecentVisible|canCollapseRecent/);
 });

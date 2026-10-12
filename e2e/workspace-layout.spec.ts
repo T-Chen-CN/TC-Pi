@@ -190,6 +190,7 @@ test("inline workspaces and session picker preserve the file tree and home overv
 	await window.getByTestId("home-overview").getByRole("button", { name: "刷新", exact: true }).click();
 	await expect(window.getByTestId("home-providers")).toContainText("layout-provider");
 	await expect(window.getByTestId("home-providers")).toContainText("已配置认证");
+	await window.getByTestId("home-overview").getByRole("button", { name: "查看用量详情", exact: true }).click();
 	await expect(window.getByTestId("home-overview")).toContainText("150 / $1.25");
 	await expect(window.getByTestId("home-overview")).not.toContainText("fixture-key");
 	await expect.poll(() => window.getByTestId("home-usage-bar").evaluateAll((bars) => Math.max(0, ...bars.map((bar) => bar.getBoundingClientRect().height)))).toBeGreaterThan(30);
@@ -233,7 +234,7 @@ test("home recent sessions retain the newest twelve and ignore the removed activ
 		// 旧使用记录特意只指向最早一条：清理后它不能决定首页最近会话的排序或范围。
 		localStorage.setItem("pideck:recent-agent-activity:v2", JSON.stringify([{ sessionId: sessions[0].id, projectId: "layout-alpha", at: Date.now() }]));
 		return sessions
-			.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+			.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || a.id.localeCompare(b.id))
 			.slice(0, 12)
 			.map((session) => session.title);
 	});
