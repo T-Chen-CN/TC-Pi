@@ -1,3 +1,18 @@
+## v0.9.2 - 2026-10-13
+
+### 🚀 Features
+- **Installation-local storage** — Windows configuration, Pi credentials and sessions, browser data, caches, logs, and temporary files now live under the installation's `data/`; private Node, Pi, Git, and voice runtimes use `runtimes/`. Development storage is isolated inside the project.
+- **Legacy migration and relocation** — First launch copies legacy configuration and history while retaining the originals. Pi SDK handles credential migration; moving the closed application relocates installation-owned references without rewriting message content.
+
+### ✨ Improvements
+- **Upgrades preserve local data** — NSIS upgrades and ordinary uninstallation retain `data/` and `runtimes/`. Startup reports an unwritable installation instead of silently using AppData. Preparing private dependencies requires network access.
+- **TC-Pi branding and managed dependencies** — Windows assets now use the TC-Pi name. Pi/npm, Git/Bash, tool caches, and update downloads resolve to the application's private directories.
+
+### 🐛 Fixes
+- **Pi authentication and model catalog refresh** — Repairs provider sign-in, model synchronization, and resource loading in independent chat while keeping the Agent loop controlled by Pi.
+
+Windows packages are validated for this release. macOS and Linux have path-policy tests only; WSL uses a separate configuration scope and requires signing in again from its terminal.
+
 ## v0.9.1 - 2026-10-12
 
 The first independent TC-Pi release, based on TC-Pi with a reduced feature set and a file-first desktop layout. The application retains the TC-Pi brand.

@@ -9,31 +9,26 @@ TC-Pi 是一个用于管理多个 [pi](https://pi.dev) 编码 Agent 会话的桌
 
 ## 环境要求
 
-- Node.js 20+
-- npm
-- 系统 `PATH` 中可访问 `pi` 命令
-- 已完成 pi 的 Provider、登录或 API Key 配置
-
-验证 pi 是否可用：
-
-```bash
-pi --version
-pi --mode rpc
-```
+- Windows 版安装到当前用户可写的目录。
+- 首次准备依赖需要网络；在应用内安装私有 Node/Pi 运行时。
+- 在配置管理中完成供应商登录或 API Key 配置。
+- 从源码开发需要 Node.js 与 npm，版本以 `package.json` 为准。
 
 ## 下载安装
 
-Windows、macOS、Linux 的预构建安装包发布在 GitHub Releases：
+Windows 安装版与便携版发布在 GitHub Releases；v0.9.2 已完成 Windows 整包验证，macOS、Linux 本次仅验证路径策略：
 
 [打开 GitHub Releases](https://github.com/T-Chen-CN/TC-Pi/releases)
 
-安装后首次启动时，TC-Pi 会尝试自动检测 `pi` 路径。如果检测失败，可以在设置里手动填写 pi 可执行文件路径。
+安装后首次启动时，TC-Pi 会复制旧配置与历史并保留原件；缺少 Node/Pi 时通过环境安装入口准备。Windows Git/Bash 使用校验 SHA256 的私有 PortableGit。
+
+配置、Pi 授权与会话、浏览器数据、缓存和日志存入安装目录的 `data/`；运行时存入 `runtimes/`。覆盖升级和普通卸载保留二者。安装目录不可写时会停止启动，请安装到可写目录。关闭程序后可整体移动目录，外部项目与脚本硬编码路径不自动迁移。WSL 使用独立配置范围，需要在对应终端重新登录。
 
 ## 从源码运行
 
 ```bash
 git clone https://github.com/T-Chen-CN/TC-Pi.git
-cd pi-desktop
+cd TC-Pi
 npm install
 npm run make-icon
 npm run dev

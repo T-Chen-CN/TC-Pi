@@ -5,19 +5,16 @@
 This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). TC-Pi is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
 Maintained at [T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi). Application updates use this repository’s [Releases](https://github.com/T-Chen-CN/TC-Pi/releases).
 
-[![Version](https://img.shields.io/badge/version-0.9.1-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.9.2-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
 
-> **Latest: v0.9.1** (2026-10-12)
+> **Latest: v0.9.2** (2026-10-13)
 
-### v0.9.1 Release Highlights
-- 🚀 **File-first workbench**
-- 🚀 **Pi Agent global configuration tree**
-- 🚀 **Usage overview and session management**
-- 🚀 **Git commit graph**
-- ✨ **Reduced Agent and auxiliary features**
-- ✨ **TC-Pi releases and automatic updates**
-- ✨ **Stable window layout**
-- ✨ **Text previews and file authorization**
+### v0.9.2 Release Highlights
+- 🚀 **Installation-local storage**
+- 🚀 **Legacy migration and relocation**
+- ✨ **Upgrades preserve local data**
+- ✨ **TC-Pi branding and managed dependencies**
+- ✨ **Pi authentication and model catalog refresh**
 
 [View Full Changelog →](CHANGELOG.md)
 

@@ -1,6 +1,6 @@
 {
   "name": "tc-pi",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "packageManager": "npm@11.6.2",
   "engines": {
     "npm": "^11.6.2"
@@ -218,10 +218,10 @@
     },
     "nsis": {
       "oneClick": false,
-	  "perMachine": false,
-	  "allowElevation": false,
-	  "deleteAppDataOnUninstall": false,
-	  "include": "build/install-directory-storage.nsh",
+      "perMachine": false,
+      "allowElevation": false,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/install-directory-storage.nsh",
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
