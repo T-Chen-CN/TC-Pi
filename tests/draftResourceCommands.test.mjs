@@ -4,6 +4,14 @@ import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 const { buildDraftResourceCommands, draftResourceCommandsForProject, selectComposerSuggestionCommands, standbyPreviewCommandsForProject } = loadTsCommonJs("src/renderer/src/utils/draftResourceCommands.ts");
 
+test("Independent chat never requests project-scoped prompts or skills", () => {
+	const { projectScopedResourceId } = loadTsCommonJs("src/renderer/src/utils/draftResourceCommands.ts");
+	assert.equal(projectScopedResourceId("builtin-chat"), undefined);
+	assert.equal(projectScopedResourceId("custom-chat", "chat"), undefined);
+	assert.equal(projectScopedResourceId(undefined), undefined);
+	assert.equal(projectScopedResourceId("workspace-a"), "workspace-a");
+});
+
 test("draft resource commands include enabled user-only skills and discovered prompts", () => {
 	const commands = buildDraftResourceCommands(
 		[

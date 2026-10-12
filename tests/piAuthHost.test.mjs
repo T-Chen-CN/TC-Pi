@@ -19,6 +19,31 @@ async function withFakePi(fn) {
 	}
 }
 
+test("browser-only OAuth cancellation is processed while login awaits polling without a prompt", async () => {
+	const fake = await createFakePiPackage(`export const VERSION = "1.1.0-test";
+export const ModelRuntime = { async create() { return {
+getProvider() { return { auth: { oauth: { name: "Demo" } } }; },
+async login(_id, _type, interaction) {
+interaction.notify({ type: "auth_url", url: "https://example.com/login" });
+await new Promise((_resolve, reject) => interaction.signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }));
+}
+}; } };`);
+	try {
+		const result = await runAuthHost({
+			entry: fake.entry,
+			timeoutMs: 1500,
+			commands: [{ cmd: "login", providerId: "demo", type: "oauth" }],
+			onMessage: (message, send) => {
+				if (message.type === "event") send({ cmd: "cancel" });
+			},
+		});
+		assert.equal(result.timedOut, false);
+		assert.equal(resultOf(result.messages).cancelled, true);
+	} finally {
+		await fake.cleanup();
+	}
+});
+
 test("list 返回 pi 自带供应商描述、已登录状态，并过滤无认证方式的供应商", async () => {
 	await withFakePi(async (fake) => {
 		const { code, messages } = await runAuthHost({ entry: fake.entry, commands: [{ cmd: "list" }] });

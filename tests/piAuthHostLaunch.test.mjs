@@ -54,6 +54,22 @@ function withTempDir(run) {
 	}
 }
 
+test("resolvePiSdkEntry: official managed pi.cmd resolves the active release SDK", () => {
+	withTempDir((dir) => {
+		const bin = join(dir, "bin");
+		mkdirSync(bin, { recursive: true });
+		writeFileSync(join(bin, "pi.cmd"), "@echo off\nnode pi-launcher.js %*\n");
+		const install = join(dir, "install");
+		mkdirSync(install, { recursive: true });
+		writeFileSync(join(install, "current-version"), "1.1.0\n");
+		const packagePath = join(install, "releases", "1.1.0", "node_modules", "@earendil-works", "pi-coding-agent");
+		writePiPackage(packagePath);
+		assert.equal(resolvePiSdkEntry(join(bin, "pi.cmd")), join(packagePath, "dist", "index.js"));
+		writeFileSync(join(install, "current-version"), "../outside");
+		assert.equal(resolvePiSdkEntry(join(bin, "pi.cmd")), undefined);
+	});
+});
+
 test("resolvePiSdkEntry 从包内任意 JS 文件向上找到 dist/index.js", () => {
 	withTempDir((dir) => {
 		const packageRoot = join(dir, "node_modules", "@earendil-works", "pi-coding-agent");

@@ -143,5 +143,5 @@ test("manual picker reload (force) refreshes catalog before re-hydration", () =>
 	assert.match(refreshCall, /modelCapabilityCache\.refresh\(\{ loadExtensions: true \}\)/);
 	// 渲染层已有 refreshing 转圈状态（失败也不打断选择器使用）。
 	const hook = readFileSync("src/renderer/src/hooks/useBackendModelCatalog.ts", "utf8");
-	assert.match(hook, /if \(force\) setRefreshing\(true\)/);
+	assert.match(hook, /store\.set\(\s*catalogAtom,\s*\{[^}]*loading:\s*!force,\s*refreshing:\s*force\s*\}/);
 });

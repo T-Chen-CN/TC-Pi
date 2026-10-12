@@ -58,7 +58,7 @@ import { t } from "../i18n";
 import { PASTE_TO_FILE_MIN_CHARS } from "../rendererUtils";
 import { GUIDE_BOOTSTRAP_SESSION_ID, readWelcomeBackendPreference, readWelcomeModelPreference, resolveGuidePageBackend } from "../utils/chatSessionBootstrap";
 import { COMPOSER_IMAGE_MAX_BYTES, ComposerImageError, dataUrlToFile, getClipboardImageFiles, getDroppedImageFiles, imageMimeTypeFromPath, isImageFilePath, processComposerImageFile } from "../utils/composerImages";
-import { buildDraftResourceCommands, draftResourceCommandsForProject, selectComposerSuggestionCommands, standbyPreviewCommandsForProject, type DraftResourceCommandSnapshot, type StandbyPreviewCommandSnapshot } from "../utils/draftResourceCommands";
+import { buildDraftResourceCommands, draftResourceCommandsForProject, projectScopedResourceId, selectComposerSuggestionCommands, standbyPreviewCommandsForProject, type DraftResourceCommandSnapshot, type StandbyPreviewCommandSnapshot } from "../utils/draftResourceCommands";
 import { mergeFileTreeChildren, resolveAtDrillDirectory, shouldLoadFullTreeForAtSearch } from "../utils/fileTreeLazy";
 import { showNotice } from "../utils/notice";
 import { requireSessionCommand, toSessionRuntimeTarget } from "../utils/sessionCommands";
@@ -273,6 +273,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 	// 统一经 projectId 反查项目清单，拿到已登记的项目根路径，避免把有项目会话
 	// 误当成匿名会话（用户反馈：粘贴大文本发送后消息里被展开成普通文本）。
 	const composerProject = useAtomValue(projectByIdAtomFamily(effectiveProjectId ?? ""));
+	const projectResourceId = projectScopedResourceId(effectiveProjectId, composerProject?.kind);
 	const runtime = useAtomValue(sessionRuntimeBySessionIdAtomFamily(sessionId));
 	const runtimeUi = useAtomValue(sessionRuntimeUiBySessionIdAtomFamily(sessionId));
 	const projectSessions = useAtomValue(sessionSummariesByProjectIdAtomFamily(effectiveProjectId ?? ""));
@@ -467,9 +468,9 @@ export function useSessionComposerController(options: UseSessionComposerControll
 		} catch {
 			// Project templates remain usable when the global store is unavailable.
 		}
-		if (record?.projectId) {
+		if (projectResourceId) {
 			try {
-				const projectResult = await desktopApi.prompts.listByProject(record.projectId);
+				const projectResult = await desktopApi.prompts.listByProject(projectResourceId);
 				next.push(
 					...projectResult.templates.map((template) => ({
 						...template,
@@ -484,7 +485,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 			setTemplateState({ key: templateKey, items: next });
 		}
 		return next;
-	}, [record?.projectId, sessionId, templateKey]);
+	}, [projectResourceId, sessionId, templateKey]);
 
 	useEffect(() => {
 		liveDomDraftRef.current = { sessionId, value: draft };
@@ -628,8 +629,8 @@ export function useSessionComposerController(options: UseSessionComposerControll
 			.list()
 			.then((result) => result.skills)
 			.catch(() => []);
-		const projectSkills = effectiveProjectId ? desktopApi.projectResources.list(effectiveProjectId).catch(() => undefined) : Promise.resolve(undefined);
-		const discovered = desktopApi.projectResources.discovery(effectiveProjectId ?? undefined).catch(() => ({ projectResourcesAllowed: false, overrides: { disabledGlobalExtensions: [], disabledGlobalSkills: [], disabledGlobalPrompts: [] }, skills: [], prompts: [], extensions: [] }));
+		const projectSkills = projectResourceId ? desktopApi.projectResources.list(projectResourceId).catch(() => undefined) : Promise.resolve(undefined);
+		const discovered = desktopApi.projectResources.discovery(projectResourceId).catch(() => ({ projectResourcesAllowed: false, overrides: { disabledGlobalExtensions: [], disabledGlobalSkills: [], disabledGlobalPrompts: [] }, skills: [], prompts: [], extensions: [] }));
 		void Promise.all([globalSkills, projectSkills, discovered]).then(([global, project, resources]) => {
 			if (!current) return;
 			const skills = [...(project?.skills ?? []), ...global, ...resources.skills];
@@ -646,7 +647,7 @@ export function useSessionComposerController(options: UseSessionComposerControll
 		return () => {
 			current = false;
 		};
-	}, [effectiveProjectId, runtime?.agentId, templates]);
+	}, [effectiveProjectId, projectResourceId, runtime?.agentId, templates]);
 
 	// Issue #316：草稿会话在 standby 池里有同项目已握手进程时，只读借用其 get_commands
 	// 预览扩展注册的命令（本地技能/提示词发现覆盖不到）。拿不到预览就保持空快照，

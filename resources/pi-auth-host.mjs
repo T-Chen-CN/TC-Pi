@@ -95,6 +95,9 @@ function pushCommand(command) {
 }
 
 function dispatch(command) {
+	// Browser/device flows may never request input. Abort immediately rather than queueing cancel
+	// behind runtime.login(); prompts still receive the queued command for their own cleanup path.
+	if (command?.cmd === "cancel") abortActive("host cancelled authentication");
 	pushCommand(command);
 }
 

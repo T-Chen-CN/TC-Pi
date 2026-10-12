@@ -95,11 +95,26 @@ export function resolvePiSdkEntry(entryJsPath: string, maxDepth = 5): string | u
 		// 垫片目录（npm 全局前缀、用户自定义 bin 目录）本身不是包根，但常与 node_modules 同级。
 		const nested = piSdkEntryIn(join(dir, "node_modules", PI_PACKAGE_NAME));
 		if (nested) return nested;
+		const managed = managedPiSdkEntry(dir);
+		if (managed) return managed;
 		const parent = dirname(dir);
 		if (parent === dir) break;
 		dir = parent;
 	}
 	return undefined;
+}
+
+/** Official installers keep bin/pi-launcher.js separate from install/releases/<version>/node_modules. */
+function managedPiSdkEntry(agentDir: string): string | undefined {
+	try {
+		const installRoot = join(agentDir, "install");
+		const version = readFileSync(join(installRoot, "current-version"), "utf8").trim();
+		// Installation metadata is still input: a version must be a bounded basename, never a path.
+		if (!/^[0-9A-Za-z][0-9A-Za-z._+-]{0,127}$/.test(version)) return undefined;
+		return piSdkEntryIn(join(installRoot, "releases", version, "node_modules", PI_PACKAGE_NAME));
+	} catch {
+		return undefined;
+	}
 }
 
 /** 裸命令名（靠 PATH 解析）与绝对路径的区分：后者才包含路径分隔符。 */

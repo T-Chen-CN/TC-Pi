@@ -1,5 +1,10 @@
 import type { PiCommand } from "../../../shared/types";
 
+/** Independent chat owns only global resources; never send its synthetic ID to project-only IPC. */
+export function projectScopedResourceId(projectId?: string, kind?: "chat"): string | undefined {
+	return projectId && projectId !== "builtin-chat" && kind !== "chat" ? projectId : undefined;
+}
+
 type DraftSkill = {
 	name: string;
 	description: string;
