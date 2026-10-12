@@ -9,8 +9,8 @@ import { filterSnapshotResults } from "../utils/fileSearchFilter";
  */
 export const FILE_SEARCH_DEBOUNCE_MS = 250;
 
-export function useFileSearch(options: { projectId?: string }) {
-	const { projectId } = options;
+export function useFileSearch(options: { projectId?: string; search?: (query: string) => Promise<FileSearchResult[]> }) {
+	const { projectId, search } = options;
 	const [query, setQuery] = useState("");
 	const [results, setResults] = useState<FileSearchResult[] | null>(null);
 	const [isSearching, setIsSearching] = useState(false);
@@ -32,11 +32,11 @@ export function useFileSearch(options: { projectId?: string }) {
 				setIsSearching(false);
 				return;
 			}
-			if (!projectId) return;
+			if (!projectId && !search) return;
 			const seq = ++requestSeqRef.current;
 			setIsSearching(true);
 			try {
-				const list = await window.piDesktop.files.search(projectId, trimmed);
+				const list = search ? await search(trimmed) : projectId ? await window.piDesktop.files.search(projectId, trimmed) : [];
 				if (seq !== requestSeqRef.current) return; // 迟到的旧请求：静默丢弃
 				setResults(list);
 				// 查询变长时快照才更新：保证快照查询恒为当前查询的前缀，前缀过滤才有意义
@@ -51,7 +51,7 @@ export function useFileSearch(options: { projectId?: string }) {
 				if (seq === requestSeqRef.current) setIsSearching(false);
 			}
 		},
-		[projectId],
+		[projectId, search],
 	);
 
 	// 防抖：停止输入 250ms 才发起扫描；切项目立即清态（旧项目的查询对新项目无意义）。
@@ -60,10 +60,10 @@ export function useFileSearch(options: { projectId?: string }) {
 			void searchNow("");
 			return;
 		}
-		if (!projectId) return;
+		if (!projectId && !search) return;
 		const timer = setTimeout(() => void searchNow(query), FILE_SEARCH_DEBOUNCE_MS);
 		return () => clearTimeout(timer);
-	}, [query, projectId, searchNow]);
+	}, [query, projectId, search, searchNow]);
 
 	// 卸载时作废在途请求，防止 setState 到已卸载组件
 	useEffect(

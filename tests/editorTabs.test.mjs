@@ -1,25 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-import ts from "typescript";
-import vm from "node:vm";
+import { loadTsCommonJs } from "./helpers/loadTsCommonJs.mjs";
 
 /**
  * 编辑器文件 Tab 预览/常驻纯策略（与 sessionTabs 同语义）。
  */
 
 function loadEditorTabs() {
-	const source = readFileSync("src/renderer/src/utils/editorTabs.ts", "utf8");
-	const output = ts.transpileModule(source, {
-		compilerOptions: {
-			module: ts.ModuleKind.CommonJS,
-			target: ts.ScriptTarget.ES2022,
-		},
-		fileName: "editorTabs.ts",
-	}).outputText;
-	const sandbox = { exports: {}, require: () => ({}) };
-	vm.runInNewContext(output, sandbox, { filename: "editorTabs.ts" });
-	return sandbox.exports;
+	return loadTsCommonJs("src/renderer/src/utils/editorTabs.ts");
 }
 
 const json = (value) => JSON.stringify(value);

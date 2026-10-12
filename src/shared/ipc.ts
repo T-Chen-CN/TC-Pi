@@ -35,6 +35,8 @@ export const ipcChannels = {
 	editorsChooseExecutable: "editors:choose-executable",
 	editorsOpenProject: "editors:open-project",
 	filesList: "files:list",
+	filesPiConfigList: "files:pi-config-list",
+	filesPiConfigSearch: "files:pi-config-search",
 	/** 工作区文件名搜索（issue #215）：主进程全盘扫描，不受抽屉懒加载深度限制 */
 	filesSearch: "files:search",
 	filesOpen: "files:open",

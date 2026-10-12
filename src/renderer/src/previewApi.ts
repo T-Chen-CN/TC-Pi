@@ -453,6 +453,8 @@ export function createPreviewApi(): PiDesktopApi {
 			discovery: async () => ({ projectResourcesAllowed: false, overrides: { disabledGlobalExtensions: [], disabledGlobalSkills: [], disabledGlobalPrompts: [] }, skills: [], prompts: [], extensions: [] }),
 		},
 		files: {
+			listPiConfig: async () => ({ rootPath: "/preview/pi-agent", files: [] }),
+			searchPiConfig: async () => [],
 			list: async (_projectId, options) => {
 				if (options?.directory) {
 					const match = findPreviewDirectory(files, options.directory);

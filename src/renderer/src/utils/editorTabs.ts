@@ -1,4 +1,4 @@
-import type { ProjectFileAccessScope } from "../../../shared/types";
+import { fileAccessScopeKey, type FileAccessScope } from "../../../shared/types";
 
 /**
  * 编辑器文件 Tab 的 VS Code 式预览/常驻策略（纯函数）。
@@ -17,11 +17,11 @@ export type EditorTabIdentity = {
 	id: string;
 	filePath: string;
 	tabKey?: string;
-	fileAccessScope?: ProjectFileAccessScope;
+	fileAccessScope?: FileAccessScope;
 };
 
 function sameFile(a: EditorTabIdentity, b: EditorTabIdentity): boolean {
-	return a.filePath === b.filePath && a.tabKey === b.tabKey && a.fileAccessScope?.projectId === b.fileAccessScope?.projectId;
+	return a.filePath === b.filePath && a.tabKey === b.tabKey && fileAccessScopeKey(a.fileAccessScope) === fileAccessScopeKey(b.fileAccessScope);
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ProjectFileAccessScope, WorkspaceContentOpenMode } from "../../../../shared/types";
+import type { FileAccessScope, WorkspaceContentOpenMode } from "../../../../shared/types";
 import { FileDiffViewer } from "../app/FileDiffViewer";
 
 type EditorTabLike = {
@@ -11,7 +11,7 @@ type EditorTabLike = {
 	label?: string;
 	preserveDrawer?: boolean;
 	/** 工具/消息文件入口的项目读取授权，随 tab 固化。 */
-	fileAccessScope?: ProjectFileAccessScope;
+	fileAccessScope?: FileAccessScope;
 	/** 打开文件后滚动定位的目标行（来自 `path:line` 链接）。 */
 	initialLine?: number;
 };
@@ -24,6 +24,8 @@ type GitDiffLike = {
 };
 
 export type WorkbenchContentProps = {
+	/** 总览覆盖阅读面时也暂停全局保存快捷键，不能保存隐藏的配置编辑器。 */
+	contentActive?: boolean;
 	theme: "dark" | "light";
 	maxFileSizeMB: number;
 	/** Git Diff 优先；无 Diff 时渲染编辑器 tab */
@@ -39,9 +41,9 @@ export type WorkbenchContentProps = {
 	editorMode: WorkspaceContentOpenMode;
 	onToggleEditorMode?: () => void;
 	onCloseEditor: () => void;
-	readContent: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => Promise<string>;
+	readContent: (path: string, maxBytes?: number, scope?: FileAccessScope) => Promise<string>;
 	readOriginalContent: (path: string) => Promise<string>;
-	saveContent: (path: string, content: string, scope?: ProjectFileAccessScope) => Promise<void>;
+	saveContent: (path: string, content: string, scope?: FileAccessScope) => Promise<void>;
 };
 
 /**
@@ -59,7 +61,7 @@ export function WorkbenchContent(props: WorkbenchContentProps) {
 			{props.editorTabs.map((tab) => (
 				<div key={tab.id} className={props.activeTab?.id === tab.id && !props.gitDiff ? "flex h-full min-h-0 flex-col" : "hidden"}>
 					<FileDiffViewer
-						active={props.activeTab?.id === tab.id && !props.gitDiff}
+						active={props.contentActive !== false && props.activeTab?.id === tab.id && !props.gitDiff}
 						onDirty={() => props.onDirty(tab.id)}
 						onSaved={() => props.onSaved?.(tab.id)}
 						registerCloseGuard={props.registerCloseGuard}
@@ -85,6 +87,7 @@ export function WorkbenchContent(props: WorkbenchContentProps) {
 			{props.gitDiff && (
 				<FileDiffViewer
 					key="git-diff"
+					active={props.contentActive !== false}
 					displayMode={props.gitDiffDisplayMode}
 					filePath={props.gitDiff.filePath}
 					mode="diff"

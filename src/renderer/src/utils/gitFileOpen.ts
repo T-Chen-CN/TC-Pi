@@ -1,4 +1,4 @@
-import type { ProjectFileAccessScope } from "../../../shared/types";
+import type { FileAccessScope } from "../../../shared/types";
 import type { EditorTabOpenMode } from "./editorTabs";
 
 /**
@@ -11,7 +11,7 @@ import type { EditorTabOpenMode } from "./editorTabs";
  */
 export function openGitFileInEditor(
 	dismissGitDiff: () => void,
-	openTab: (path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave?: boolean, tabKey?: string, label?: string, preserveDrawer?: boolean, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: ProjectFileAccessScope) => void,
+	openTab: (path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave?: boolean, tabKey?: string, label?: string, preserveDrawer?: boolean, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: FileAccessScope) => void,
 	path: string,
 ): void {
 	dismissGitDiff();

@@ -2262,6 +2262,7 @@ function registerIpc() {
 	// ── 配置管理 ──────────────────────────────────────
 
 	registerFilesIpc({
+		getPiConfigDir: () => configManager.getConfigDir(),
 		fileSystemService,
 		projectStore,
 		settingsStore,

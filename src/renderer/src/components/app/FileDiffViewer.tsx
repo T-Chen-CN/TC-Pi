@@ -1,4 +1,4 @@
-import type { ProjectFileAccessScope } from "../../../../shared/types";
+import { fileAccessScopeKey, type FileAccessScope } from "../../../../shared/types";
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { t } from "../../i18n";
@@ -60,16 +60,16 @@ export function FileDiffViewer(props: {
 	onCloseTab?: (id: string) => void;
 	/** 双击预览 Tab → 常驻 */
 	onPromotePreviewTab?: (id: string) => void;
-	readContent: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => Promise<string>;
+	readContent: (path: string, maxBytes?: number, scope?: FileAccessScope) => Promise<string>;
 	/** 项目文件读取授权；存在时 read/stat/base64 都由主进程限制到该项目根。 */
-	fileAccessScope?: ProjectFileAccessScope;
+	fileAccessScope?: FileAccessScope;
 	/** 从会话消息 meta 中提取的工具执行前原始内容，优先于 Git HEAD。 */
 	originalContent?: string;
 	/** Session-recorded modified content, preferred over disk read for historical sessions. */
 	modifiedContent?: string;
 	/** 读取文件的 Git HEAD 原始内容，供差异模式左侧基准列使用。 */
 	readOriginalContent?: (path: string) => Promise<string>;
-	saveContent?: (path: string, content: string, scope?: ProjectFileAccessScope) => Promise<void>;
+	saveContent?: (path: string, content: string, scope?: FileAccessScope) => Promise<void>;
 	/** HTML 文件点击预览时，切换到内置浏览器面板预览。 */
 	onPreviewHtml?: (filePath: string) => void;
 	theme?: "light" | "dark";
@@ -233,7 +233,7 @@ export function FileDiffViewer(props: {
 		// readContent/readOriginalContent 是稳定的 API 回调（上层已 useCallback），
 		// 不参与 effect deps，避免父组件因其他状态变化重渲染时反复加载文件导致编辑器重置到顶部。
 		// 两侧缓存内容都需要监听：同一路径可在多个历史提交 Diff tab 之间切换。
-	}, [props.filePath, props.activeTabId, props.originalContent, props.modifiedContent, props.fileAccessScope?.projectId, isDiffMode, maxFileSize]);
+	}, [props.filePath, props.activeTabId, props.originalContent, props.modifiedContent, fileAccessScopeKey(props.fileAccessScope), isDiffMode, maxFileSize]);
 
 	const handleClose = useCallback(() => {
 		props.onClose();
@@ -269,7 +269,7 @@ export function FileDiffViewer(props: {
 		contentRef.current = "";
 		lastSavedRef.current = "";
 		setSaving(false);
-	}, [props.activeTabId, props.filePath, props.originalContent, props.modifiedContent, props.fileAccessScope?.projectId, isDiffMode]);
+	}, [props.activeTabId, props.filePath, props.originalContent, props.modifiedContent, fileAccessScopeKey(props.fileAccessScope), isDiffMode]);
 
 	const saveNow = useCallback(async (): Promise<boolean> => {
 		if (saveTimerRef.current) {
@@ -308,7 +308,7 @@ export function FileDiffViewer(props: {
 		} finally {
 			if (saveGeneration === saveGenerationRef.current) setSaving(false);
 		}
-	}, [getLatestContent, isDiffMode, props.saveContent, props.filePath, props.fileAccessScope?.projectId]);
+	}, [getLatestContent, isDiffMode, props.saveContent, props.filePath, fileAccessScopeKey(props.fileAccessScope)]);
 
 	const saveNowRef = useRef(saveNow);
 	saveNowRef.current = saveNow;

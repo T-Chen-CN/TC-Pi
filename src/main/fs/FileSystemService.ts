@@ -36,21 +36,23 @@ export class FileSystemService {
 	 * maxDepth=0：只读当前目录一层，子目录 children=[] 且 hasChildren 标记是否可再展开。
 	 * maxDepth>0：继续向下递归，供 composer @ 引用一次性拿到有限深度清单。
 	 */
-	async listTree(root: string, maxDepth = DEFAULT_FILE_TREE_MAX_DEPTH, directory?: string): Promise<FileTreeNode[]> {
+	async listTree(root: string, maxDepth = DEFAULT_FILE_TREE_MAX_DEPTH, directory?: string, allowEntry?: (relativePath: string) => boolean): Promise<FileTreeNode[]> {
 		const current = directory ? resolve(directory) : resolve(root);
 		if (!isPathInsideProject(root, current)) {
 			throw new Error(`Invalid path: "${directory}" escapes project directory`);
 		}
 		const depthLimit = Math.max(0, Math.min(maxDepth, FILE_TREE_ABSOLUTE_MAX_DEPTH));
-		return this.readDirectory(root, current, 0, depthLimit);
+		return this.readDirectory(root, current, 0, depthLimit, allowEntry);
 	}
 
-	private async readDirectory(root: string, current: string, depth: number, maxDepth: number): Promise<FileTreeNode[]> {
-		const entries = await readdir(current, { withFileTypes: true });
+	private async readDirectory(root: string, current: string, depth: number, maxDepth: number, allowEntry?: (relativePath: string) => boolean): Promise<FileTreeNode[]> {
+		const rawEntries = await readdir(current, { withFileTypes: true });
 		// 单层过大时拒绝构造整层节点：否则 IPC + React 树会把渲染进程打崩。
-		if (entries.length > FILE_TREE_MAX_DIRECTORY_ENTRIES) {
-			throw new Error(`FILE_TREE_DIRECTORY_TOO_LARGE:${entries.length}:${FILE_TREE_MAX_DIRECTORY_ENTRIES}`);
+		if (rawEntries.length > FILE_TREE_MAX_DIRECTORY_ENTRIES) {
+			throw new Error(`FILE_TREE_DIRECTORY_TOO_LARGE:${rawEntries.length}:${FILE_TREE_MAX_DIRECTORY_ENTRIES}`);
 		}
+		// 授权域的排除策略先于 stat 和子目录探测执行，配置树不能顺带扫描历史/安装目录。
+		const entries = allowEntry ? rawEntries.filter((entry) => allowEntry(relative(root, join(current, entry.name)))) : rawEntries;
 		// 并行 stat：为排序（名称/更新时间/创建时间/大小）附加元数据。
 		// 目录 stat.size 无意义，恒置 0；目录仍保留时间戳用于“按更新时间/创建时间”排序。
 		const stats = await Promise.all(
@@ -77,7 +79,7 @@ export class FileSystemService {
 			if (entry.isDirectory()) {
 				// 达到深度上限时不再递归，只看一层是否还有可见子项，避免抽屉一次拉整棵仓库。
 				const canRecurse = depth < maxDepth;
-				const children = canRecurse ? await this.readDirectory(root, absolutePath, depth + 1, maxDepth) : undefined;
+				const children = canRecurse ? await this.readDirectory(root, absolutePath, depth + 1, maxDepth, allowEntry) : undefined;
 				nodes.push({
 					name: entry.name,
 					path: absolutePath,
@@ -87,7 +89,7 @@ export class FileSystemService {
 					// 未递归时 children 为 undefined，省略该字段；已递归的空目录是 []。
 					// 渲染层用「有没有 children 数组」区分未加载 vs 已加载空目录。
 					...(children ? { children } : {}),
-					hasChildren: canRecurse ? (children?.length ?? 0) > 0 : await this.directoryHasVisibleChildren(absolutePath),
+					hasChildren: canRecurse ? (children?.length ?? 0) > 0 : await this.directoryHasVisibleChildren(absolutePath, root, allowEntry),
 				});
 			} else if (entry.isFile()) {
 				nodes.push({
@@ -108,10 +110,10 @@ export class FileSystemService {
 	}
 
 	/** 浅层 listing 用：目录是否还有未被忽略的子项，决定是否显示展开箭头。 */
-	private async directoryHasVisibleChildren(directory: string): Promise<boolean> {
+	private async directoryHasVisibleChildren(directory: string, root: string, allowEntry?: (relativePath: string) => boolean): Promise<boolean> {
 		try {
 			const entries = await readdir(directory, { withFileTypes: true });
-			return entries.some((entry) => !ignoredNames.has(entry.name) && (entry.isDirectory() || entry.isFile()));
+			return entries.some((entry) => !ignoredNames.has(entry.name) && (!allowEntry || allowEntry(relative(root, join(directory, entry.name)))) && (entry.isDirectory() || entry.isFile()));
 		} catch {
 			return false;
 		}
@@ -125,7 +127,7 @@ export class FileSystemService {
 	 *   而不是报错（对超大 monorepo 尤其重要）。
 	 * 查询按小写子串匹配；空查询由 IPC 层拦截，这里不再校验。
 	 */
-	async searchNames(root: string, query: string): Promise<FileSearchResult[]> {
+	async searchNames(root: string, query: string, allowEntry?: (relativePath: string) => boolean): Promise<FileSearchResult[]> {
 		const normalizedQuery = query.trim().toLowerCase();
 		// 空查询兑底：includes("") 恒真，不清掉会返回全盘前 N 条；IPC 层已拦，这里防御直接调用方
 		if (normalizedQuery.length === 0) return [];
@@ -151,6 +153,8 @@ export class FileSystemService {
 				if (results.length >= FILE_SEARCH_MAX_RESULTS) break;
 				const name = entry.name;
 				if (ignoredNames.has(name)) continue;
+				// 配置浏览器在目录入队前排除会话/安装等内部数据，不扫描后再过滤。
+				if (allowEntry && !allowEntry(relative(rootResolved, join(current, name)))) continue;
 				if (!name.toLowerCase().includes(normalizedQuery)) {
 					// 未命中也要入队目录继续下钻：搜索目标是「路径任意位置包含查询词的文件」
 					if (entry.isDirectory()) pendingDirs.push(join(current, name));

@@ -919,6 +919,7 @@ export function App() {
 		openFilePath,
 		viewFilePath,
 		openEditorTab,
+		showHomeOverview,
 		diffFilePath,
 		openWorkspaceFileDiff,
 		openCommitFileDiff,
@@ -2419,6 +2420,7 @@ export function App() {
 
 	const workbenchContentNode = (
 		<WorkbenchContent
+			contentActive={!showHomeOverview}
 			theme={workbenchTheme}
 			maxFileSizeMB={settings.maxEditorFileSizeMB}
 			editorTabs={allEditorTabs}
@@ -2662,7 +2664,7 @@ export function App() {
 					sidebarContent={sidebarContentNode}
 					chatPaneContent={chatPaneContentNode}
 					filePaneContent={filePaneContentNode}
-					overview={workspaceNavigation.page === "home" ? <HomeOverview actions={workspaceNavigation.actions} onRefresh={refreshHomeOverview} /> : undefined}
+					overview={showHomeOverview ? <HomeOverview actions={workspaceNavigation.actions} onRefresh={refreshHomeOverview} /> : undefined}
 					drawerRail={
 						<WorkspaceDrawerRail
 							addLabel={t("drawer.addPanel")}

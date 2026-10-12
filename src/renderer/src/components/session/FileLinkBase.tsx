@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import type { ProjectFileAccessScope } from "../../../../shared/types";
+import type { FileAccessScope } from "../../../../shared/types";
 import { getFilePathVerdict, requestFilePathVerdicts, subscribeFilePathVerdicts } from "../../utils/filePathVerdictStore";
 import { resolveFileLinkPath } from "../../utils/filePathLinks";
 
 type FileLinkBase = {
 	baseDir?: string;
 	projectRoot?: string;
-	scope?: ProjectFileAccessScope;
+	scope?: FileAccessScope;
 	/** 会话身份：右键菜单里的系统动作要与左键点击走同一道安全等级门（会话级覆盖优先于全局默认） */
 	sessionId?: string;
 };

@@ -54,6 +54,21 @@ test("workspaces restore their own file selection and preview while editors rema
 	);
 });
 
+test("opening a document into an explicit owner does not overwrite the visible config workspace", () => {
+	const render = harness();
+	let state = render("pi-agent-config");
+	state.setTabs([{ id: "config", dirty: true }]);
+	state.setActiveTabId("config");
+	state.setTabs([{ id: "project" }], "alpha");
+	state.setActiveTabId("project", "alpha");
+	state.setPreviewTabId("project", "alpha");
+	assert.equal(render("pi-agent-config").activeTabId, "config");
+	state = render("alpha");
+	assert.equal(state.activeTabId, "project");
+	assert.equal(state.previewTabId, "project");
+	assert.equal(state.getWorkspace("pi-agent-config").tabs[0].dirty, true);
+});
+
 test("dirty updates from a hidden workspace do not affect the current workspace", () => {
 	const render = harness();
 	let state = render("alpha");

@@ -21,11 +21,11 @@ test("file management expands inline and preserves the file tree and document pr
 	await expect(toggle).toHaveAttribute("aria-expanded", "true");
 	await toggle.click();
 	await expect(toggle).toHaveAttribute("aria-expanded", "false");
-	await expect(explorer.locator("p")).toBeHidden();
+	await expect(explorer.getByTestId("pi-config-file-tree")).toBeHidden();
 	// 键盘与鼠标使用同一个入口；无工作区时同样可展开。
 	await toggle.press("Enter");
 	await expect(toggle).toHaveAttribute("aria-expanded", "true");
-	await expect(explorer.locator("p")).toBeVisible();
+	await expect(explorer.getByTestId("pi-config-file-tree")).toBeVisible();
 	await window.getByRole("button", { name: "选择工作区", exact: true }).click();
 	await window.getByTestId("workspace-inline-list").getByRole("button", { name: "Explorer", exact: true }).click();
 	await explorer.getByRole("button", { name: "documents", exact: true }).click();

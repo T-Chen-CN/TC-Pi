@@ -59,7 +59,7 @@ test("附件选择器默认仅选文件，includeDirectories 才同时选目录"
 test("readBase64 支持 maxBytes 预检，粘贴图片超大时主进程拦截", () => {
 	assert.match(filesIpc, /filesReadBase64,[\s\S]*?async \(_event, path: unknown, maxBytes\?: number, scope\?: unknown\)/);
 	assert.match(filesIpc, /FILE_TOO_LARGE/);
-	assert.match(preload, /readBase64: \(path: string, maxBytes\?: number, scope\?: ProjectFileAccessScope\)/);
+	assert.match(preload, /readBase64:\s*\(path:\s*string,\s*maxBytes\?:\s*number,\s*scope\?:\s*FileAccessScope\)/);
 });
 
 test("onPaste 图片文件走预览分支，失败回退 @path 引用", () => {

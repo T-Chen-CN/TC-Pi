@@ -12,7 +12,7 @@ import type { WorkspaceDrawerPanel } from "../../hooks/useWorkspacePanels";
 import { SessionBranchTreePanel } from "../session/branch/SessionBranchTreePanel";
 import type { RpcLogEntry } from "../../../../shared/types/rpcLog";
 import { t } from "../../i18n";
-import type { CommitEntry, FileTreeNode, GitBranchInfo, GitChangedFile, GitResourceGroupType, Project, SessionSummary } from "../../../../shared/types";
+import type { CommitEntry, FileTreeNode, GitBranchInfo, GitChangedFile, GitResourceGroupType, Project, SessionSummary, FileAccessScope } from "../../../../shared/types";
 import type { PiDesktopApi } from "../../../../preload";
 
 // ── port objects（字段类型直接取自消费组件的 props 契约：GitDrawerHost / DrawerContent）──
@@ -81,7 +81,7 @@ export interface DrawerFilesPort {
 	runCopySession: (sessionId: string, projectId: string | undefined) => void | Promise<void>;
 	runExportHistorySession: (session: SessionSummary) => void | Promise<void>;
 	runDeleteHistorySession: (session: SessionSummary) => void | Promise<void>;
-	viewFilePath: (path: string, openMode?: "preview" | "permanent") => void;
+	viewFilePath: (path: string, openMode?: "preview" | "permanent", initialLine?: number, scope?: FileAccessScope) => void;
 	openFilePath: (path: string) => void;
 	/** 在中间栏编辑器打开（可编辑 tab）；Git 变更行内“打开”按钮使用 */
 	openEditorTab: (path: string) => void;

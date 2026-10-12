@@ -1,12 +1,14 @@
 import { app, dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { homedir } from "node:os";
 import { cp, readFile, rename as fsRename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { ipcChannels } from "../../shared/ipc";
 import type { FileManagerInfo, ProjectFileAccessScope } from "../../shared/types/project";
 import type { FileSearchResult } from "../../shared/types";
 import { detectFileManager, openFileManagerAt } from "../files/FileManager";
-import { createProjectFileReadBoundary, resolveProjectFileReadPath, type ProjectFileReadBoundary } from "../files/projectFileAccess";
+import { createProjectFileReadBoundary, resolveProjectFileReadPath, resolveProjectFileWritePath, type ProjectFileReadBoundary } from "../files/projectFileAccess";
+import { PiConfigFilesService } from "../files/PiConfigFilesService";
+import { isPiConfigFileAccessScope } from "../../shared/types/piConfigFiles";
 import type { FileSystemService } from "../fs/FileSystemService";
 import type { ProjectStore } from "../projects/ProjectStore";
 import type { SettingsStore } from "../settings/SettingsStore";
@@ -27,9 +29,12 @@ export type FilesIpcDeps = {
 	appLogger: Pick<AppLogger, "info" | "error">;
 	getMainWindow: () => BrowserWindow | null;
 	openExternalUrl: (url: string, forceSystem?: boolean) => Promise<void>;
+	getPiConfigDir?: () => string;
 };
 
-export function registerFilesIpc({ fileSystemService, projectStore, settingsStore, appLogger, getMainWindow, openExternalUrl }: FilesIpcDeps): void {
+export function registerFilesIpc({ fileSystemService, projectStore, settingsStore, appLogger, getMainWindow, openExternalUrl, getPiConfigDir }: FilesIpcDeps): void {
+	const piConfigFiles = new PiConfigFilesService(getPiConfigDir ?? (() => join(homedir(), ".pi", "agent")), fileSystemService);
+	type FileReadBoundary = ProjectFileReadBoundary & { piConfig?: true };
 	// Windows Node / Electron 边界不能直接消费 WSL Linux 路径：统一走 WslPaths 转成当前发行版的主机 UNC。
 	// 已经是普通 Windows/非 WSL 网络盘的输入保持不变，避免误伤非 WSL 路径。
 	const toWindowsPath = (path: string): string => {
@@ -49,8 +54,9 @@ export function registerFilesIpc({ fileSystemService, projectStore, settingsStor
 	 * renderer 可选携带 projectId 收窄读取权限；根路径只从 ProjectStore 获取，
 	 * 再经 realpath 校验 symlink，不能由 renderer 自报一个任意“可信根”。
 	 */
-	const resolveProjectReadBoundary = async (rawScope?: unknown): Promise<ProjectFileReadBoundary | undefined> => {
+	const resolveProjectReadBoundary = async (rawScope?: unknown): Promise<FileReadBoundary | undefined> => {
 		if (rawScope === undefined) return undefined;
+		if (isPiConfigFileAccessScope(rawScope)) return { ...(await piConfigFiles.boundary()), piConfig: true };
 		if (!isProjectFileAccessScope(rawScope)) {
 			throw new Error("INVALID_PROJECT_FILE_ACCESS_SCOPE");
 		}
@@ -59,13 +65,39 @@ export function registerFilesIpc({ fileSystemService, projectStore, settingsStor
 		return createProjectFileReadBoundary(toWindowsPath(project.path));
 	};
 
-	const resolveReadablePath = async (rawPath: unknown, boundary?: ProjectFileReadBoundary): Promise<string> => {
+	const resolveReadablePath = async (rawPath: unknown, boundary?: FileReadBoundary): Promise<string> => {
 		if (typeof rawPath !== "string" || !rawPath.trim() || rawPath.length > 32_768) {
 			throw new Error("Invalid file path");
 		}
 		const hostPath = toWindowsPath(rawPath);
+		if (boundary?.piConfig) return piConfigFiles.readPath(hostPath, boundary);
 		return boundary ? resolveProjectFileReadPath(boundary, hostPath) : hostPath;
 	};
+
+	/** 新配置树的写操作固定到 ConfigManager 根；其余已有文件操作保持原来的授权语义。 */
+	const resolveMutationPath = async (path: unknown, scope?: unknown, destructive = false): Promise<string> => {
+		if (isPiConfigFileAccessScope(scope)) {
+			if (typeof path !== "string" || !path.trim() || path.length > 32_768) throw new Error("Invalid file path");
+			return piConfigFiles.writePath(toWindowsPath(path), destructive);
+		}
+		const boundary = await resolveProjectReadBoundary(scope);
+		if (boundary) {
+			if (typeof path !== "string" || !path.trim() || path.length > 32_768) throw new Error("Invalid file path");
+			return resolveProjectFileWritePath(boundary, toWindowsPath(path));
+		}
+		return resolveReadablePath(path, boundary);
+	};
+
+	ipcMain.handle(ipcChannels.filesPiConfigList, async (_event, options?: unknown) => {
+		if (options !== undefined && (typeof options !== "object" || options === null || Array.isArray(options))) throw new Error("Invalid config listing options");
+		const directory = options && "directory" in options ? options.directory : undefined;
+		if (directory !== undefined && (typeof directory !== "string" || !directory.trim() || directory.length > 32_768)) throw new Error("Invalid config directory");
+		return piConfigFiles.list(directory);
+	});
+	ipcMain.handle(ipcChannels.filesPiConfigSearch, async (_event, query: unknown) => {
+		if (typeof query !== "string" || !query.trim() || query.length > 256) throw new Error("Invalid search query");
+		return piConfigFiles.search(query);
+	});
 
 	ipcMain.handle(ipcChannels.dialogPickFiles, async (_event, options?: { title?: string; includeDirectories?: boolean }) => {
 		const result = await dialog.showOpenDialog({
@@ -265,15 +297,18 @@ export function registerFilesIpc({ fileSystemService, projectStore, settingsStor
 		}
 	});
 
-	ipcMain.handle(ipcChannels.filesCreate, async (_event, parentDir: string, name: string, type: "file" | "directory") => {
-		const result = await fileSystemService.create(toWindowsPath(parentDir), name, type);
+	ipcMain.handle(ipcChannels.filesCreate, async (_event, parentDir: string, name: string, type: "file" | "directory", scope?: unknown) => {
+		if (typeof name !== "string" || !name.trim() || name === "." || name === ".." || /[/\\]/.test(name) || (type !== "file" && type !== "directory")) throw new Error("Invalid file name or type");
+		const hostParent = await resolveMutationPath(parentDir, scope);
+		await resolveMutationPath(join(hostParent, name), scope);
+		const result = await fileSystemService.create(hostParent, name, type);
 		void appLogger.info("file", "File/folder created", { parentDir, name, type, result });
 		return result;
 	});
 
-	ipcMain.handle(ipcChannels.filesDelete, async (_event, path: string, recursive?: boolean) => {
+	ipcMain.handle(ipcChannels.filesDelete, async (_event, path: string, recursive?: boolean, scope?: unknown) => {
 		try {
-			await fileSystemService.delete(toWindowsPath(path), recursive);
+			await fileSystemService.delete(await resolveMutationPath(path, scope, true), recursive);
 			void appLogger.info("file", "File deleted", { path, recursive: Boolean(recursive) });
 		} catch (error) {
 			// 删除失败同样留痕（回收站不可用/权限不足/路径不存在等），
@@ -287,20 +322,24 @@ export function registerFilesIpc({ fileSystemService, projectStore, settingsStor
 		}
 	});
 
-	ipcMain.handle(ipcChannels.filesRename, async (_event, path: string, newName: string) => {
-		const result = await fileSystemService.rename(toWindowsPath(path), newName);
+	ipcMain.handle(ipcChannels.filesRename, async (_event, path: string, newName: string, scope?: unknown) => {
+		if (typeof newName !== "string" || !newName.trim() || newName === "." || newName === ".." || /[/\\]/.test(newName)) throw new Error("Invalid file name");
+		const source = await resolveMutationPath(path, scope, true);
+		await resolveMutationPath(join(dirname(source), newName), scope);
+		const result = await fileSystemService.rename(source, newName);
 		void appLogger.info("file", "File renamed", { path, newName, result });
 		return result;
 	});
 
-	ipcMain.handle(ipcChannels.filesCopy, async (_event, sourcePaths: string[], targetDir: string) => {
-		const hostTargetDir = toWindowsPath(targetDir);
+	ipcMain.handle(ipcChannels.filesCopy, async (_event, sourcePaths: string[], targetDir: string, scope?: unknown) => {
+		if (!Array.isArray(sourcePaths) || sourcePaths.length > 1000 || sourcePaths.some((path) => typeof path !== "string")) throw new Error("Invalid file paths");
+		const hostTargetDir = await resolveMutationPath(targetDir, scope);
 		const results: string[] = [];
 		for (const src of sourcePaths) {
 			try {
-				const hostSrc = toWindowsPath(src);
+				const hostSrc = isPiConfigFileAccessScope(scope) ? await piConfigFiles.copySourcePath(toWindowsPath(src)) : toWindowsPath(src);
 				const name = basename(hostSrc);
-				const dest = join(hostTargetDir, name);
+				const dest = await resolveMutationPath(join(hostTargetDir, name), scope);
 				// 递归复制目录/文件；同名已存在时跳过覆盖（errorOnExist: false 反而报错，
 				// 这里语义为「已存在则不重复复制」——与资源管理器粘贴行为一致）
 				await cp(hostSrc, dest, { recursive: true, errorOnExist: false });
@@ -314,14 +353,15 @@ export function registerFilesIpc({ fileSystemService, projectStore, settingsStor
 		return results;
 	});
 
-	ipcMain.handle(ipcChannels.filesMove, async (_event, sourcePaths: string[], targetDir: string) => {
-		const hostTargetDir = toWindowsPath(targetDir);
+	ipcMain.handle(ipcChannels.filesMove, async (_event, sourcePaths: string[], targetDir: string, scope?: unknown) => {
+		if (!Array.isArray(sourcePaths) || sourcePaths.length > 1000 || sourcePaths.some((path) => typeof path !== "string")) throw new Error("Invalid file paths");
+		const hostTargetDir = await resolveMutationPath(targetDir, scope);
 		const results: string[] = [];
 		for (const src of sourcePaths) {
 			try {
-				const hostSrc = toWindowsPath(src);
+				const hostSrc = await resolveMutationPath(src, scope, true);
 				const name = basename(hostSrc);
-				const dest = join(hostTargetDir, name);
+				const dest = await resolveMutationPath(join(hostTargetDir, name), scope);
 				// 同设备优先 rename（瞬时）；跨设备/跨盘 rename 会报 EXDEV，回退 cp + rm
 				try {
 					await fsRename(hostSrc, dest);

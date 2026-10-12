@@ -33,7 +33,7 @@ test("project-scoped reads are validated in main before touching disk", () => {
 	assert.match(filesIpc, /const writablePath = await resolveReadablePath\(path, boundary\)/);
 	assert.match(filesIpc, /await writeFile\(writablePath, content, "utf8"\)/);
 	// preload 只能传 projectId scope，不能传一个由 renderer 自报的可信根目录。
-	assert.match(preload, /scope\?: ProjectFileAccessScope/);
+	assert.match(preload, /scope\?: FileAccessScope/);
 	assert.match(preload, /filesOpen, path, scope/);
 	assert.match(preload, /filesShowInFolder, path, scope/);
 	assert.match(preload, /filesReadContent, path, maxBytes, scope/);

@@ -209,9 +209,9 @@ test("files drawer wires the project id all the way to the search entry", () => 
 	// DrawerContent 声明该 prop 并转交 FilesPanel，保留 project?.id 兜底给其他调用方
 	assert.match(surface, /projectId\?: string/);
 	assert.match(surface, /projectId=\{props\.projectId \?\? props\.project\?\.id\}/);
-	// 搜索入口以 projectId 为前提；快捷键与「输入即搜索」同一前提，首字符要播种进查询词
-	assert.match(surface, /\{props\.projectId && \(/);
-	assert.match(surface, /if \(!props\.projectId\) return;/);
+	// 项目 id 或全局配置搜索器提供同一入口；快捷键与「输入即搜索」也必须使用同一条件。
+	assert.match(surface, /\{\(props\.projectId\s*\|\|\s*props\.search\)\s*&&\s*\(/);
+	assert.match(surface, /if\s*\(!props\.projectId\s*&&\s*!props\.search\)\s*return;/);
 	assert.match(surface, /isTypeToSearchKey\(event\)/);
 	assert.match(surface, /fileSearch\.setQuery\(event\.key\)/);
 	// 空查询必须保留搜索框（只把结果区换成引导文案），不能整块 return null

@@ -1,4 +1,4 @@
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useId, useState } from "react";
 import { ChevronRight, FolderTree } from "lucide-react";
 import { FilesPanel } from "../session/WorkspaceSurface";
@@ -9,27 +9,33 @@ import { isChatProject, displayProjectDirectoryName } from "../../rendererUtils"
 import { showNotice } from "../../utils/notice";
 import { Button } from "../ui-shadcn/button";
 import { cn } from "../../lib/utils";
+import { PiConfigFileExplorer } from "./PiConfigFileExplorer";
+import { usesPiConfigFiles } from "../../utils/fileExplorerSource";
 
 /** 复用唯一文件树控制器；文件操作从总览返回工作区编辑区域。 */
 export function WorkspaceFileExplorer(props: { projectId?: string; files: DrawerFilesPort }) {
 	const { projectId, files } = props;
 	const setPage = useSetAtom(workspacePageAtom);
+	const page = useAtomValue(workspacePageAtom);
 	const [expanded, setExpanded] = useState(true);
 	const contentId = useId();
 	const project = files.projects.find((item) => item.id === projectId);
+	const configFiles = usesPiConfigFiles(page, project);
 	return (
 		<section className={cn("flex min-h-0 flex-col overflow-hidden", expanded ? "flex-1" : "shrink-0")} aria-label={t("workspace.files")} data-testid="workspace-file-explorer">
 			<Button variant="ghost" className="h-8 w-full shrink-0 justify-start gap-2 px-2 text-caption" aria-label={t("workspace.files")} aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded((value) => !value)}>
 				<FolderTree className="size-4 shrink-0" aria-hidden="true" />
 				<span>{t("workspace.files")}</span>
-				<span className="min-w-0 flex-1 truncate text-micro font-normal text-muted-foreground" title={project?.path}>
-					{project && !isChatProject(project) ? displayProjectDirectoryName(project) : ""}
+				<span className="min-w-0 flex-1 truncate text-micro font-normal text-muted-foreground" title={configFiles ? t("workspace.piAgentConfig") : project?.path}>
+					{configFiles ? t("workspace.piAgentConfig") : project ? displayProjectDirectoryName(project) : ""}
 				</span>
 				<ChevronRight className={cn("size-3.5 shrink-0", expanded && "rotate-90")} aria-hidden="true" />
 			</Button>
 			{/* 只隐藏内容而不卸载文件树：收起/展开保留目录展开、搜索与滚动状态。 */}
 			<div id={contentId} hidden={!expanded} className={cn("min-h-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}>
-				{project && !isChatProject(project) ? (
+				{configFiles ? (
+					<PiConfigFileExplorer api={files.api} viewFilePath={files.viewFilePath} />
+				) : project && !isChatProject(project) ? (
 					<FilesPanel
 						key={project.id}
 						projectId={project.id}

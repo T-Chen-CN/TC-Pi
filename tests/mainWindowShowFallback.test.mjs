@@ -41,11 +41,13 @@ test("linux display workaround opens the main window without hidden pre-map", ()
 test("file editor: openEditorTab updater is pure (StrictMode double-invoke safe)", () => {
 	// 首次点击文件空白根因：openEditorTab 的 updater 内含 crypto.randomUUID + setActiveTabId，
 	// StrictMode 双调用产生两个不同 tab id → activeTabId 与 editorTabs 不一致 → activeTab null。
-	// 修复：闭包内读同步 ref 计算 next，setState 传值。
+	// 修复：闭包内读目标 owner 的同步快照计算 next，setState 传值。
 	const source = readFileSync("src/renderer/src/hooks/useFileEditor.ts", "utf8");
 	assert.match(source, /editorTabsRef\.current = editorTabs;/);
 	assert.match(source, /updater 纯化：StrictMode 双调用下/);
-	assert.match(source, /const prev = editorTabsRef\.current;/);
+	assert.match(source, /const\s+targetWorkspace\s*=\s*workspaceEditors\.getWorkspace\(targetOwner\);/);
+	assert.match(source, /const\s+prev\s*=\s*targetWorkspace\.tabs;/);
+	assert.match(source, /setEditorTabs\(nextTabs,\s*targetOwner\)/);
 	assert.doesNotMatch(source, /setEditorTabs\(\(prev\) => \{[\s\S]{0,200}?crypto\.randomUUID/);
 	// 渲染层 StrictMode 开启（双调用条件存在）
 	const mainSource = readFileSync("src/renderer/src/main.tsx", "utf8");

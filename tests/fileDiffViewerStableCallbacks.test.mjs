@@ -17,12 +17,12 @@ test("file viewer IO callbacks are stable across App re-renders", () => {
 	assert.doesNotMatch(app, /saveContent=\{\(path, content\) => api\.files\.writeContent\(path, content\)\}/);
 });
 
-test("file viewer keeps project scope and drops stale media reads", () => {
+test("file viewer keeps file access scope and drops stale media reads", () => {
 	assert.match(viewer, /props\.readContent\(props\.filePath, maxFileSize, props\.fileAccessScope\)/);
 	assert.match(viewer, /FILE_TOO_LARGE:\(\\d\+\):\(\\d\+\)/);
 	assert.match(viewer, /const\s+write\s*=\s*props\.saveContent/);
 	assert.match(viewer, /write\(savePath,\s*latest,\s*props\.fileAccessScope\)/);
-	assert.match(viewer, /\[getLatestContent, isDiffMode, props\.saveContent, props\.filePath, props\.fileAccessScope\?\.projectId\]/);
+	assert.match(viewer, /\[getLatestContent,\s*isDiffMode,\s*props\.saveContent,\s*props\.filePath,\s*fileAccessScopeKey\(props\.fileAccessScope\)\]/);
 	assert.match(viewer, /async function loadMediaPreview\(\)/);
 	assert.match(viewer, /if \(cancelled \|\| !base64\)/);
 	// 回归（2026-10）：主进程 FILE_TOO_LARGE:size:max 结构化前缀必须经

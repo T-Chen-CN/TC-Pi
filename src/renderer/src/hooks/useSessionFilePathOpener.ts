@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { ImageContent, ProjectFileAccessScope } from "../../../shared/types";
+import type { ImageContent, FileAccessScope } from "../../../shared/types";
 import type { EditorTabOpenMode } from "../utils/editorTabs";
 import { desktopApi as api } from "../desktopApi";
 import { t } from "../i18n";
@@ -13,7 +13,7 @@ export type SessionFilePathOpenOptions = {
 	/** `path:line` 位置标记：编辑器打开后滚动定位到该行（1 起） */
 	line?: number;
 	/** 项目文件读取授权；项目外路径（用户已确认）不带 scope */
-	scope?: ProjectFileAccessScope;
+	scope?: FileAccessScope;
 	/** 只读打开：项目外文件确认后按只读查看，编辑器不提供保存与自动保存 */
 	readOnly?: boolean;
 };
@@ -27,7 +27,7 @@ export type SessionFilePathOpenOptions = {
  * 从 App.tsx 抽出的原因：App 只该负责边界解析（resolveFileLinkPath）与安全策略，
  * 「路径 → 打开方式」是业务路由，放这里才能不依赖 App 大组件的闭包状态。
  */
-export function useSessionFilePathOpener(props: { onPreviewImage: (image: ImageContent | null) => void; viewFilePath: (path: string, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: ProjectFileAccessScope, readOnly?: boolean) => void }) {
+export function useSessionFilePathOpener(props: { onPreviewImage: (image: ImageContent | null) => void; viewFilePath: (path: string, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: FileAccessScope, readOnly?: boolean) => void }) {
 	const { onPreviewImage, viewFilePath } = props;
 	return useCallback(
 		async (path: string, options: SessionFilePathOpenOptions = {}) => {

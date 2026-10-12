@@ -5,7 +5,7 @@ import { useFileLinkContext, useFilePathExists } from "./FileLinkBase";
 import { extractFileLinkLocation, relativeFilePathWithinRoot, resolveFileLinkPath } from "../../utils/filePathLinks";
 import { isExecutableLikePath } from "../../utils/externalPathAccessPolicy";
 import { useExternalPathOpenGate } from "../../hooks/useExternalPathOpenGate";
-import type { ProjectFileAccessScope } from "../../../../shared/types";
+import type { FileAccessScope } from "../../../../shared/types";
 import { t } from "../../i18n";
 import { showNotice } from "../../utils/notice";
 // 剪贴板工具必须取 utils 而非 notice-toast：notice-toast 经 MarkdownStream 依赖本文件，
@@ -106,7 +106,7 @@ export function MarkdownLink(
 	// 「在资源管理器打开」：stat 分流——目录直接打开该目录（shell.openPath），
 	// 文件定位到父目录并选中（showInFolder）；不存在时与左键点击同一份提示。
 	// targetScope 有形（项目内）时用项目边界，无（项目外）时走主进程的通用入口。
-	const revealInExplorer = (targetPath: string, targetScope?: ProjectFileAccessScope) => {
+	const revealInExplorer = (targetPath: string, targetScope?: FileAccessScope) => {
 		void desktopApi.files
 			.stat(targetPath, targetScope)
 			.then((stat) => {

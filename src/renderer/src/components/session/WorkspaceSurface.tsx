@@ -17,7 +17,7 @@ import { t } from "../../i18n";
 import type { WorkspaceDrawerPanel } from "../../hooks/useWorkspacePanels";
 import { showNotice } from "../../utils/notice";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "../ui-shadcn/dialog";
-import type { FileTreeNode, Project, SessionSummary } from "../../../../shared/types";
+import type { FileTreeNode, FileSearchResult, Project, SessionSummary } from "../../../../shared/types";
 import { Input } from "../ui-shadcn/input";
 import { PathTooltip } from "../ui-shadcn/PathTooltip";
 import { Search } from "lucide-react";
@@ -114,6 +114,9 @@ export function DrawerContent(props: {
 export function FilesPanel(props: {
 	/** 搜索用项目 id（由抽屉按当前文件树项目传入）：缺省时不渲染搜索入口、快捷键也不响应 */
 	projectId?: string;
+	/** 非项目文件树使用自己的扫描入口，不伪造 ProjectStore 身份。 */
+	search?: (query: string) => Promise<FileSearchResult[]>;
+	absoluteReferences?: boolean;
 	files: FileTreeNode[];
 	expandedDirs: Set<string>;
 	onToggleDirectory: (path: string) => void;
@@ -157,7 +160,7 @@ export function FilesPanel(props: {
 	// 折叠中间包开关：IDEA 式把单子目录链合并成点分节点，深包结构一行展示。
 	const [compactPackages, setCompactPackages] = useAtom(compactMiddlePackagesAtom);
 	// 文件名搜索（issue #215）：状态域在 hook，面板只转发输入与关闭
-	const fileSearch = useFileSearch({ projectId: props.projectId });
+	const fileSearch = useFileSearch({ projectId: props.projectId, search: props.search });
 	const [searchOpen, setSearchOpen] = useState(false);
 	// 面板容器：退出搜索后把焦点收回来，否则焦点落到 body，之后的 Ctrl+F / 输入即搜索都收不到键
 	const panelRef = useRef<HTMLDivElement | null>(null);
@@ -197,7 +200,7 @@ export function FilesPanel(props: {
 			return;
 		}
 		// 搜索要项目 id 才能扫盘：没有选中项目时连入口都不渲染，快捷键也不应响应
-		if (!props.projectId) return;
+		if (!props.projectId && !props.search) return;
 		// Ctrl+F / ⌘F：在面板内打开搜索视图（挡掉宿主自带查找栏）；焦点在输入框里时不抢键
 		if (isFileSearchShortcut(event)) {
 			if (isEditableTarget(event.target)) return;
@@ -272,7 +275,7 @@ export function FilesPanel(props: {
 						<FolderTree size={13} aria-hidden="true" />
 					</Button>
 					{/* 文件名搜索入口（issue #215）：打开后用结果列表替换文件树 */}
-					{props.projectId && (
+					{(props.projectId || props.search) && (
 						<Button
 							type="button"
 							variant="ghost"
@@ -325,6 +328,7 @@ export function FilesPanel(props: {
 						onViewFile={props.onViewFile}
 						onDropFiles={props.onDropFiles}
 						onMoveFiles={props.onMoveFiles}
+						absoluteReferences={props.absoluteReferences}
 						dragOverDir={dragOverDir}
 						onDragOverDirChange={setDragOverDir}
 					/>
@@ -448,6 +452,7 @@ function fileIconElement(name: string, isDirectory: boolean, isExpanded: boolean
 
 function FileNode(props: {
 	node: FileTreeNode;
+	absoluteReferences?: boolean;
 	expandedDirs: Set<string>;
 	onToggleDirectory: (path: string) => void;
 	onFileContextMenu: (node: FileTreeNode, x: number, y: number) => void;
@@ -484,9 +489,9 @@ function FileNode(props: {
 	const handleDragStart = useCallback(
 		(event: React.DragEvent) => {
 			event.dataTransfer.effectAllowed = "copyMove";
-			writeFileNodeDragPayload(event.dataTransfer, node);
+			writeFileNodeDragPayload(event.dataTransfer, props.absoluteReferences ? { ...node, relativePath: node.path } : node);
 		},
-		[node],
+		[node, props.absoluteReferences],
 	);
 	const handleDragOver = useCallback(
 		(event: React.DragEvent) => {
@@ -593,6 +598,7 @@ function FileNode(props: {
 									onViewFile={props.onViewFile}
 									onDropFiles={props.onDropFiles}
 									onMoveFiles={props.onMoveFiles}
+									absoluteReferences={props.absoluteReferences}
 									dragOverDir={props.dragOverDir}
 									onDragOverDirChange={props.onDragOverDirChange}
 									depth={depth + 1}

@@ -103,7 +103,7 @@ test("edit/write diff cards expose an accessible open-file action", () => {
 	assert.match(sessionFilePathOpener, /mimeType:\s*imageMimeTypeFromPath\(\s*path\s*\)/);
 	assert.doesNotMatch(sessionFilePathOpener, /dataUrl\.match\(\/\^data:/);
 	// 授权随 editor tab 固化，异步加载不能改用后来聚焦的项目。
-	assert.match(fileEditor, /fileAccessScope\?: ProjectFileAccessScope/);
+	assert.match(fileEditor, /fileAccessScope\?:\s*FileAccessScope/);
 	assert.match(fileEditor, /readFileContent\(path, maxBytes, scope\)/);
 	assert.match(fileEditor, /writeFileContent\(path, content, scope\)/);
 });

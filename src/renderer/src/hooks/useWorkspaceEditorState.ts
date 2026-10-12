@@ -30,16 +30,14 @@ export function useWorkspaceEditorState<T extends EditorIdentity>(projectId: str
 	const closing = useRef(new Set<string>());
 	const current = workspaces[projectId ?? ""] ?? empty.current;
 
-	const update = useCallback(<K extends keyof WorkspaceEditorState<T>>(field: K, value: SetStateAction<WorkspaceEditorState<T>[K]>) => {
-		const key = projectRef.current;
+	const update = useCallback(<K extends keyof WorkspaceEditorState<T>>(field: K, value: SetStateAction<WorkspaceEditorState<T>[K]>, key = projectRef.current) => {
 		const previous = snapshot.current[key] ?? empty.current;
 		const nextValue = typeof value === "function" ? value(previous[field]) : value;
 		const next = { ...snapshot.current, [key]: { ...previous, [field]: nextValue } };
 		snapshot.current = next;
 		setWorkspaces(next);
 	}, []);
-	const setTabs = useCallback((value: SetStateAction<T[]>) => {
-		const key = projectRef.current;
+	const setTabs = useCallback((value: SetStateAction<T[]>, key = projectRef.current) => {
 		const previous = snapshot.current[key] ?? empty.current;
 		const tabs = typeof value === "function" ? value(previous.tabs) : value;
 		const next = pruneWorkspaceEditors({ ...snapshot.current, [key]: { ...previous, tabs } }, key);
@@ -48,8 +46,10 @@ export function useWorkspaceEditorState<T extends EditorIdentity>(projectId: str
 		setWorkspaces(next);
 		return true;
 	}, []);
-	const setActiveTabId = useCallback((value: SetStateAction<string | null>) => update("activeTabId", value), [update]);
-	const setPreviewTabId = useCallback((value: SetStateAction<string | null>) => update("previewTabId", value), [update]);
+	const setActiveTabId = useCallback((value: SetStateAction<string | null>, key?: string) => update("activeTabId", value, key), [update]);
+	const setPreviewTabId = useCallback((value: SetStateAction<string | null>, key?: string) => update("previewTabId", value, key), [update]);
+	/** 页面投影切换前便可写入目标 owner，文件链接不会写进当前可见的配置标签缓存。 */
+	const getWorkspace = useCallback((key: string) => snapshot.current[key] ?? empty.current, []);
 
 	/** 按稳定 tab 身份更新，后台自动保存不能清除另一个工作区的 dirty 状态。 */
 	const markDirty = useCallback((id: string, dirty: boolean) => {
@@ -98,5 +98,5 @@ export function useWorkspaceEditorState<T extends EditorIdentity>(projectId: str
 		}
 	}, []);
 	const allTabs = useMemo(() => Object.values(workspaces).flatMap((state) => state.tabs), [workspaces]);
-	return { ...current, allTabs, setTabs, setActiveTabId, setPreviewTabId, markDirty, registerCloseGuard, closeTab };
+	return { ...current, allTabs, setTabs, setActiveTabId, setPreviewTabId, getWorkspace, markDirty, registerCloseGuard, closeTab };
 }

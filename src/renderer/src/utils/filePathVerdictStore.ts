@@ -1,4 +1,4 @@
-import type { ProjectFileAccessScope } from "../../../shared/types";
+import { fileAccessScopeKey, type FileAccessScope } from "../../../shared/types";
 import { desktopApi } from "../desktopApi";
 
 /**
@@ -17,7 +17,7 @@ const FLUSH_DELAY_MS = 250;
 
 type Listener = () => void;
 type PendingBucket = {
-	scope?: ProjectFileAccessScope;
+	scope?: FileAccessScope;
 	paths: string[];
 };
 
@@ -27,11 +27,11 @@ const pendingByScope = new Map<string, PendingBucket>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 
-function scopeKey(scope?: ProjectFileAccessScope): string {
-	return scope?.projectId ?? "";
+function scopeKey(scope?: FileAccessScope): string {
+	return fileAccessScopeKey(scope);
 }
 
-function verdictKey(absPath: string, scope?: ProjectFileAccessScope): string {
+function verdictKey(absPath: string, scope?: FileAccessScope): string {
 	return `${scopeKey(scope)}\u0000${absPath}`;
 }
 
@@ -50,7 +50,7 @@ function trimCache(): void {
 }
 
 /** 读取判定结果：true/false = 已校验；undefined = 未校验（含校验失败）。 */
-export function getFilePathVerdict(absPath: string, scope?: ProjectFileAccessScope): boolean | undefined {
+export function getFilePathVerdict(absPath: string, scope?: FileAccessScope): boolean | undefined {
 	return verdictCache.get(verdictKey(absPath, scope));
 }
 
@@ -74,7 +74,7 @@ function armFlushTimer(): void {
  * 批量请求存在性校验：按项目授权域分桶，250ms 去抖后逐桶发 IPC。
  * 同一 IPC 只能携带一个 projectId，不能把两个分屏项目的路径混在一批里。
  */
-export function requestFilePathVerdicts(paths: string[], scope?: ProjectFileAccessScope): void {
+export function requestFilePathVerdicts(paths: string[], scope?: FileAccessScope): void {
 	const key = scopeKey(scope);
 	const bucket = pendingByScope.get(key) ?? { scope, paths: [] };
 	let added = false;

@@ -68,14 +68,15 @@ function normalizeSeeds<T>(name: string, value: readonly T[] | T | undefined, re
 	throw new Error(`${name} 只收到单个对象（不是数组）——这几乎一定是 Playwright 把 >=2 元素的数组当成 [value, options] 元组截断了。${requirement} 多个种子请用函数式覆盖：test.use({ ${name}: async ({}, use) => use([a, b]) })`);
 }
 
-export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | undefined; seedSessionFiles: SeedSessionFile[] | undefined; seedSettings: SeedSettings | undefined; launchArgs: string[]; mockSessionInProject: boolean }>({
+export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | undefined; seedSessionFiles: SeedSessionFile[] | undefined; seedSettings: SeedSettings | undefined; seedPiConfigFiles: Record<string, string> | undefined; launchArgs: string[]; mockSessionInProject: boolean }>({
 	seedProjects: [undefined, { option: true }],
 	seedSessionFiles: [undefined, { option: true }],
 	seedSettings: [undefined, { option: true }],
+	seedPiConfigFiles: [undefined, { option: true }],
 	// Exercise real startup intents with the same isolated profile and mock RPC backend.
 	launchArgs: [[], { option: true }],
 	mockSessionInProject: [false, { option: true }],
-	app: async ({ seedProjects, seedSessionFiles, seedSettings, launchArgs, mockSessionInProject }, use) => {
+	app: async ({ seedProjects, seedSessionFiles, seedSettings, seedPiConfigFiles, launchArgs, mockSessionInProject }, use) => {
 		// 先归一化（元组陷阱见 normalizeSeeds 注释）：非法值在启动 Electron 之前就报错，
 		// 避免用例因「种子项目凭空消失」在后面超时。
 		const projects = normalizeSeeds("seedProjects", seedProjects, "项目需含 id / name / path（用 makeSeedProject 生成）。");
@@ -143,6 +144,14 @@ export const test = base.extend<MockPiFixture & { seedProjects: SeedProject[] | 
 			const trustDir = join(userDataRoot, ".pi", "agent");
 			mkdirSync(trustDir, { recursive: true });
 			writeFileSync(join(trustDir, "trust.json"), JSON.stringify({ [tmpdir()]: true }));
+
+			// 配置文件只写隔离的假 HOME，不操作本机 pi 配置。
+			for (const [relativePath, content] of Object.entries(seedPiConfigFiles ?? {})) {
+				const target = join(trustDir, relativePath);
+				if (!resolve(target).startsWith(resolve(trustDir) + (process.platform === "win32" ? "\\" : "/"))) throw new Error("Config seed escapes isolated profile");
+				mkdirSync(join(target, ".."), { recursive: true });
+				writeFileSync(target, content);
+			}
 
 			// 重定向 USERPROFILE 后，shell 文件夹解析要求配置目录骨架存在
 			// （否则 app.getPath("appData") 抛错、主进程启动即崩，见 ./win-profile.ts）。

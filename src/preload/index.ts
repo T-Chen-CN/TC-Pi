@@ -89,7 +89,8 @@ import type {
 	PiUpdateCheckResult,
 	ProcessMetricsSnapshot,
 	Project,
-	ProjectFileAccessScope,
+	FileAccessScope,
+	PiConfigFileTree,
 	ProjectInheritedResourceToggleInput,
 	ProjectResourceDirectoryKind,
 	ProjectResourceDiscoveryResult,
@@ -318,35 +319,37 @@ const api = {
 		discovery: (projectId?: string) => ipcRenderer.invoke(ipcChannels.projectResourcesDiscovery, projectId) as Promise<ProjectResourceDiscoveryResult>,
 	},
 	files: {
+		listPiConfig: (options?: { directory?: string }) => ipcRenderer.invoke(ipcChannels.filesPiConfigList, options) as Promise<PiConfigFileTree>,
+		searchPiConfig: (query: string) => ipcRenderer.invoke(ipcChannels.filesPiConfigSearch, query) as Promise<FileSearchResult[]>,
 		list: (projectId: string, options?: { maxDepth?: number; directory?: string }) => ipcRenderer.invoke(ipcChannels.filesList, projectId, options) as Promise<FileTreeNode[]>,
 		/** 工作区文件名搜索（issue #215）：主进程全盘扫描，忽略规则与文件树一致 */
 		search: (projectId: string, query: string) => ipcRenderer.invoke(ipcChannels.filesSearch, projectId, query) as Promise<FileSearchResult[]>,
-		open: (path: string, scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesOpen, path, scope) as Promise<void>,
-		showInFolder: (path: string, scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesShowInFolder, path, scope) as Promise<void>,
+		open: (path: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesOpen, path, scope) as Promise<void>,
+		showInFolder: (path: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesShowInFolder, path, scope) as Promise<void>,
 		/** 检测系统可用的文件管理器（打开方式下拉补充入口） */
 		detectFileManager: () => ipcRenderer.invoke(ipcChannels.filesDetectFileManager) as Promise<FileManagerInfo | null>,
 		/** 在系统文件管理器中打开目录 */
 		openFileManager: (path: string) => ipcRenderer.invoke(ipcChannels.filesOpenFileManager, path) as Promise<void>,
-		readContent: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesReadContent, path, maxBytes, scope) as Promise<string>,
+		readContent: (path: string, maxBytes?: number, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesReadContent, path, maxBytes, scope) as Promise<string>,
 		/** 批量校验路径是否存在（返回与入参等长的 boolean[]；单路径失败按 false 计） */
-		pathsExist: (paths: string[], scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesPathsExist, paths, scope) as Promise<boolean[]>,
+		pathsExist: (paths: string[], scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesPathsExist, paths, scope) as Promise<boolean[]>,
 		/** 单路径 stat（存在性 + 是否目录）：会话内文件链接点击路由用（目录 → 资源管理器打开） */
-		stat: (path: string, scope?: ProjectFileAccessScope) =>
+		stat: (path: string, scope?: FileAccessScope) =>
 			ipcRenderer.invoke(ipcChannels.filesStat, path, scope) as Promise<{
 				exists: boolean;
 				isDirectory: boolean;
 			}>,
 		/** 读取二进制文件为 base64；scope 存在时主进程限制到对应 ProjectStore 根目录。 */
-		readBase64: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesReadBase64, path, maxBytes, scope) as Promise<string>,
+		readBase64: (path: string, maxBytes?: number, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesReadBase64, path, maxBytes, scope) as Promise<string>,
 		/** 保存项目来源文件时复用读取 scope，主进程据此校验真实写入路径。 */
-		writeContent: (path: string, content: string, scope?: ProjectFileAccessScope) => ipcRenderer.invoke(ipcChannels.filesWriteContent, path, content, scope) as Promise<void>,
-		delete: (path: string, recursive?: boolean) => ipcRenderer.invoke(ipcChannels.filesDelete, path, recursive) as Promise<void>,
+		writeContent: (path: string, content: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesWriteContent, path, content, scope) as Promise<void>,
+		delete: (path: string, recursive?: boolean, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesDelete, path, recursive, scope) as Promise<void>,
 		/** 复制来源路径到目标目录（支持文件和目录递归），返回目标路径列表 */
-		copy: (sourcePaths: string[], targetDir: string) => ipcRenderer.invoke(ipcChannels.filesCopy, sourcePaths, targetDir) as Promise<string[]>,
+		copy: (sourcePaths: string[], targetDir: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesCopy, sourcePaths, targetDir, scope) as Promise<string[]>,
 		/** 移动来源路径到目标目录（同设备 rename，跨设备 cp+rm） */
-		move: (sourcePaths: string[], targetDir: string) => ipcRenderer.invoke(ipcChannels.filesMove, sourcePaths, targetDir) as Promise<string[]>,
-		create: (parentDir: string, name: string, type: "file" | "directory") => ipcRenderer.invoke(ipcChannels.filesCreate, parentDir, name, type) as Promise<string>,
-		rename: (path: string, newName: string) => ipcRenderer.invoke(ipcChannels.filesRename, path, newName) as Promise<string>,
+		move: (sourcePaths: string[], targetDir: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesMove, sourcePaths, targetDir, scope) as Promise<string[]>,
+		create: (parentDir: string, name: string, type: "file" | "directory", scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesCreate, parentDir, name, type, scope) as Promise<string>,
+		rename: (path: string, newName: string, scope?: FileAccessScope) => ipcRenderer.invoke(ipcChannels.filesRename, path, newName, scope) as Promise<string>,
 		/**
 		 * Electron 32+ 已移除 File.path，拖拽/粘贴得到的 File 必须经 webUtils 解析本地路径。
 		 * 同步返回，可在 drop/paste 事件中立即使用。

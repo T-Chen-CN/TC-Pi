@@ -1,14 +1,15 @@
 import { t as i18nT } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { activeEditorFileAtom } from "../atoms/app-ui-atoms";
-import type { AgentTab, CommitEntry, GitChangedFile, GitResourceGroupType, Project, ProjectFileAccessScope } from "../../../shared/types";
+import type { AgentTab, CommitEntry, GitChangedFile, GitResourceGroupType, Project, FileAccessScope } from "../../../shared/types";
 import type { WorkspaceContentOpenMode } from "../../../shared/types/settings";
 import type { DrawerPanel, SessionModifiedFile } from "../components/app/AppParts";
 import { openPermanentEditorTab, openPreviewEditorTab, promotePreviewEditorTab as nextPreviewAfterPromote, type EditorTabOpenMode } from "../utils/editorTabs";
 import { resolveFileLinkPath } from "../utils/filePathLinks";
 import { useWorkspaceEditorState } from "./useWorkspaceEditorState";
-import { workspacePageAtom } from "../atoms/workspace-navigation-atoms";
+import { workspacePageAtom, piConfigDocumentVisibleAtom } from "../atoms/workspace-navigation-atoms";
+import { fileEditorOwner, PI_CONFIG_EDITOR_OWNER } from "../utils/fileExplorerSource";
 
 const EDITOR_TAB_LIMIT = 5;
 const EDITOR_TAB_TEXT_BUDGET = 24 * 1024 * 1024;
@@ -28,7 +29,7 @@ interface EditorTab {
 	 * 仅显式携带时写入，普通重复点击不覆盖已有定位。 */
 	initialLine?: number;
 	/** 项目文件入口的读取授权；随 tab 固化，不能在加载时改读当前焦点项目。 */
-	fileAccessScope?: ProjectFileAccessScope;
+	fileAccessScope?: FileAccessScope;
 	lastAccess: number;
 }
 
@@ -54,11 +55,11 @@ export interface UseFileEditorInput {
 	contentOpenMode: WorkspaceContentOpenMode;
 	showToast: (message: string, duration?: number) => void;
 	/** 读取文件内容的 API；maxBytes 用于编辑器大文件前置拦截（主进程 stat 检查，不传输超限内容） */
-	readFileContent: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => Promise<string>;
+	readFileContent: (path: string, maxBytes?: number, scope?: FileAccessScope) => Promise<string>;
 	/** 读取 Git 原始内容的 API */
 	readGitOriginalContent: (path: string) => Promise<string>;
 	/** 保存文件内容的 API；项目来源的 tab 必须把同一授权 scope 带到写入边界 */
-	writeFileContent: (path: string, content: string, scope?: ProjectFileAccessScope) => Promise<void>;
+	writeFileContent: (path: string, content: string, scope?: FileAccessScope) => Promise<void>;
 	/** 系统打开文件 */
 	openFile: (path: string) => Promise<void>;
 	/** 获取 Git 工作区差异 */
@@ -89,6 +90,7 @@ export interface UseFileEditorInput {
 }
 
 export interface UseFileEditorOutput {
+	showHomeOverview: boolean;
 	/** 中间栏内容布局：分屏或占满中间栏（不再进侧栏抽屉） */
 	editorMode: WorkspaceContentOpenMode;
 	toggleEditorMode: () => void;
@@ -99,10 +101,10 @@ export interface UseFileEditorOutput {
 	activeTabId: string | null;
 	activeTab: EditorTab | null;
 	editorTabAccessSequenceRef: React.MutableRefObject<number>;
-	readEditorFileContent: (path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => Promise<string>;
+	readEditorFileContent: (path: string, maxBytes?: number, scope?: FileAccessScope) => Promise<string>;
 	readEditorOriginalContent: (path: string) => Promise<string>;
-	saveEditorFileContent: (path: string, content: string, scope?: ProjectFileAccessScope) => Promise<void>;
-	openEditorTab: (path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave?: boolean, tabKey?: string, label?: string, preserveDrawer?: boolean, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: ProjectFileAccessScope) => void;
+	saveEditorFileContent: (path: string, content: string, scope?: FileAccessScope) => Promise<void>;
+	openEditorTab: (path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave?: boolean, tabKey?: string, label?: string, preserveDrawer?: boolean, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: FileAccessScope) => void;
 	closeEditorTab: (tabId: string) => void;
 	selectEditorTab: (tabId: string) => void;
 	/** 双击预览 Tab → 常驻 */
@@ -111,7 +113,7 @@ export interface UseFileEditorOutput {
 	previewEditorTabId: string | null;
 	openFilePath: (path: string) => void;
 	/** 单击默认 preview；双击传 permanent。readOnly=true 时不提供保存/自动保存（项目外文件） */
-	viewFilePath: (path: string, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: ProjectFileAccessScope, readOnly?: boolean) => void;
+	viewFilePath: (path: string, openMode?: EditorTabOpenMode, initialLine?: number, fileAccessScope?: FileAccessScope, readOnly?: boolean) => void;
 	diffFilePath: (path: string, originalContent?: string, content?: string) => void;
 	openWorkspaceFileDiff: (group: GitResourceGroupType, path: string, repoPath?: string) => Promise<void>;
 	openCommitFileDiff: (commit: CommitEntry, file: GitChangedFile, repoPath?: string) => Promise<void>;
@@ -161,7 +163,10 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 
 	// ---- editor tabs ----
 	const editorTabAccessSequenceRef = useRef(0);
-	const workspaceEditors = useWorkspaceEditorState<EditorTab>(activeProjectId);
+	const page = useAtomValue(workspacePageAtom);
+	const configDocumentVisible = useAtomValue(piConfigDocumentVisibleAtom);
+	const setConfigDocumentVisible = useSetAtom(piConfigDocumentVisibleAtom);
+	const workspaceEditors = useWorkspaceEditorState<EditorTab>(fileEditorOwner(page, activeProject));
 	const { tabs: editorTabs, allTabs: allEditorTabs, setTabs: setEditorTabs, activeTabId, setActiveTabId, previewTabId: previewEditorTabId, setPreviewTabId: setPreviewEditorTabId } = workspaceEditors;
 	/** VS Code 式预览 Tab：至多一个；单击打开会替换它 */
 	// tabs / preview 同步 ref：openEditorTab/closeEditorTab 需要在 updater 外计算 next——
@@ -200,9 +205,9 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 	}, []);
 
 	// ---- IO callbacks ----
-	const readEditorFileContent = useCallback((path: string, maxBytes?: number, scope?: ProjectFileAccessScope) => readFileContent(path, maxBytes, scope), [readFileContent]);
+	const readEditorFileContent = useCallback((path: string, maxBytes?: number, scope?: FileAccessScope) => readFileContent(path, maxBytes, scope), [readFileContent]);
 	const readEditorOriginalContent = useCallback((path: string) => readGitOriginalContent(path), [readGitOriginalContent]);
-	const saveEditorFileContent = useCallback((path: string, content: string, scope?: ProjectFileAccessScope) => writeFileContent(path, content, scope), [writeFileContent]);
+	const saveEditorFileContent = useCallback((path: string, content: string, scope?: FileAccessScope) => writeFileContent(path, content, scope), [writeFileContent]);
 
 	// ---- tab management helpers ----
 	const editorTabTextBytes = (tab: EditorTab) => (tab.originalContent.length + (tab.modifiedContent?.length ?? 0)) * 2;
@@ -222,13 +227,16 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 	};
 
 	const openEditorTab = useCallback(
-		(path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave = true, tabKey?: string, label?: string, preserveDrawer = false, openMode: EditorTabOpenMode = "permanent", initialLine?: number, fileAccessScope?: ProjectFileAccessScope) => {
+		(path: string, mode: "view" | "diff", originalContent?: string, modifiedContent?: string, allowSave = true, tabKey?: string, label?: string, preserveDrawer = false, openMode: EditorTabOpenMode = "permanent", initialLine?: number, fileAccessScope?: FileAccessScope) => {
 			// updater 纯化：StrictMode 双调用下，updater 内 crypto.randomUUID/嵌套
 			// setState 会产生两个不同 id → activeTabId 与 editorTabs 不一致 → 首次空白。
 			// 改为在闭包内读同步 ref 计算 next，setState 传值（幂等，双调用安全）
 			// 预览/常驻名单由 editorTabs 纯策略决定；内容字段再写回 active tab。
-			const prev = editorTabsRef.current;
-			const previewId = previewEditorTabIdRef.current;
+			const configFile = fileAccessScope && "kind" in fileAccessScope && fileAccessScope.kind === "pi-config";
+			const targetOwner = configFile || activeProject?.kind === "chat" || !activeProjectIdRef.current ? PI_CONFIG_EDITOR_OWNER : `project:${activeProjectIdRef.current}`;
+			const targetWorkspace = workspaceEditors.getWorkspace(targetOwner);
+			const prev = targetWorkspace.tabs;
+			const previewId = targetWorkspace.previewTabId;
 			const candidate: EditorTab = {
 				id: crypto.randomUUID(),
 				filePath: path,
@@ -271,17 +279,18 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 			// trim 可能挤掉预览 Tab；预览 id 必须以仍在列表中的为准
 			const nextPreview = strategy.previewId && nextTabs.some((tab) => tab.id === strategy.previewId) ? strategy.previewId : null;
 
-			if (!setEditorTabs(nextTabs)) {
+			if (!setEditorTabs(nextTabs, targetOwner)) {
 				showToast(t("workbench.saveBeforeOpening"));
 				return;
 			}
 			editorTabsRef.current = nextTabs;
 			previewEditorTabIdRef.current = nextPreview;
-			setActiveTabId(strategy.activeId);
-			setPreviewEditorTabId(nextPreview);
-			setWorkspacePage("workspace");
+			setActiveTabId(strategy.activeId, targetOwner);
+			setPreviewEditorTabId(nextPreview, targetOwner);
+			if (configFile) setConfigDocumentVisible(true);
+			else setWorkspacePage("workspace");
 		},
-		[setEditorTabs, setActiveTabId, setPreviewEditorTabId, showToast, t, setWorkspacePage],
+		[setEditorTabs, setActiveTabId, setPreviewEditorTabId, showToast, t, setWorkspacePage, setConfigDocumentVisible, activeProjectIdRef, activeProject?.kind, workspaceEditors.getWorkspace],
 	);
 
 	const closeEditorTab = useCallback(
@@ -349,7 +358,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 	);
 
 	const viewFilePath = useCallback(
-		(path: string, openMode: EditorTabOpenMode = "preview", initialLine?: number, fileAccessScope?: ProjectFileAccessScope, readOnly = false) => {
+		(path: string, openMode: EditorTabOpenMode = "preview", initialLine?: number, fileAccessScope?: FileAccessScope, readOnly = false) => {
 			// 只清 Git Diff，保留已有文件 tab——否则预览/多 tab 无法成立
 			dismissGitDiffOnly();
 			// readOnly 用 allowSave=false 表达：FileDiffViewer 只在该值为真时才挂保存与自动保存，
@@ -459,6 +468,7 @@ export function useFileEditor(input: UseFileEditorInput): UseFileEditorOutput {
 	);
 
 	return {
+		showHomeOverview: page === "home" && (!configDocumentVisible || !activeTab),
 		editorMode,
 		toggleEditorMode,
 		editorTabs,
