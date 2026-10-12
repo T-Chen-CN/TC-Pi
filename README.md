@@ -5,12 +5,29 @@
 基于 [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck) 的本地二次开发版本。PiDeck 是 Electron 桌面工作台，通过 stdio JSON-RPC 管理 pi Agent，提供工作区、会话、文件与开发工具管理。
 当前维护仓库：[T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi)。应用更新从本仓库的 [Releases](https://github.com/T-Chen-CN/TC-Pi/releases) 获取。
 
+[![Version](https://img.shields.io/badge/version-0.9.1-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
+
+> **最新版本 v0.9.1**（2026-10-12）
+
+### v0.9.1 更新亮点
+- 🚀 **文件为中心的工作台**
+- 🚀 **Pi Agent 全局配置文件树**
+- 🚀 **使用总览与会话管理**
+- 🚀 **Git 提交图谱**
+- ✨ **精简 Agent 与附加功能**
+- ✨ **TC-Pi 发布与自动更新**
+- ✨ **窗口布局稳定性**
+- ✨ **文本预览与文件授权**
+
+[查看完整更新日志 →](CHANGELOG.zh-CN.md)
+
+---
 
 ## 当前功能
 
 | 板块 | 能力 |
 | --- | --- |
-| 文件工作台 | 左侧文件树；中间文件预览与编辑；文件标签页；目录、搜索、刷新与外部编辑器入口。 |
+| 文件工作台 | 左侧文件树；中间文件预览与编辑；文件标签页；目录、搜索、刷新与外部编辑器入口。主界面和独立聊天显示 Pi Agent 全局配置文件，工作区显示项目文件。 |
 | 工作区 | 添加、选择、移除工作区；Git worktree 管理；独立聊天。 |
 | 会话 | 当前工作区的会话标签页、会话选择、创建、搜索、归档、恢复、导入与导出。会话列表按创建时间倒序固定排序。 |
 | pi Agent | 模型与思考档位、流式对话、工具调用、运行与停止、计划和目标模式、提问审批、子代理与待办。 |
@@ -54,7 +71,11 @@ npm run test:e2e
 
 src/main 管理桌面能力与进程，src/preload 暴露最小 API，src/renderer 管理界面，src/shared 保存跨层契约。开发规则见根目录 AGENTS.md；精简对照和审计记录见 docs/feature-pruning-plan.txt 与 docs/feature-pruning-audit-2026-10-11.txt。
 
-应用与内置内容的更新来源仍保留上游配置，迁移到个人仓库的方案另行处理。此说明不代表已发布安装包。
+## 下载与更新
+
+从 [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest) 下载当前版本。Windows 安装版使用 `setup.exe`，便携版使用 `portable.exe` 或 `win.zip`。首次使用仍需安装并配置 pi CLI。
+
+应用与内置内容从 TC-Pi 获取更新。Windows 安装版支持应用内下载和安装更新，便携版通过 Releases 手动更新。原作者的上游安装包不包含此分支的修改。
 
 ## License
 

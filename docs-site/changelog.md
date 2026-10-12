@@ -7,8 +7,21 @@ description: PiDeck 每个版本的发布记录：新功能、问题修复与体
 
 完整更新日志仍维护在仓库根目录：
 
-- [中文 CHANGELOG](https://github.com/ayuayue/PiDeck/blob/main/CHANGELOG.zh-CN.md)
-- [English CHANGELOG](https://github.com/ayuayue/PiDeck/blob/main/CHANGELOG.md)
+- [中文 CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md)
+- [English CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md)
+
+## v0.9.1
+
+发布时间：2026-10-12
+
+- 🚀 **文件为中心的工作台**
+- 🚀 **Pi Agent 全局配置文件树**
+- 🚀 **使用总览与会话管理**
+- 🚀 **Git 提交图谱**
+- ✨ **精简 Agent 与附加功能**
+- ✨ **TC-Pi 发布与自动更新**
+- ✨ **窗口布局稳定性**
+- ✨ **文本预览与文件授权**
 
 ## v0.9.0 (2026-10-10)
 
@@ -38,7 +51,7 @@ description: PiDeck 每个版本的发布记录：新功能、问题修复与体
 - 🚀 **MCP 配置页改版**
 - 🚀 **输入框提示词增强（✦）**
 - 🚀 **重发/编辑 fork 化**
-- 🚀 **Web 端会话路由 /s/<id>**
+- 🚀 **Web 端会话路由 /s/&lt;id&gt;**
 - ✨ **WSL 项目全部会话从侧栏消失（0.7.9 回归）**
 - ✨ **mcp.json 保存加乐观锁**
 - ✨ **未信任项目的资源面板降级为引导文案**

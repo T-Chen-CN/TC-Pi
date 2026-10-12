@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: 下载最新版本
-      link: https://github.com/ayuayue/PiDeck/releases
+      link: https://github.com/T-Chen-CN/TC-Pi/releases
     - theme: alt
       text: 快速开始
       link: /guide/getting-started
@@ -20,9 +20,7 @@ hero:
       text: 源码仓库
       items:
         - text: GitHub 仓库（海外）
-          link: https://github.com/ayuayue/PiDeck
-        - text: AtomGit 仓库（国内镜像）
-          link: https://atomgit.com/ayuayue/PiDeck
+          link: https://github.com/T-Chen-CN/TC-Pi
 
 features:
   - icon: 🗂️
@@ -39,7 +37,7 @@ features:
     details: "& 会话引用快捷输入，跨会话上下文注入。消息队列在 Agent 忙碌时排队发送。会话大纲面板快速跳转。"
   - icon: 📝
     title: 文件编辑器
-    details: 多 Tab 文件编辑器，弹框/侧栏双模式，Diff 差异对比，Markdown 预览，Monaco 编辑器支持。
+    details: 中间文档区支持多标签预览、编辑与 Diff；主界面和独立聊天可浏览 Pi Agent 全局配置文件。
   - icon: 🧰
     title: 内置工具
     details: 内置浏览器（多标签/全屏/设备预设）、草稿本、外部编辑器集成、浮动快捷操作栏、内置终端。
@@ -55,7 +53,7 @@ features:
 ---
 
 ::: info
-当前为二次开发工作区，功能以 [当前功能手册](/guide/feature-reference) 为准。本页继承的下载与发布信息指向上游；上游安装包不包含本工作区的修改。
+TC-Pi v0.9.1 是此分支的首个独立发布版本，应用内品牌仍为 PiDeck。下载与更新使用 TC-Pi Releases，功能以 [当前功能手册](/guide/feature-reference) 为准。
 :::
 
 
@@ -64,7 +62,7 @@ features:
   <figcaption>工作区、会话、文件抽屉、Git 分支和工具调用集中在同一个桌面窗口中。</figcaption>
 </figure>
 
-<p class="version-badge"><a href="/changelog">v0.7.8</a> 已发布 · <a href="/guide/getting-started#下载安装">下载安装</a> · <a href="/changelog">查看更新日志</a></p>
+<p class="version-badge"><a href="/changelog">v0.9.1</a> 已发布 · <a href="/guide/getting-started#下载安装">下载安装</a> · <a href="/changelog">查看更新日志</a></p>
 
 ## 面向本地开发的桌面控制台
 

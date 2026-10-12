@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: Download Latest
-      link: https://github.com/ayuayue/PiDeck/releases
+      link: https://github.com/T-Chen-CN/TC-Pi/releases
     - theme: alt
       text: Get Started
       link: /en/guide/getting-started
@@ -20,9 +20,7 @@ hero:
       text: Source Code
       items:
         - text: GitHub (Global)
-          link: https://github.com/ayuayue/PiDeck
-        - text: AtomGit (China mirror)
-          link: https://atomgit.com/ayuayue/PiDeck
+          link: https://github.com/T-Chen-CN/TC-Pi
 
 features:
   - icon: 🗂️
@@ -55,7 +53,7 @@ features:
 ---
 
 ::: info
-This is a development fork. See the [current feature reference](/en/guide/feature-reference). Inherited release and download information refers to upstream builds, which do not include changes in this workspace.
+TC-Pi v0.9.1 is this fork's first independent release; the application retains the PiDeck brand. Downloads and updates use TC-Pi Releases. See the [current feature reference](/en/guide/feature-reference).
 :::
 
 
@@ -64,7 +62,7 @@ This is a development fork. See the [current feature reference](/en/guide/featur
   <figcaption>Workspace, sessions, file drawer, Git branches, and tool calls — all in one desktop window.</figcaption>
 </figure>
 
-<p class="version-badge"><a href="/en/changelog">v0.7.8</a> released · <a href="/en/guide/getting-started">Download & install</a> · <a href="/en/changelog">Changelog</a></p>
+<p class="version-badge"><a href="/en/changelog">v0.9.1</a> released · <a href="/en/guide/getting-started">Download & install</a> · <a href="/en/changelog">Changelog</a></p>
 
 ## Community
 

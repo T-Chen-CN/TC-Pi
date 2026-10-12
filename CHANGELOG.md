@@ -1,3 +1,21 @@
+## v0.9.1 - 2026-10-12
+
+The first independent TC-Pi release, based on PiDeck with a reduced feature set and a file-first desktop layout. The application retains the PiDeck brand.
+
+### 🚀 Features
+- **File-first workbench** — File management on the left, preview and editing in the center, and a persistent conversation pane on the right. The optional tool sidebar starts hidden.
+- **Pi Agent global configuration tree** — Home and independent chat show global settings, model configuration, rules, prompts, skills, and extension resources with preview, editing, search, and file actions. Workspaces show their own files and retain document drafts when switching.
+- **Usage overview and session management** — Home displays usage history and consumption. Sessions are scoped to the current workspace and sorted by creation time, with independent chat, selection, search, and scheduled tasks.
+- **Git commit graph** — The tool sidebar displays workspace changes, staging, commit history, branches, and file diffs.
+
+### ✨ Improvements
+- **Reduced Agent and auxiliary features** — Retains pi RPC Agents and removes the UI, backend, and compatibility code for DSH, ACP, standalone image generation, online stores and the prompt database, Feishu, pets, the vision bridge, floating windows, and Windows CUA.
+- **TC-Pi releases and automatic updates** — Installers, update metadata, and release notes use the public T-Chen-CN/TC-Pi repository. Windows installed builds update through NSIS; portable builds can be downloaded manually.
+
+### 🐛 Fixes
+- **Stable window layout** — Workspace switching preserves tool visibility. Resizing tools consumes document width before reducing conversation width within its limits; the left sidebar only responds to its own resize control.
+- **Text previews and file authorization** — Corrects rendering for JSON, gitignore, and other text files, and adds directory boundaries, canonical-path validation, and authentication-file protection for global configuration access.
+
 ## v0.9.0 (2026-10-10)
 
 This is a major feature update: PiDeck expands beyond the pi / DSH workbench with ACP tools and an independent host-plugin system, alongside upgrades to remote access, the terminal and native session management.

@@ -1,6 +1,6 @@
 # PiDeck
 
-[English](README.en.md)
+[English](/en/guide/feature-reference)
 
 基于 [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck) 的本地二次开发版本。PiDeck 是 Electron 桌面工作台，通过 stdio JSON-RPC 管理 pi Agent，提供工作区、会话、文件与开发工具管理。
 

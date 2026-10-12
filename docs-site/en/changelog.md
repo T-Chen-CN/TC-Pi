@@ -7,12 +7,12 @@ description: "Release notes for every PiDeck version: new features, fixes, and i
 
 The full changelog is maintained in the project repository:
 
-- [English CHANGELOG](https://github.com/ayuayue/PiDeck/blob/main/CHANGELOG.md)
-- [中文更新日志](https://github.com/ayuayue/PiDeck/blob/main/CHANGELOG.zh-CN.md)
+- [English CHANGELOG](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md)
+- [中文更新日志](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.zh-CN.md)
 
 ## Latest Release
 
-See the [GitHub Releases](https://github.com/ayuayue/PiDeck/releases) page for the latest version and download links.
+See the [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest) page for the latest version and download links. Version 0.9.1 is this fork's first independent release; the application retains the PiDeck brand. Read the full [v0.9.1 notes](https://github.com/T-Chen-CN/TC-Pi/blob/main/CHANGELOG.md) for the file-first layout, Pi Agent configuration tree, scoped sessions, and removed features.
 
 ## v0.6.7 (highlights)
 

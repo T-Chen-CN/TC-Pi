@@ -52,12 +52,11 @@ export default defineConfig({
             ],
           },
           { text: "更新日志", link: "/changelog" },
-          { text: "下载", link: "https://github.com/ayuayue/PiDeck/releases" },
+          { text: "下载", link: "https://github.com/T-Chen-CN/TC-Pi/releases" },
           {
             text: "源码",
             items: [
-              { text: "GitHub 仓库（海外）", link: "https://github.com/ayuayue/PiDeck" },
-              { text: "AtomGit 仓库（国内镜像）", link: "https://atomgit.com/ayuayue/PiDeck" },
+              { text: "GitHub 仓库（海外）", link: "https://github.com/T-Chen-CN/TC-Pi" },
             ],
           },
         ],
@@ -90,7 +89,7 @@ export default defineConfig({
           formatOptions: { dateStyle: "medium", timeStyle: "short" },
         },
         editLink: {
-          pattern: "https://github.com/ayuayue/PiDeck/edit/main/docs-site/:path",
+          pattern: "https://github.com/T-Chen-CN/TC-Pi/edit/main/docs-site/:path",
           text: "在 GitHub 上编辑此页",
         },
         footer: {
@@ -127,12 +126,11 @@ export default defineConfig({
             ],
           },
           { text: "Changelog", link: "/en/changelog" },
-          { text: "Download", link: "https://github.com/ayuayue/PiDeck/releases" },
+          { text: "Download", link: "https://github.com/T-Chen-CN/TC-Pi/releases" },
           {
             text: "Source",
             items: [
-              { text: "GitHub (Global)", link: "https://github.com/ayuayue/PiDeck" },
-              { text: "AtomGit (China mirror)", link: "https://atomgit.com/ayuayue/PiDeck" },
+              { text: "GitHub (Global)", link: "https://github.com/T-Chen-CN/TC-Pi" },
             ],
           },
         ],
@@ -164,7 +162,7 @@ export default defineConfig({
           formatOptions: { dateStyle: "medium", timeStyle: "short" },
         },
         editLink: {
-          pattern: "https://github.com/ayuayue/PiDeck/edit/main/docs-site/:path",
+          pattern: "https://github.com/T-Chen-CN/TC-Pi/edit/main/docs-site/:path",
           text: "Edit this page on GitHub",
         },
         footer: {
@@ -179,10 +177,9 @@ export default defineConfig({
   themeConfig: {
     logo: "/icon.svg",
     siteTitle: "PiDeck",
-    // 只保留内置图标（github）；AtomGit 无内置图标，作为「源码」下拉项出现在导航中，
-    // 避免 socialLinks 里出现 no-icon 空白图标位。
+    // 当前维护与下载入口统一指向 TC-Pi，原作者署名保留在版权信息中。
     socialLinks: [
-      { icon: "github", link: "https://github.com/ayuayue/PiDeck", ariaLabel: "GitHub 仓库" },
+      { icon: "github", link: "https://github.com/T-Chen-CN/TC-Pi", ariaLabel: "GitHub 仓库" },
     ],
     search: {
       provider: "local",
@@ -260,11 +257,10 @@ export default defineConfig({
         "operatingSystem": "Windows, macOS, Linux",
         "description": "Open-source desktop workbench for managing multiple pi AI coding agents across local project folders.",
         "url": siteOrigin,
-        "downloadUrl": "https://github.com/ayuayue/PiDeck/releases",
-        "sourceCodeRepository": "https://github.com/ayuayue/PiDeck",
+        "downloadUrl": "https://github.com/T-Chen-CN/TC-Pi/releases",
+        "sourceCodeRepository": "https://github.com/T-Chen-CN/TC-Pi",
         "sameAs": [
-          "https://github.com/ayuayue/PiDeck",
-          "https://atomgit.com/ayuayue/PiDeck"
+          "https://github.com/T-Chen-CN/TC-Pi",
         ],
         "license": "https://opensource.org/licenses/MIT",
         "author": {

@@ -5,12 +5,29 @@
 This local development fork is based on [ayuayue/PiDeck](https://github.com/ayuayue/PiDeck). PiDeck is an Electron workbench that manages pi Agents through stdio JSON-RPC and provides workspace, session, file, and development tool management.
 Maintained at [T-Chen-CN/TC-Pi](https://github.com/T-Chen-CN/TC-Pi). Application updates use this repository’s [Releases](https://github.com/T-Chen-CN/TC-Pi/releases).
 
+[![Version](https://img.shields.io/badge/version-0.9.1-blue)](https://github.com/T-Chen-CN/TC-Pi/releases/latest)
+
+> **Latest: v0.9.1** (2026-10-12)
+
+### v0.9.1 Release Highlights
+- 🚀 **File-first workbench**
+- 🚀 **Pi Agent global configuration tree**
+- 🚀 **Usage overview and session management**
+- 🚀 **Git commit graph**
+- ✨ **Reduced Agent and auxiliary features**
+- ✨ **TC-Pi releases and automatic updates**
+- ✨ **Stable window layout**
+- ✨ **Text previews and file authorization**
+
+[View Full Changelog →](CHANGELOG.md)
+
+---
 
 ## Current features
 
 | Area | Capabilities |
 | --- | --- |
-| File workbench | Left file tree; central preview and editing; file tabs; directory selection, search, refresh, and external editor integration. |
+| File workbench | Left file tree; central preview and editing; file tabs; directory selection, search, refresh, and external editor integration. Home and independent chat show Pi Agent global configuration; workspaces show project files. |
 | Workspaces | Add, select, and remove workspaces; Git worktrees; independent chat. |
 | Sessions | Tabs and selection scoped to the current workspace; creation, search, archive, restore, import, and export. Lists use fixed descending creation order. |
 | pi Agent | Models and thinking levels, streaming conversations, tool calls, run/stop, plan and goal modes, questions and approvals, subagents and todos. |
@@ -54,7 +71,11 @@ Use targeted tests during development and full regression for cross-domain chang
 
 src/main owns desktop capabilities and processes, src/preload exposes the minimal API, src/renderer owns UI, and src/shared contains cross-layer contracts. See root AGENTS.md for development rules and docs/feature-pruning-plan.txt / docs/feature-pruning-audit-2026-10-11.txt for pruning records.
 
-App and built-in content update sources still use upstream configuration. Migration to a personal repository will be handled separately. This document does not announce a published installer.
+## Downloads and updates
+
+Download the current version from [TC-Pi Releases](https://github.com/T-Chen-CN/TC-Pi/releases/latest). On Windows, use `setup.exe` for installation or `portable.exe` / `win.zip` for portable use. Install and configure pi CLI separately before use.
+
+Application and built-in content updates come from TC-Pi. Installed Windows builds support in-app update downloads and installation; portable builds are updated manually through Releases. Upstream installers do not contain this fork's changes.
 
 ## License
 
